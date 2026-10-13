@@ -124,9 +124,10 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
   /// @dev WARNING: Setting to address(0) disables forwarder validation.
   ///      This makes your contract INSECURE - anyone can call onReport() with arbitrary data.
   ///      Only use address(0) if you fully understand the security implications.
+  ///      clim: `public` instead of upstream's `external`, so RiskDeskV2.disableSim() can set it in the same call.
   function setForwarderAddress(
     address _forwarder
-  ) external onlyOwner {
+  ) public onlyOwner {
     address previousForwarder = s_forwarderAddress;
 
     // Emit warning if disabling forwarder check

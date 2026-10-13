@@ -15,6 +15,7 @@ interface IRiskDeskV2 {
     /// @param dispBp Venue dispersion in basis points.
     /// @param nSources Venues that passed the freshness filter.
     /// @param kE4 Model-risk multiplier applied, times 1e4 (clamped to [10_000, 20_000]).
+    /// @param flags State flags after this report (bit 0: degraded, the venues disagree beyond DISP_MAX_BP).
     event RiskReportedV2(
         uint32 indexed seq,
         uint40 tObs,
@@ -25,20 +26,13 @@ interface IRiskDeskV2 {
         int32 devPips,
         uint16 dispBp,
         uint8 nSources,
-        uint16 kE4
+        uint16 kE4,
+        uint8 flags
     );
 
     /// @notice Latest accepted state, packed in one storage slot.
     function state()
         external
         view
-        returns (
-            uint40 tObs,
-            uint32 sigma15E9,
-            uint32 sigma5E9,
-            int32 devPips,
-            uint16 kE4,
-            uint8 flags,
-            uint32 seq
-        );
+        returns (uint40 tObs, uint32 sigma15E9, uint32 sigma5E9, int32 devPips, uint16 kE4, uint8 flags, uint32 seq);
 }
