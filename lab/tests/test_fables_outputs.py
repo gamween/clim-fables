@@ -49,3 +49,18 @@ def test_direction_output():
         assert rule["slopeE4"] > 0 and 0 < rule["maxPremiumPips"] <= 3_000
     else:
         assert rule["slopeE4"] == 0 and rule["maxPremiumPips"] == 0
+
+
+def test_params_fables():
+    p = SHARED_DIR / "params-fables.json"
+    if not p.exists():
+        pytest.skip("params-fables.json not generated yet")
+    d = json.loads(p.read_text())
+    assert d["feeFloorPips"] == 700 and d["feeCapPips"] == 6_000
+    assert d["feeFloorPips"] <= d["feeSafePips"] <= d["feeCapPips"]
+    assert d["sigmaWindowSec"] in (300, 900)
+    assert d["etaE4"] > 0 and d["sqrtHalfDtE6"] > 0
+    assert 0 < d["pStar"] < 1
+    assert d["pokeTtlSec"] == 600 and d["tauKillSec"] == 180
+    assert d["targetPoolId"] == "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551"
+    assert d["decidedBy"] == "lab/scripts/decide_fables_params.py"

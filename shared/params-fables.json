@@ -1,0 +1,24 @@
+{
+  "targetChainId": 4663,
+  "targetPoolId": "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551",
+  "dtEffSec": 1.4480277,
+  "sqrtHalfDtE6": 850890,
+  "sigmaWindowSec": 300,
+  "etaE4": 175198,
+  "pStar": 0.053996263,
+  "feeFloorPips": 700,
+  "feeCapPips": 6000,
+  "feeSafePips": 3000,
+  "tauKillSec": 180,
+  "dirEnabled": true,
+  "dirSlopeE4": 2753,
+  "dirMaxPremiumPips": 567,
+  "pokeTtlSec": 600,
+  "decidedBy": "lab/scripts/decide_fables_params.py",
+  "sources": [
+    "lab/out/fables-dt-eff.json",
+    "lab/out/fables-window.json",
+    "lab/out/fables-direction.json"
+  ],
+  "generatedAt": "2026-10-13T21:10:27Z"
+}
