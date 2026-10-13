@@ -10,6 +10,13 @@ for artifact in \
   RiskDesk.sol/RiskDesk \
   IRiskDesk.sol/IRiskDesk \
   ClimHook.sol/ClimHook \
+  RiskDeskV2.sol/RiskDeskV2 \
+  IRiskDeskV2.sol/IRiskDeskV2 \
+  ClimFeePolicy.sol/ClimFeePolicy \
+  ClimPoker.sol/ClimPoker \
+  PokeFeeHook.sol/PokeFeeHook \
+  IOverrideFeeHook.sol/ISymmetricPokeHook \
+  IOverrideFeeHook.sol/IDirectionalPokeHook \
   TestToken.sol/TestToken \
   IPoolManager.sol/IPoolManager \
   IStateView.sol/IStateView \
