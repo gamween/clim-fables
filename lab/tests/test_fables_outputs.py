@@ -35,3 +35,17 @@ def test_window_output():
         assert w["meanFeeBp"] == pytest.approx(d["keeper"]["meanFeeBp"], rel=0.01)
     assert d["chosenWindowSec"] in (300, 900)
     assert "flat7" in d["arbVsKeeperPct"]
+
+
+def test_direction_output():
+    d = _load("fables-direction.json")
+    for key in ("instant", "desk"):
+        rows = d["signals"][key]["buckets"]
+        assert len(rows) == 8
+        assert sum(r["n"] for r in rows) == d["swapsUsed"]
+    rule = d["rule"]
+    assert isinstance(rule["enabled"], bool)
+    if rule["enabled"]:
+        assert rule["slopeE4"] > 0 and 0 < rule["maxPremiumPips"] <= 3_000
+    else:
+        assert rule["slopeE4"] == 0 and rule["maxPremiumPips"] == 0

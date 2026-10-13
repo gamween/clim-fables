@@ -1,0 +1,210 @@
+{
+  "generatedAt": "2026-10-13T21:10:05Z",
+  "swapsUsed": 442820,
+  "horizonsSec": [
+    5,
+    30,
+    300
+  ],
+  "signals": {
+    "instant": {
+      "buckets": [
+        {
+          "loBp": null,
+          "hiBp": -10.0,
+          "n": 6358,
+          "notionalUsd": 5727311.1,
+          "markoutBp": {
+            "5": -34.216869,
+            "30": -34.826049,
+            "300": -33.238463
+          }
+        },
+        {
+          "loBp": -10.0,
+          "hiBp": -5.0,
+          "n": 21489,
+          "notionalUsd": 15732631.0,
+          "markoutBp": {
+            "5": -13.764848,
+            "30": -13.251284,
+            "300": -12.263304
+          }
+        },
+        {
+          "loBp": -5.0,
+          "hiBp": -2.0,
+          "n": 20906,
+          "notionalUsd": 15614924.0,
+          "markoutBp": {
+            "5": -10.438538,
+            "30": -9.4043858,
+            "300": -9.3581214
+          }
+        },
+        {
+          "loBp": -2.0,
+          "hiBp": 0.0,
+          "n": 15901,
+          "notionalUsd": 16764133.0,
+          "markoutBp": {
+            "5": -6.1125365,
+            "30": -5.0358887,
+            "300": -4.2534646
+          }
+        },
+        {
+          "loBp": 0.0,
+          "hiBp": 2.0,
+          "n": 19029,
+          "notionalUsd": 27126345.0,
+          "markoutBp": {
+            "5": -3.8154824,
+            "30": -3.2838931,
+            "300": -1.6895377
+          }
+        },
+        {
+          "loBp": 2.0,
+          "hiBp": 5.0,
+          "n": 47848,
+          "notionalUsd": 145414950.0,
+          "markoutBp": {
+            "5": -0.57285815,
+            "30": -0.59312035,
+            "300": 0.17861756
+          }
+        },
+        {
+          "loBp": 5.0,
+          "hiBp": 10.0,
+          "n": 232365,
+          "notionalUsd": 1125553500.0,
+          "markoutBp": {
+            "5": 0.84526638,
+            "30": 0.853943,
+            "300": 0.98362705
+          }
+        },
+        {
+          "loBp": 10.0,
+          "hiBp": null,
+          "n": 78924,
+          "notionalUsd": 515130470.0,
+          "markoutBp": {
+            "5": 3.8207775,
+            "30": 3.1818462,
+            "300": 2.3302453
+          }
+        }
+      ],
+      "corrMarkout30": 0.10204412
+    },
+    "desk": {
+      "buckets": [
+        {
+          "loBp": null,
+          "hiBp": -10.0,
+          "n": 6628,
+          "notionalUsd": 6320997.2,
+          "markoutBp": {
+            "5": -23.873851,
+            "30": -22.128742,
+            "300": -32.033029
+          }
+        },
+        {
+          "loBp": -10.0,
+          "hiBp": -5.0,
+          "n": 22792,
+          "notionalUsd": 29991803.0,
+          "markoutBp": {
+            "5": -5.4081629,
+            "30": -5.4259945,
+            "300": -3.8772119
+          }
+        },
+        {
+          "loBp": -5.0,
+          "hiBp": -2.0,
+          "n": 23338,
+          "notionalUsd": 35001747.0,
+          "markoutBp": {
+            "5": -3.0446446,
+            "30": -3.984858,
+            "300": -2.2451329
+          }
+        },
+        {
+          "loBp": -2.0,
+          "hiBp": 0.0,
+          "n": 19433,
+          "notionalUsd": 41883517.0,
+          "markoutBp": {
+            "5": -2.4482909,
+            "30": -1.4674987,
+            "300": -1.5710913
+          }
+        },
+        {
+          "loBp": 0.0,
+          "hiBp": 2.0,
+          "n": 26335,
+          "notionalUsd": 79812610.0,
+          "markoutBp": {
+            "5": -0.6656807,
+            "30": -0.97944208,
+            "300": -0.56890092
+          }
+        },
+        {
+          "loBp": 2.0,
+          "hiBp": 5.0,
+          "n": 73734,
+          "notionalUsd": 314854110.0,
+          "markoutBp": {
+            "5": 0.72884479,
+            "30": 1.0358626,
+            "300": 0.63149943
+          }
+        },
+        {
+          "loBp": 5.0,
+          "hiBp": 10.0,
+          "n": 203858,
+          "notionalUsd": 969405350.0,
+          "markoutBp": {
+            "5": 1.0602149,
+            "30": 1.1049034,
+            "300": 1.0982881
+          }
+        },
+        {
+          "loBp": 10.0,
+          "hiBp": null,
+          "n": 66702,
+          "notionalUsd": 389794130.0,
+          "markoutBp": {
+            "5": 3.5220717,
+            "30": 2.4889205,
+            "300": 2.3908914
+          }
+        }
+      ],
+      "corrMarkout30": 0.095361669
+    }
+  },
+  "rule": {
+    "enabled": true,
+    "slopeE4": 2753,
+    "maxPremiumPips": 567,
+    "fitOn": "desk signal (30 s reports, 2 s latency), markout at 30 s (trader edge after fee), notional-weighted",
+    "topBucket": {
+      "minSignalBp": 10.0,
+      "swaps": 66702,
+      "excessBp": 2.4889205
+    },
+    "gate": "enabled if >= 200 swaps in the top bucket, markout at 30 s (trader edge after fee) >= 1.0 bp and slope > 0",
+    "meaning": "premium on the side the gap points to = slopeE4 * |gap in pips| / 1e4, capped at maxPremiumPips"
+  }
+}
