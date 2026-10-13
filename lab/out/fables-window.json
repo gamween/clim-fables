@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-10-13T21:09:47Z",
+  "dtEffSec": 1.4480277,
+  "keeper": {
+    "meanFeeBp": 10.383346,
+    "medianFeeBp": 7.0
+  },
+  "windows": {
+    "300": {
+      "etaE4": 175198,
+      "meanFeeBp": 10.383346,
+      "corrKeeper": {
+        "pearson": 0.83313189,
+        "spearman": 0.53647127
+      },
+      "sharePctAtFloor": 41.657672,
+      "sharePctAtCap": 0.20634921
+    },
+    "900": {
+      "etaE4": 172708,
+      "meanFeeBp": 10.383346,
+      "corrKeeper": {
+        "pearson": 0.81080313,
+        "spearman": 0.49398771
+      },
+      "sharePctAtFloor": 37.717196,
+      "sharePctAtCap": 0.1875
+    }
+  },
+  "arbVsKeeperPct": {
+    "300": -4.3837777,
+    "900": -2.8571314,
+    "flat7": 63.733182
+  },
+  "chosenWindowSec": 300,
+  "rule": "lower arbitrage loss at equal average fee; within 1 point, higher Pearson correlation with the keeper",
+  "caveats": [
+    "1 s grid: the simulator cannot see sub-second races; it ranks policies, it does not predict dollars",
+    "the keeper's path is replayed as posted; clim's fee follows reports every 30 s with 2 s latency"
+  ]
+}

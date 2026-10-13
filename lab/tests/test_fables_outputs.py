@@ -23,3 +23,15 @@ def test_dt_eff_output():
     assert d["holdout"]["fitWeeks"] == [0, 1, 2] and d["holdout"]["testWeeks"] == [3, 4]
     assert d["holdout"]["predictedOverObserved"] > 0
     assert d["delay"]["meanSec"] >= 0
+
+
+def test_window_output():
+    d = _load("fables-window.json")
+    assert set(d["windows"]) == {"300", "900"}
+    for k in ("300", "900"):
+        w = d["windows"][k]
+        assert w["etaE4"] > 0
+        assert -1 <= w["corrKeeper"]["pearson"] <= 1 and -1 <= w["corrKeeper"]["spearman"] <= 1
+        assert w["meanFeeBp"] == pytest.approx(d["keeper"]["meanFeeBp"], rel=0.01)
+    assert d["chosenWindowSec"] in (300, 900)
+    assert "flat7" in d["arbVsKeeperPct"]
