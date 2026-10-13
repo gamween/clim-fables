@@ -48,3 +48,4 @@ shared/deployments/anvil.json
 
 # Vercel CLI link (deploys from the repo root, Root Directory app/)
 .vercel
+.local/
