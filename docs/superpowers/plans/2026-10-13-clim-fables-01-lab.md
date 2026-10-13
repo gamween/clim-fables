@@ -1472,7 +1472,9 @@ def load_window() -> Window:
     t = clock.time_of(swaps.block)
     keep = (t >= START) & (t < END)
     swaps, t = swaps.select(keep), t[keep]
-    b1s = venue.load_b1s_days(_days(START - 3_600, END + 600), RAW)
+    # day files cover whole days; keep the span the USDT-USD minutes cover (fetched from START - 3,600, so the
+    # first minute closes at START - 3,540) up to END + 600 (markouts look 300 s ahead)
+    b1s = venue.load_b1s_days(_days(START - 3_600, END + 600), RAW).slice(START - 3_540, END + 600)
     usd = venue.usd_log_series(b1s, load_1m_pairs_json(RAW / "usdtusd_1m.json"))
     pokes = [fb.decode_feepoked(r) for r in json.loads((RAW / "feepoked.json").read_text())]
     configs = [fb.decode_poolconfigured(r) for r in json.loads((RAW / "poolconfigured.json").read_text())]
