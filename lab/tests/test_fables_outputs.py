@@ -23,6 +23,14 @@ def test_dt_eff_output():
     assert d["holdout"]["fitWeeks"] == [0, 1, 2] and d["holdout"]["testWeeks"] == [3, 4]
     assert d["holdout"]["predictedOverObserved"] > 0
     assert d["delay"]["meanSec"] >= 0
+    assert "all weeks" in d["hourly"]["scope"] and "fit weeks" in d["chosen"]["scope"]
+    sens = d["sensitivity"]
+    assert set(sens["zShiftBp"]) == {"-1", "+1"}
+    for v in list(sens["zShiftBp"].values()) + [sens["eventPerSecondSide"]]:
+        assert len(v["weeklyDtSecPoisson"]) == 5
+        assert v["dtSecFitWeeks"] > 0 and v["predictedOverObserved"] > 0 and -1 <= v["hourlyCorr"] <= 1
+    assert any("Jensen" in c for c in d["caveats"])
+    assert d["framing"].startswith("dt_eff is of order") and "<" not in d["framing"]
 
 
 def test_window_output():

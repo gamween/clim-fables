@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-13T21:08:14Z",
+  "generatedAt": "2026-10-13T21:25:59Z",
   "window": {
     "start": "2026-09-07T00:00:00Z",
     "end": "2026-10-12T00:00:00Z"
@@ -16,6 +16,7 @@
     "hoursKept": "hours with at least 5 events and a rate the model can produce"
   },
   "hourly": {
+    "scope": "all weeks (0 to 4); the chosen dt uses the fit weeks only",
     "hours": 799,
     "medianDtSecPoisson": 2.5251591,
     "iqrDtSecPoisson": [
@@ -87,6 +88,60 @@
   },
   "chosen": {
     "dtEffSec": 1.4480277,
+    "scope": "fit weeks (0 to 2)",
+    "fitHours": 499,
     "rule": "median hourly frequency inversion, Poisson (c = 1), fit weeks only"
-  }
+  },
+  "sensitivity": {
+    "zShiftBp": {
+      "-1": {
+        "arbEvents": 108641,
+        "dtSecFitWeeks": 1.3251273,
+        "weeklyDtSecPoisson": [
+          1.4220224,
+          1.4248523,
+          1.1951073,
+          3.2275683,
+          4.4589446
+        ],
+        "predictedOverObserved": 1.3338156,
+        "hourlyCorr": 0.28777581
+      },
+      "+1": {
+        "arbEvents": 115069,
+        "dtSecFitWeeks": 1.2092474,
+        "weeklyDtSecPoisson": [
+          1.21986,
+          1.2438274,
+          1.1145717,
+          3.2991207,
+          3.2648646
+        ],
+        "predictedOverObserved": 1.3382618,
+        "hourlyCorr": 0.29003049
+      }
+    },
+    "zShiftNote": "reference price moved by the given bp before classifying arbitrages (z +- 1e-4); same hours, sigma and band",
+    "eventPerSecondSide": {
+      "arbEvents": 66503,
+      "dtSecFitWeeks": 2.5752401,
+      "weeklyDtSecPoisson": [
+        1.784723,
+        2.4596369,
+        4.3661193,
+        21.223194,
+        31.269958
+      ],
+      "predictedOverObserved": 2.3236587,
+      "hourlyCorr": 0.025638464
+    },
+    "eventPerSecondSideNote": "one event per (second, side) instead of per (block, side)"
+  },
+  "caveats": [
+    "the per-hour estimate is very sensitive to the band: a 1 bp shift in the reference price, either way, changes the late weeks several-fold (sensitivity.zShiftBp)",
+    "the rate model did not hold out: the fit-week dt over-predicts the test weeks' arbitrage counts (holdout)",
+    "Jensen effect: the band enters the non-linear rate model as an hourly time average, so an hour mixing floor and storm fees is not equivalent to its average band",
+    "the delay method is a lower bound (whole-second timestamps, arbitrages seen only if the venue is still outside the band)"
+  ],
+  "framing": "dt_eff is of order 1 to 3 s; the per-hour estimate is very sensitive to the band (a 1 bp shift in the reference price moves weeks 4-5 from ~13 s to ~3-4.5 s). clim's posted fee does not depend on dt: eta is calibrated at equal average fee, so only eta*sqrt(dt/2) matters."
 }
