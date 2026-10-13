@@ -65,12 +65,25 @@ def test_direction_output():
         rows = d["signals"][key]["buckets"]
         assert len(rows) == 8
         assert sum(r["n"] for r in rows) == d["swapsUsed"]
+    dec = d["signals"]["desk"]["decomposition30"]
+    assert len(dec["buckets"]) == 8
+    for r in dec["buckets"]:
+        if r["n"]:
+            assert r["markout30Bp"] == pytest.approx(r["gapCaptureBp"] + r["laterMoveBp"] - r["costBp"], abs=1e-6)
+    assert -1 <= dec["corrSignalGap"] <= 1 and -1 <= dec["corrSignalLaterMove"] <= 1
     rule = d["rule"]
     assert isinstance(rule["enabled"], bool)
     if rule["enabled"]:
         assert rule["slopeE4"] > 0 and 0 < rule["maxPremiumPips"] <= 3_000
     else:
         assert rule["slopeE4"] == 0 and rule["maxPremiumPips"] == 0
+    assert len(rule["weekly"]) == 5
+    assert rule["stableWeeks"] == sum(r["passesGate"] for r in rule["weekly"])
+    if not rule["enabled"]:
+        assert rule["status"] == "disabled"
+    else:
+        assert rule["status"] == ("stable" if rule["stableWeeks"] >= 4 else "experimental")
+    assert d["framing"].startswith("Trades toward the venue") and "<" not in d["framing"]
 
 
 def test_params_fables():

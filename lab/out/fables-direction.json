@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-13T21:10:05Z",
+  "generatedAt": "2026-10-13T21:27:46Z",
   "swapsUsed": 442820,
   "horizonsSec": [
     5,
@@ -191,11 +191,92 @@
           }
         }
       ],
-      "corrMarkout30": 0.095361669
+      "corrMarkout30": 0.095361669,
+      "decomposition30": {
+        "buckets": [
+          {
+            "loBp": null,
+            "hiBp": -10.0,
+            "n": 6628,
+            "markout30Bp": -22.128742,
+            "gapCaptureBp": -6.8746011,
+            "laterMoveBp": 3.1502155,
+            "costBp": 18.404356
+          },
+          {
+            "loBp": -10.0,
+            "hiBp": -5.0,
+            "n": 22792,
+            "markout30Bp": -5.4259945,
+            "gapCaptureBp": 2.0459364,
+            "laterMoveBp": 1.8593509,
+            "costBp": 9.3312817
+          },
+          {
+            "loBp": -5.0,
+            "hiBp": -2.0,
+            "n": 23338,
+            "markout30Bp": -3.984858,
+            "gapCaptureBp": 3.6502913,
+            "laterMoveBp": 0.61557077,
+            "costBp": 8.25072
+          },
+          {
+            "loBp": -2.0,
+            "hiBp": 0.0,
+            "n": 19433,
+            "markout30Bp": -1.4674987,
+            "gapCaptureBp": 4.5672813,
+            "laterMoveBp": 2.4082512,
+            "costBp": 8.4430312
+          },
+          {
+            "loBp": 0.0,
+            "hiBp": 2.0,
+            "n": 26335,
+            "markout30Bp": -0.97944208,
+            "gapCaptureBp": 5.4819382,
+            "laterMoveBp": 1.7363921,
+            "costBp": 8.1977724
+          },
+          {
+            "loBp": 2.0,
+            "hiBp": 5.0,
+            "n": 73734,
+            "markout30Bp": 1.0358626,
+            "gapCaptureBp": 6.7840781,
+            "laterMoveBp": 2.1878662,
+            "costBp": 7.9360817
+          },
+          {
+            "loBp": 5.0,
+            "hiBp": 10.0,
+            "n": 203858,
+            "markout30Bp": 1.1049034,
+            "gapCaptureBp": 7.4550327,
+            "laterMoveBp": 1.639941,
+            "costBp": 7.9900702
+          },
+          {
+            "loBp": 10.0,
+            "hiBp": null,
+            "n": 66702,
+            "markout30Bp": 2.4889205,
+            "gapCaptureBp": 24.392659,
+            "laterMoveBp": 1.169389,
+            "costBp": 23.073128
+          }
+        ],
+        "corrSignalGap": 0.9288098,
+        "corrSignalLaterMove": 0.040871595,
+        "note": "notional-weighted means per desk-signal bucket; markout30 = gapCapture + laterMove - cost; gapCapture = side * (venue at t-1 - pool before), laterMove = side * (venue at t+29 - venue at t-1), cost = the rest (fee and price impact)"
+      }
     }
   },
   "rule": {
     "enabled": true,
+    "status": "experimental",
+    "stableWeeks": 3,
     "slopeE4": 2753,
     "maxPremiumPips": 567,
     "fitOn": "desk signal (30 s reports, 2 s latency), markout at 30 s (trader edge after fee), notional-weighted",
@@ -204,7 +285,46 @@
       "swaps": 66702,
       "excessBp": 2.4889205
     },
+    "weekly": [
+      {
+        "week": 0,
+        "weekStart": "2026-09-07T00:00:00Z",
+        "topSwaps": 9776,
+        "topExcessBp": 8.0283082,
+        "passesGate": true
+      },
+      {
+        "week": 1,
+        "weekStart": "2026-09-14T00:00:00Z",
+        "topSwaps": 14901,
+        "topExcessBp": 1.2876311,
+        "passesGate": true
+      },
+      {
+        "week": 2,
+        "weekStart": "2026-09-21T00:00:00Z",
+        "topSwaps": 15919,
+        "topExcessBp": 0.56873675,
+        "passesGate": false
+      },
+      {
+        "week": 3,
+        "weekStart": "2026-09-28T00:00:00Z",
+        "topSwaps": 15120,
+        "topExcessBp": 0.28360031,
+        "passesGate": false
+      },
+      {
+        "week": 4,
+        "weekStart": "2026-10-05T00:00:00Z",
+        "topSwaps": 10986,
+        "topExcessBp": 6.4315457,
+        "passesGate": true
+      }
+    ],
     "gate": "enabled if >= 200 swaps in the top bucket, markout at 30 s (trader edge after fee) >= 1.0 bp and slope > 0",
+    "statusRule": "disabled if the pooled gate fails; stable if the top bucket also passes it (>= 200 swaps, >= 1.0 bp) in at least 4 of the 5 weeks; experimental otherwise",
     "meaning": "premium on the side the gap points to = slopeE4 * |gap in pips| / 1e4, capped at maxPremiumPips"
-  }
+  },
+  "framing": "Trades toward the venue capture the stale pool's gap (signal correlates 0.93 with the pre-trade gap and 0.04 with the later move); the premium rule clears its gate on the five weeks pooled but in only 3 of 5 weeks; measured, experimental, not deployed on ETH/USDG (its hook is symmetric)."
 }
