@@ -28,3 +28,7 @@ anvil = "http://127.0.0.1:8545"
 
 [lint]
 lint_on_build = false
+
+[fmt]
+# vendored code (Chainlink cre-templates) and fixtures keep their upstream formatting
+ignore = ["src/receiver/*.sol", "test/fixtures/**"]
