@@ -1,0 +1,92 @@
+{
+  "generatedAt": "2026-10-13T21:08:14Z",
+  "window": {
+    "start": "2026-09-07T00:00:00Z",
+    "end": "2026-10-12T00:00:00Z"
+  },
+  "pool": "Fables ETH/USDG, Robinhood Chain (4663)",
+  "swaps": 442823,
+  "arbSwaps": 117927,
+  "arbEvents": 95181,
+  "method": {
+    "arbitrage": "swap toward the venue USD price from outside the band -ln(1 - fee); one event per block and side",
+    "sigma": "venue realized volatility per hour from 5 s returns (Binance ETHUSDT 1 s x Coinbase USDT-USD)",
+    "band": "Fables' resolved fee per second (FeePoked, PoolConfigured), time-averaged per hour",
+    "model": "events/s = 1 / (dt (eta + c)), eta = gamma / (sigma sqrt(dt/2)); c = 1 Poisson, 0.824 fixed",
+    "hoursKept": "hours with at least 5 events and a rate the model can produce"
+  },
+  "hourly": {
+    "hours": 799,
+    "medianDtSecPoisson": 2.5251591,
+    "iqrDtSecPoisson": [
+      0.98212337,
+      11.604678
+    ],
+    "medianDtSecFixed": 2.6061113
+  },
+  "weekly": [
+    {
+      "weekStart": "2026-09-07T00:00:00Z",
+      "hours": 167,
+      "arbEvents": 26696,
+      "dtSecPoisson": 1.2078871,
+      "dtSecFixed": 1.2284218
+    },
+    {
+      "weekStart": "2026-09-14T00:00:00Z",
+      "hours": 168,
+      "arbEvents": 28565,
+      "dtSecPoisson": 1.2788257,
+      "dtSecFixed": 1.3053539
+    },
+    {
+      "weekStart": "2026-09-21T00:00:00Z",
+      "hours": 164,
+      "arbEvents": 21186,
+      "dtSecPoisson": 1.9872949,
+      "dtSecFixed": 2.0321723
+    },
+    {
+      "weekStart": "2026-09-28T00:00:00Z",
+      "hours": 146,
+      "arbEvents": 8757,
+      "dtSecPoisson": 12.152125,
+      "dtSecFixed": 12.628973
+    },
+    {
+      "weekStart": "2026-10-05T00:00:00Z",
+      "hours": 154,
+      "arbEvents": 9916,
+      "dtSecPoisson": 14.572219,
+      "dtSecFixed": 15.430188
+    }
+  ],
+  "delay": {
+    "events": 95181,
+    "meanSec": 2.3654931,
+    "medianSec": 1.0,
+    "dtSecPoisson": 2.3654931,
+    "dtSecFixed": 4.7309862,
+    "note": "lower bound: an arbitrage is only seen if the venue is still outside the band when it lands, and timestamps are whole seconds"
+  },
+  "holdout": {
+    "fitWeeks": [
+      0,
+      1,
+      2
+    ],
+    "testWeeks": [
+      3,
+      4
+    ],
+    "dtSec": 1.4480277,
+    "predictedEvents": 37640.257,
+    "observedEvents": 18673,
+    "predictedOverObserved": 2.0157584,
+    "hourlyCorr": 0.089534451
+  },
+  "chosen": {
+    "dtEffSec": 1.4480277,
+    "rule": "median hourly frequency inversion, Poisson (c = 1), fit weeks only"
+  }
+}
