@@ -36,5 +36,6 @@ def calibrate_eta(sigma, dt_sec: float, floor_pips: int, cap_pips: int, target_m
 
 
 def pstar_from_eta(eta: float, c: float = 1.0) -> float:
-    """Predicted share of arbitrage opportunities taken: P* = 1 / (eta + c)."""
+    """Probability of an arbitrage per interval in the model (MMR 2023): P* = 1 / (eta + c). Model-implied, not
+    measured."""
     return 1.0 / (eta + c)

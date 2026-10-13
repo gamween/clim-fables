@@ -6,11 +6,13 @@
   "sigmaWindowSec": 300,
   "etaE4": 175198,
   "pStar": 0.053996263,
+  "pStarNote": "model-implied at dtEffSec (P_trade per interval, MMR 2023); not measured and not used on-chain; the posted fee depends only on etaE4 * sqrtHalfDtE6",
   "feeFloorPips": 700,
   "feeCapPips": 6000,
   "feeSafePips": 3000,
   "tauKillSec": 180,
   "dirEnabled": true,
+  "dirStatus": "experimental",
   "dirSlopeE4": 2753,
   "dirMaxPremiumPips": 567,
   "pokeTtlSec": 600,
@@ -20,5 +22,5 @@
     "lab/out/fables-window.json",
     "lab/out/fables-direction.json"
   ],
-  "generatedAt": "2026-10-13T21:10:27Z"
+  "generatedAt": "2026-10-13T21:27:57Z"
 }

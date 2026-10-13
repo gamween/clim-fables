@@ -1266,7 +1266,8 @@ def calibrate_eta(sigma, dt_sec: float, floor_pips: int, cap_pips: int, target_m
 
 
 def pstar_from_eta(eta: float, c: float = 1.0) -> float:
-    """Predicted share of arbitrage opportunities taken: P* = 1 / (eta + c)."""
+    """Probability of an arbitrage per interval in the model (MMR 2023): P* = 1 / (eta + c). Model-implied, not
+    measured."""
     return 1.0 / (eta + c)
 ```
 
@@ -2274,6 +2275,9 @@ def test_params_fables():
     assert d["sigmaWindowSec"] in (300, 900)
     assert d["etaE4"] > 0 and d["sqrtHalfDtE6"] > 0
     assert 0 < d["pStar"] < 1
+    assert "not used on-chain" in d["pStarNote"]
+    assert d["dirStatus"] in ("stable", "experimental", "disabled")
+    assert (d["dirStatus"] == "disabled") == (not d["dirEnabled"])
     assert d["pokeTtlSec"] == 600 and d["tauKillSec"] == 180
     assert d["targetPoolId"] == "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551"
     assert d["decidedBy"] == "lab/scripts/decide_fables_params.py"
@@ -2287,9 +2291,10 @@ def test_params_fables():
     uv run python scripts/decide_fables_params.py     # shared/params-fables.json
 
 - dtEffSec from study 1; sqrtHalfDtE6 = round(sqrt(dt / 2) * 1e6).
-- sigmaWindowSec and etaE4 from study 2 (eta at equal average fee with the keeper); pStar = 1 / (eta + 1).
+- sigmaWindowSec and etaE4 from study 2 (eta at equal average fee with the keeper); pStar = 1 / (eta + 1) is the
+  model-implied probability of an arbitrage per interval at dtEffSec, kept for reference and not used on-chain.
 - floor = Fables' flat fee (7 bp), cap = Fables' cap (60 bp), safe = 30 bp.
-- per-direction premium from study 3 (or disabled).
+- per-direction premium from study 3 (or disabled), with its status (stable, experimental or disabled).
 - pokeTtlSec = 600: if clim goes quiet, Fables' pool returns to its flat fee within 10 minutes.
 """
 
@@ -2318,11 +2323,13 @@ def main() -> None:
         "sigmaWindowSec": int(w),
         "etaE4": int(eta_e4),
         "pStar": pstar_from_eta(eta_e4 / 1e4, c=1.0),
+        "pStarNote": "model-implied at dtEffSec (P_trade per interval, MMR 2023); not measured and not used on-chain; the posted fee depends only on etaE4 * sqrtHalfDtE6",
         "feeFloorPips": 700,
         "feeCapPips": 6_000,
         "feeSafePips": 3_000,
         "tauKillSec": 180,
         "dirEnabled": bool(rule["enabled"]),
+        "dirStatus": rule["status"],
         "dirSlopeE4": int(rule["slopeE4"]),
         "dirMaxPremiumPips": int(rule["maxPremiumPips"]),
         "pokeTtlSec": 600,

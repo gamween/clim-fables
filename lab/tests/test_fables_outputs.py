@@ -96,6 +96,9 @@ def test_params_fables():
     assert d["sigmaWindowSec"] in (300, 900)
     assert d["etaE4"] > 0 and d["sqrtHalfDtE6"] > 0
     assert 0 < d["pStar"] < 1
+    assert "not used on-chain" in d["pStarNote"]
+    assert d["dirStatus"] in ("stable", "experimental", "disabled")
+    assert (d["dirStatus"] == "disabled") == (not d["dirEnabled"])
     assert d["pokeTtlSec"] == 600 and d["tauKillSec"] == 180
     assert d["targetPoolId"] == "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551"
     assert d["decidedBy"] == "lab/scripts/decide_fables_params.py"
