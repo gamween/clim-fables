@@ -14,6 +14,10 @@ contract MockPokeHook {
 
     error FeeAboveCap();
 
+    function setCap(uint24 cap_) external {
+        cap = cap_;
+    }
+
     function pokeFee(bytes32 poolId, uint24 fee, uint40 ttl) external {
         if (fee > cap) revert FeeAboveCap();
         (lastPool, last0For1, last1For0, lastTtl) = (poolId, fee, fee, ttl);

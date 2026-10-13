@@ -29,7 +29,10 @@ contract FablesForkTest is Test {
     address internal constant POOL_MANAGER = 0x8366a39CC670B4001A1121B8F6A443A643e40951;
     address internal constant USDG = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168;
     bytes32 internal constant POOL_ID = 0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551;
+    address internal constant FABLES_KEEPER = 0x1B6a8808E1D26dba66bA11E52997803C43CAd429;
     uint64 internal constant FEE_POKER = 1;
+    /// @dev A role id Fables would pick for who may trigger ClimPoker.poke() (clim's runner and their keeper).
+    uint64 internal constant CLIM_RUNNER = 7;
     uint32 internal constant SIGMA_48 = 85_475;
     uint32 internal constant SIGMA_1000 = 1_780_730;
     uint32 internal constant ETA_E4 = 25_093;
@@ -37,7 +40,8 @@ contract FablesForkTest is Test {
 
     address internal forwarder = makeAddr("forwarder");
     address internal operator = makeAddr("operator");
-    address internal keeper = makeAddr("fablesKeeper");
+    address internal keeper = FABLES_KEEPER;
+    address internal runner = makeAddr("climRunner");
     RiskDeskV2 internal desk;
     ClimFeePolicy internal policy;
     ClimPoker internal poker;
@@ -64,15 +68,32 @@ contract FablesForkTest is Test {
                 ethIsToken0: true
             })
         );
-        poker = new ClimPoker(policy, HOOK, POOL_ID, false, 600, address(this));
-        poker.setEventKeeper(keeper);
-        vm.prank(POKER_ADMIN);
-        IAccessManager(ACCESS_MANAGER).grantRole(FEE_POKER, address(poker), 0);
+        poker = new ClimPoker(policy, HOOK, POOL_ID, false, 600, ACCESS_MANAGER);
+        _fablesGrants();
+    }
+
+    /// @dev The AccessManager batch Fables' admin would send (impersonated on the fork).
+    function _fablesGrants() internal {
+        IAccessManager am = IAccessManager(ACCESS_MANAGER);
+        bytes4[] memory keeperSel = new bytes4[](2);
+        keeperSel[0] = ClimPoker.postEvent.selector;
+        keeperSel[1] = ClimPoker.postEventAndPoke.selector;
+        bytes4[] memory runnerSel = new bytes4[](1);
+        runnerSel[0] = ClimPoker.poke.selector;
+        vm.startPrank(POKER_ADMIN);
+        am.grantRole(FEE_POKER, address(poker), 0);
+        am.setTargetFunctionRole(address(poker), keeperSel, FEE_POKER);
+        am.setTargetFunctionRole(address(poker), runnerSel, CLIM_RUNNER);
+        am.grantRole(CLIM_RUNNER, runner, 0);
+        am.grantRole(CLIM_RUNNER, keeper, 0);
+        vm.stopPrank();
     }
 
     function _report(uint32 sigma) internal {
         vm.prank(forwarder, operator);
-        desk.onReport("", abi.encode(uint40(block.timestamp), sigma, sigma, int32(0), uint16(3), uint8(4), uint16(10_000)));
+        desk.onReport(
+            "", abi.encode(uint40(block.timestamp), sigma, sigma, int32(0), uint16(3), uint8(4), uint16(10_000))
+        );
     }
 
     function _expected(uint32 sigma) internal pure returns (uint24) {
@@ -95,6 +116,7 @@ contract FablesForkTest is Test {
 
     function test_PokeSetsTheRealHooksFee() public {
         _report(SIGMA_48);
+        vm.prank(runner);
         poker.poke();
         assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), _expected(SIGMA_48));
         assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, false), _expected(SIGMA_48));
@@ -103,6 +125,7 @@ contract FablesForkTest is Test {
     function test_StormRaisesTheFee() public {
         // a first report gets only the absolute bounds, so a storm shows at once (later ones move at most x2)
         _report(SIGMA_1000 / 2);
+        vm.prank(runner);
         poker.poke();
         uint24 fee = ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true);
         assertEq(fee, _expected(SIGMA_1000 / 2));
@@ -112,6 +135,7 @@ contract FablesForkTest is Test {
 
     function test_OverrideExpiresBackToFablesFlatFee() public {
         _report(SIGMA_48);
+        vm.prank(runner);
         poker.poke();
         vm.warp(block.timestamp + 600);
         assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 700);
@@ -120,6 +144,7 @@ contract FablesForkTest is Test {
     function test_BlindDeskDoesNotPoke() public {
         _report(SIGMA_48);
         vm.warp(block.timestamp + 181);
+        vm.prank(runner);
         vm.expectRevert(ClimPoker.DeskBlind.selector);
         poker.poke();
     }
@@ -128,6 +153,7 @@ contract FablesForkTest is Test {
         _report(SIGMA_48);
         vm.prank(keeper);
         poker.postEvent(6_000, 6_000, uint40(block.timestamp + 300));
+        vm.prank(runner);
         poker.poke();
         assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 6_000);
     }
@@ -136,20 +162,26 @@ contract FablesForkTest is Test {
         _report(SIGMA_48);
         vm.prank(POKER_ADMIN);
         IAccessManager(ACCESS_MANAGER).revokeRole(FEE_POKER, address(poker));
+        vm.prank(runner);
         vm.expectRevert();
         poker.poke();
     }
 
     function test_ASwapPaysThePokedFee() public {
         _report(SIGMA_1000 / 2);
+        vm.prank(runner);
         poker.poke();
         uint24 expected = ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true);
         PoolSwapTest router = new PoolSwapTest(IPoolManager(POOL_MANAGER));
         vm.deal(address(this), 1 ether);
         vm.recordLogs();
-        router.swap{value: 0.01 ether}(
+        router.swap{
+            value: 0.01 ether
+        }(
             _key(),
-            SwapParams({zeroForOne: true, amountSpecified: -0.01 ether, sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1}),
+            SwapParams({
+                zeroForOne: true, amountSpecified: -0.01 ether, sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             ""
         );

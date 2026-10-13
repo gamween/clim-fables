@@ -7,6 +7,12 @@ import {FLAG_DEGRADED} from "../interfaces/IRiskDesk.sol";
 import {ClimFeeMath} from "../libraries/ClimFeeMath.sol";
 import {IRiskDeskV2} from "./interfaces/IRiskDeskV2.sol";
 
+/// @dev Policy modes, file-level so other contracts compare against them without a call (solc does not expose another
+///      contract's constants); ClimFeePolicy re-exports them as MODE_* for off-chain readers.
+uint8 constant POLICY_MODE_NORMAL = 0;
+uint8 constant POLICY_MODE_DEGRADED = 1;
+uint8 constant POLICY_MODE_BLIND = 2;
+
 /// @title ClimFeePolicy
 /// @notice Turns the desk's state into the fee clim recommends for one Fables pool:
 ///         fee = clamp(ceil(eta * k * sigma * sqrt(dtEff / 2)), floor, cap), sigma from the 5- or 15-minute window,
@@ -16,9 +22,9 @@ import {IRiskDeskV2} from "./interfaces/IRiskDeskV2.sol";
 ///         currency0 and zero-for-one when ETH is currency1 (`ethIsToken0`).
 ///         Every parameter is immutable and comes from the lab (shared/params-fables.json).
 contract ClimFeePolicy {
-    uint8 public constant MODE_NORMAL = 0;
-    uint8 public constant MODE_DEGRADED = 1;
-    uint8 public constant MODE_BLIND = 2;
+    uint8 public constant MODE_NORMAL = POLICY_MODE_NORMAL;
+    uint8 public constant MODE_DEGRADED = POLICY_MODE_DEGRADED;
+    uint8 public constant MODE_BLIND = POLICY_MODE_BLIND;
 
     struct Params {
         uint32 etaE4;
