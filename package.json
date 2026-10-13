@@ -5,6 +5,7 @@
   "workspaces": ["shared", "bots"],
   "scripts": {
     "test": "bun run --filter '*' test",
-    "typecheck": "bun run --filter '*' typecheck"
+    "typecheck": "bun run --filter '*' typecheck",
+    "demo:fork": "bash contracts/script/v2/fork-run.sh"
   }
 }

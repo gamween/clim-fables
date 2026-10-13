@@ -2309,6 +2309,8 @@ contract ForkRun is Script {
 
     address internal forwarder = address(0xF0F0);
     address internal operator = address(0x0F0F);
+    /// @dev clim's runner bot: holds CLIM_RUNNER, pokes and swaps. A forge script may not use its own address.
+    address internal runner = vm.addr(uint256(keccak256("climRunner")));
 
     uint256[] internal tArr;
     uint256[] internal pokedArr;
@@ -2331,15 +2333,19 @@ contract ForkRun is Script {
                 safePips: uint24(p.readUint(".feeSafePips")),
                 tauKillSec: uint32(p.readUint(".tauKillSec")),
                 shortWindow: p.readUint(".sigmaWindowSec") == 300,
-                dirSlopeE4: uint32(p.readUint(".dirSlopeE4")),
-                dirMaxPremiumPips: uint24(p.readUint(".dirMaxPremiumPips")),
+                // No directional premium on this pool: Fables' ETH/USDG hook is symmetric (one fee for both
+                // directions), and a symmetric ClimPoker sends the higher side on both, so the premium would raise
+                // the fee for both directions. The measured per-direction rule (dirSlopeE4, dirMaxPremiumPips in
+                // shared/params-fables.json, from lab/out/fables-direction.json) is for directional hooks.
+                dirSlopeE4: 0,
+                dirMaxPremiumPips: 0,
                 ethIsToken0: true // native ETH is currency0 in the ETH/USDG pool key
             })
         );
     }
 
     /// @dev The batch Fables' admin would send: FEE_POKER for the poker, postEvent and postEventAndPoke behind
-    ///      FEE_POKER, poke behind CLIM_RUNNER, granted here to this script (which plays clim's runner).
+    ///      FEE_POKER, poke behind CLIM_RUNNER, granted here to clim's runner.
     function _fablesGrants(ClimPoker poker) internal {
         IAccessManager am = IAccessManager(ACCESS_MANAGER);
         bytes4[] memory keeperSel = new bytes4[](2);
@@ -2352,7 +2358,7 @@ contract ForkRun is Script {
         am.setTargetFunctionRole(address(poker), keeperSel, FEE_POKER);
         am.labelRole(CLIM_RUNNER, "CLIM_RUNNER");
         am.setTargetFunctionRole(address(poker), runnerSel, CLIM_RUNNER);
-        am.grantRole(CLIM_RUNNER, address(this), 0);
+        am.grantRole(CLIM_RUNNER, runner, 0);
         vm.stopPrank();
     }
 
@@ -2363,6 +2369,7 @@ contract ForkRun is Script {
     function _swap(PoolSwapTest router, bool zeroForOne) internal {
         PoolSwapTest.TestSettings memory s = PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false});
         vm.recordLogs();
+        vm.startPrank(runner);
         bool ok;
         if (zeroForOne) {
             try router.swap{
@@ -2387,6 +2394,7 @@ contract ForkRun is Script {
                 ok = true;
             } catch {}
         }
+        vm.stopPrank();
         if (!ok) {
             swapReverts += 1;
             return;
@@ -2411,11 +2419,13 @@ contract ForkRun is Script {
 
         RiskDeskV2 desk = new RiskDeskV2(forwarder, operator);
         ClimFeePolicy policy = _policy(desk);
-        ClimPoker poker = new ClimPoker(policy, HOOK, POOL_ID, false, 600, ACCESS_MANAGER);
+        // symmetric hook (one fee for both directions); TTL from the lab parameters
+        uint40 ttl = uint40(vm.readFile(PARAMS).readUint(".pokeTtlSec"));
+        ClimPoker poker = new ClimPoker(policy, HOOK, POOL_ID, false, ttl, ACCESS_MANAGER);
         _fablesGrants(poker);
 
         PoolSwapTest router = new PoolSwapTest(IPoolManager(POOL_MANAGER));
-        vm.deal(address(this), 10 ether);
+        vm.deal(runner, 10 ether);
 
         for (uint256 i; i < tObs.length; i++) {
             vm.warp(tObs[i] + 2);
@@ -2426,6 +2436,7 @@ contract ForkRun is Script {
                     uint40(tObs[i]), uint32(s15[i]), uint32(s5[i]), int32(dev[i]), uint16(3), uint8(4), uint16(10_000)
                 )
             );
+            vm.prank(runner);
             (uint24 poked,) = poker.poke();
             tArr.push(block.timestamp);
             pokedArr.push(poked);
@@ -2435,6 +2446,7 @@ contract ForkRun is Script {
                 _swap(router, true);
                 if (i == 0) {
                     // the first ETH sale funds the USDG side; approve once
+                    vm.prank(runner);
                     (bool ok,) = USDG.call(
                         abi.encodeWithSignature("approve(address,uint256)", address(router), type(uint256).max)
                     );
@@ -2460,8 +2472,6 @@ contract ForkRun is Script {
         string memory json = vm.serializeUint(o, "swapReverts", swapReverts);
         vm.writeJson(json, OUT);
     }
-
-    receive() external payable {}
 }
 ```
 
