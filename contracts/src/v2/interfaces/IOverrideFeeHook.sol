@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 /// @notice The public override entry points of Fables' hooks, written from their published ABI (function
-///         signatures only; Fables' source is not used). `poolId` is a Uniswap v4 PoolId (bytes32 in the ABI).
+///         signatures only; no Fables code is copied). `poolId` is a Uniswap v4 PoolId (bytes32 in the ABI).
 
 /// @dev Fables' first-generation hooks (e.g. ETH/USDG): one fee for both directions.
 interface ISymmetricPokeHook {

@@ -12,6 +12,7 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import {PokeFeeHook} from "../../src/v2/PokeFeeHook.sol";
 
@@ -39,7 +40,8 @@ contract PokeFeeHookTest is Deployers {
         sel[2] = PokeFeeHook.clearPoke.selector;
         am.setTargetFunctionRole(address(hook), sel, FEE_POKER);
         am.grantRole(FEE_POKER, poker, 0);
-        (key, id) = initPool(currency0, currency1, IHooks(address(hook)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 10, SQRT_PRICE_1_1);
+        (key, id) =
+            initPool(currency0, currency1, IHooks(address(hook)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 10, SQRT_PRICE_1_1);
         hook.setPoolConfig(key, 100, 700, 6_000);
         modifyLiquidityRouter.modifyLiquidity(
             key,
@@ -134,6 +136,52 @@ contract PokeFeeHookTest is Deployers {
         emit PokeFeeHook.FeePoked(_id(), 2_500, uint40(T0 + 600));
         vm.prank(poker);
         hook.pokeFee(_id(), 2_500, 600);
+    }
+
+    function test_EmitsTheDirectionalEvent() public {
+        vm.expectEmit(true, false, false, true, address(hook));
+        emit PokeFeeHook.FeePoked(_id(), 900, 3_000, uint40(T0 + 600));
+        vm.prank(poker);
+        hook.pokeFee(_id(), 900, 3_000, 600);
+    }
+
+    /// @dev Same topic0 as Fables' hooks, so one indexer reads both.
+    function test_EventTopicsMatchFablesSignatures() public {
+        vm.recordLogs();
+        vm.startPrank(poker);
+        hook.pokeFee(_id(), 2_500, 600);
+        hook.pokeFee(_id(), 900, 3_000, 600);
+        vm.stopPrank();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 2);
+        assertEq(logs[0].topics[0], keccak256("FeePoked(bytes32,uint24,uint40)"));
+        assertEq(logs[1].topics[0], keccak256("FeePoked(bytes32,uint24,uint24,uint40)"));
+        assertEq(logs[0].topics[1], _id());
+    }
+
+    function test_RevertWhen_AStrangerConfiguresAPool() public {
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger));
+        hook.setPoolConfig(key, 100, 700, 6_000);
+    }
+
+    function test_RevertWhen_PoolConfigIsInvalid() public {
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(key, 0, 700, 6_000);
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(key, 800, 700, 6_000);
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(key, 100, 700, 600);
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(key, 100, 700, uint24(LPFeeLibrary.MAX_LP_FEE) + 1);
+    }
+
+    function test_RevertWhen_PoolKeyUsesAnotherHook() public {
+        PoolKey memory other = key;
+        other.hooks = IHooks(makeAddr("otherHook"));
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(other, 100, 700, 6_000);
     }
 
     function test_RevertWhen_PoolIsNotConfigured() public {

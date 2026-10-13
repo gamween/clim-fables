@@ -13,8 +13,8 @@ import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 /// @title PokeFeeHook
 /// @notice A Uniswap v4 hook with a flat LP fee and bounded, expiring overrides ("pokes"), exposing the same public
 ///         interface as Fables' override hooks so clim's live reference pools on Robinhood Chain testnet behave like
-///         Fables' pools. Clean-room: written from Fables' published ABI and observed on-chain behavior only, none
-///         of Fables' source (which is not open source) was used.
+///         Fables' pools. Independent implementation written from Fables' published ABI and documented behavior (fee
+///         bounds, TTL, the half-flat floor under an override); no Fables code is copied.
 ///         Fee rule: flat; under a live poke, max(poke, max(floor, flat / 2)); never above the cap.
 contract PokeFeeHook is BaseOverrideFee, AccessManaged {
     struct Config {
@@ -52,6 +52,7 @@ contract PokeFeeHook is BaseOverrideFee, AccessManaged {
         external
         restricted
     {
+        if (address(key.hooks) != address(this)) revert InvalidConfig();
         if (floorPips == 0 || floorPips > flatPips || flatPips > capPips || capPips > LPFeeLibrary.MAX_LP_FEE) {
             revert InvalidConfig();
         }
