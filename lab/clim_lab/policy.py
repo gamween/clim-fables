@@ -18,6 +18,13 @@ def calibrate_eta(sigma, dt_sec: float, floor_pips: int, cap_pips: int, target_m
     """eta whose clamped fee averages target_mean_pips over the samples (equal average fee with Fables' keeper)."""
     if not floor_pips < target_mean_pips < cap_pips:
         raise ValueError("target mean must lie strictly between floor and cap")
+    if not np.all(np.isfinite(sigma)):
+        raise ValueError("sigma must be finite")
+    if (
+        policy_fee_pips(sigma, 1e6, dt_sec, floor_pips, cap_pips).mean() < target_mean_pips
+        or policy_fee_pips(sigma, 1e-6, dt_sec, floor_pips, cap_pips).mean() > target_mean_pips
+    ):
+        raise ValueError("target mean unreachable for this sigma")
     lo, hi = 1e-6, 1e6
     for _ in range(200):
         mid = math.sqrt(lo * hi)

@@ -6,8 +6,8 @@ side: amount0 < 0 means the swapper paid ETH into the pool (zeroForOne, the pool
 (18 decimals) / USDG (6 decimals), so the price in USDG per ETH is (sqrtPriceX96 / 2^96)^2 * 1e12.
 
 The history has no timestamps. BlockClock maps blocks to unix seconds from sampled (block, timestamp) pairs read over
-RPC (scripts/fables_fetch.py blocks), by linear interpolation rounded down; `fables_fetch.py check-clock` measures the
-error against exact block timestamps.
+RPC (scripts/fables_fetch.py blocks), by linear interpolation rounded to the nearest second (the samples are whole
+seconds, the true time rounded down); `fables_fetch.py check-clock` measures the error against exact block timestamps.
 """
 
 import json
@@ -44,7 +44,7 @@ class Swaps:
     eth: np.ndarray  # amount0 / 1e18, swapper side
     usd: np.ndarray  # amount1 / 1e6, swapper side
     log_price: np.ndarray  # ln(USDG per ETH) after the swap
-    fee_pips: np.ndarray  # int64, LP fee charged
+    fee_pips: np.ndarray  # int64, swap fee charged (LP fee; equals the LP fee while the protocol fee is 0)
 
     def __len__(self) -> int:
         return len(self.block)
@@ -140,10 +140,15 @@ class BlockClock:
         b = np.asarray(blocks, dtype=np.int64)
         if b.min() < self.block[0] or b.max() > self.block[-1]:
             raise ValueError("block outside the sampled range")
-        return np.floor(np.interp(b, self.block, self.ts)).astype(np.int64)
+        return np.rint(np.interp(b, self.block, self.ts)).astype(np.int64)
 
     def block_at(self, t: int) -> int:
-        """First sampled block whose timestamp is at or after t (for selecting a block range)."""
+        """Last sampled block whose timestamp is at or before t (the first sample if t is before the range)."""
+        i = int(np.searchsorted(self.ts, t, side="right")) - 1
+        return int(self.block[max(i, 0)])
+
+    def block_after(self, t: int) -> int:
+        """First sampled block whose timestamp is at or after t (raises if t is after the range)."""
         i = int(np.searchsorted(self.ts, t, side="left"))
         if i >= len(self.ts):
             raise ValueError("time after the sampled range")

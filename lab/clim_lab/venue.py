@@ -51,6 +51,8 @@ def usd_log_series(b1s: SecondSeries, usdt_usd: MinuteSeries) -> SecondSeries:
     idx = np.searchsorted(usdt_usd.close_t, t, side="right") - 1
     if idx[0] < 0:
         raise ValueError("no USDT-USD minute closed before the first second")
+    if usdt_usd.close_t[-1] < b1s.t1 - 60:
+        raise ValueError("the USDT-USD series ends before the ETHUSDT series")
     return SecondSeries(b1s.t0, b1s.logp + usdt_usd.logp[idx])
 
 
@@ -60,6 +62,8 @@ def rv_window(series: SecondSeries, t_obs: np.ndarray, window_sec: int, step_sec
     if window_sec % step_sec:
         raise ValueError("window must be a multiple of the step")
     t_obs = np.asarray(t_obs, dtype=np.int64)
+    if len(t_obs) == 0:
+        raise ValueError("no observation time")
     offsets = step_sec * np.arange(window_sec // step_sec, -1, -1, dtype=np.int64)
     first = t_obs.min() - 1 - offsets[0] - series.t0
     last = t_obs.max() - 1 - series.t0

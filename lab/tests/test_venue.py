@@ -43,6 +43,13 @@ def test_usd_log_series_needs_a_rate_before_the_first_second():
         venue.usd_log_series(b1s, usdt)
 
 
+def test_usd_log_series_rejects_a_usdt_series_ending_early():
+    b1s = SecondSeries(120, np.zeros(300))  # seconds 120..419
+    usdt = MinuteSeries(np.array([120, 180], dtype=np.int64), np.zeros(2))
+    with pytest.raises(ValueError):
+        venue.usd_log_series(b1s, usdt)
+
+
 def test_rv_window_matches_hand_computation():
     # price doubles its log every 5 s by 0.001: 5-second returns are all 0.001
     t0 = 1_000
@@ -50,6 +57,12 @@ def test_rv_window_matches_hand_computation():
     s = SecondSeries(t0, logp.astype(np.float64))
     rv = venue.rv_window(s, np.array([t0 + 305]), window_sec=300, step_sec=5)
     assert rv[0] == pytest.approx(math.sqrt(60 * 0.001**2 / 300))
+
+
+def test_rv_window_needs_an_observation_time():
+    s = SecondSeries(1_000, np.zeros(400))
+    with pytest.raises(ValueError):
+        venue.rv_window(s, np.array([], dtype=np.int64), window_sec=300, step_sec=5)
 
 
 def test_rv_window_needs_history():

@@ -1624,7 +1624,7 @@ def main() -> None:
     out = {
         "generatedAt": now_iso(),
         "window": {"start": int(START), "end": int(END)},
-        "forkBlock": clock.block_at(START - 120),  # at or before the first report, so the run only warps forward
+        "forkBlock": clock.block_at(START - 120),  # last sampled block at or before 2 minutes ahead of the first report, so the run only warps forward
         "note": "lab replay: Binance ETHUSDT 1 s converted to USD stands in for the live desk's four venues",
         "tObs": [int(t) for t in t_obs],
         "sigma15E9": [sigma_e9_from_per_sqrt_s(float(x)) for x in s15],

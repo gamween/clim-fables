@@ -32,5 +32,16 @@ def test_calibrate_eta_rejects_unreachable_targets():
         policy.calibrate_eta(sigma, 1.0, 700, 6000, target_mean_pips=7000)
 
 
+def test_calibrate_eta_rejects_non_finite_sigma():
+    with pytest.raises(ValueError):
+        policy.calibrate_eta(np.array([1e-4, np.nan]), 1.0, 700, 6000, target_mean_pips=1_480)
+
+
+def test_calibrate_eta_rejects_targets_the_sigma_cannot_reach():
+    # sigma = 0: every fee sits at the floor whatever eta is
+    with pytest.raises(ValueError):
+        policy.calibrate_eta(np.zeros(10), 1.0, 700, 6000, target_mean_pips=1_480)
+
+
 def test_pstar_from_eta():
     assert policy.pstar_from_eta(1.0, c=1.0) == pytest.approx(0.5)

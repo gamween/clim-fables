@@ -139,7 +139,11 @@ def test_select_keeps_alignment(tmp_path):
 def test_block_clock_interpolates_and_floors():
     c = robin.BlockClock(np.array([100, 110, 130]), np.array([1_000, 1_001, 1_003]))
     assert list(c.time_of([100, 105, 110, 120, 130])) == [1_000, 1_000, 1_001, 1_002, 1_003]
-    assert c.block_at(1_002) == 130
+    assert c.block_at(1_002) == 110
+    assert c.block_after(1_002) == 130
+    assert c.block_at(500) == 100
+    with pytest.raises(ValueError):
+        c.block_after(2_000)
     with pytest.raises(ValueError):
         c.time_of([99])
 
@@ -167,8 +171,8 @@ side: amount0 < 0 means the swapper paid ETH into the pool (zeroForOne, the pool
 (18 decimals) / USDG (6 decimals), so the price in USDG per ETH is (sqrtPriceX96 / 2^96)^2 * 1e12.
 
 The history has no timestamps. BlockClock maps blocks to unix seconds from sampled (block, timestamp) pairs read over
-RPC (scripts/fables_fetch.py blocks), by linear interpolation rounded down; `fables_fetch.py check-clock` measures the
-error against exact block timestamps.
+RPC (scripts/fables_fetch.py blocks), by linear interpolation rounded to the nearest second (the samples are whole
+seconds, the true time rounded down); `fables_fetch.py check-clock` measures the error against exact block timestamps.
 """
 
 import json
@@ -205,7 +209,7 @@ class Swaps:
     eth: np.ndarray  # amount0 / 1e18, swapper side
     usd: np.ndarray  # amount1 / 1e6, swapper side
     log_price: np.ndarray  # ln(USDG per ETH) after the swap
-    fee_pips: np.ndarray  # int64, LP fee charged
+    fee_pips: np.ndarray  # int64, swap fee charged (LP fee; equals the LP fee while the protocol fee is 0)
 
     def __len__(self) -> int:
         return len(self.block)
@@ -301,10 +305,15 @@ class BlockClock:
         b = np.asarray(blocks, dtype=np.int64)
         if b.min() < self.block[0] or b.max() > self.block[-1]:
             raise ValueError("block outside the sampled range")
-        return np.floor(np.interp(b, self.block, self.ts)).astype(np.int64)
+        return np.rint(np.interp(b, self.block, self.ts)).astype(np.int64)
 
     def block_at(self, t: int) -> int:
-        """First sampled block whose timestamp is at or after t (for selecting a block range)."""
+        """Last sampled block whose timestamp is at or before t (the first sample if t is before the range)."""
+        i = int(np.searchsorted(self.ts, t, side="right")) - 1
+        return int(self.block[max(i, 0)])
+
+    def block_after(self, t: int) -> int:
+        """First sampled block whose timestamp is at or after t (raises if t is after the range)."""
         i = int(np.searchsorted(self.ts, t, side="left"))
         if i >= len(self.ts):
             raise ValueError("time after the sampled range")
@@ -377,6 +386,13 @@ def test_usd_log_series_needs_a_rate_before_the_first_second():
         venue.usd_log_series(b1s, usdt)
 
 
+def test_usd_log_series_rejects_a_usdt_series_ending_early():
+    b1s = SecondSeries(120, np.zeros(300))  # seconds 120..419
+    usdt = MinuteSeries(np.array([120, 180], dtype=np.int64), np.zeros(2))
+    with pytest.raises(ValueError):
+        venue.usd_log_series(b1s, usdt)
+
+
 def test_rv_window_matches_hand_computation():
     # price doubles its log every 5 s by 0.001: 5-second returns are all 0.001
     t0 = 1_000
@@ -384,6 +400,12 @@ def test_rv_window_matches_hand_computation():
     s = SecondSeries(t0, logp.astype(np.float64))
     rv = venue.rv_window(s, np.array([t0 + 305]), window_sec=300, step_sec=5)
     assert rv[0] == pytest.approx(math.sqrt(60 * 0.001**2 / 300))
+
+
+def test_rv_window_needs_an_observation_time():
+    s = SecondSeries(1_000, np.zeros(400))
+    with pytest.raises(ValueError):
+        venue.rv_window(s, np.array([], dtype=np.int64), window_sec=300, step_sec=5)
 
 
 def test_rv_window_needs_history():
@@ -459,6 +481,8 @@ def usd_log_series(b1s: SecondSeries, usdt_usd: MinuteSeries) -> SecondSeries:
     idx = np.searchsorted(usdt_usd.close_t, t, side="right") - 1
     if idx[0] < 0:
         raise ValueError("no USDT-USD minute closed before the first second")
+    if usdt_usd.close_t[-1] < b1s.t1 - 60:
+        raise ValueError("the USDT-USD series ends before the ETHUSDT series")
     return SecondSeries(b1s.t0, b1s.logp + usdt_usd.logp[idx])
 
 
@@ -468,6 +492,8 @@ def rv_window(series: SecondSeries, t_obs: np.ndarray, window_sec: int, step_sec
     if window_sec % step_sec:
         raise ValueError("window must be a multiple of the step")
     t_obs = np.asarray(t_obs, dtype=np.int64)
+    if len(t_obs) == 0:
+        raise ValueError("no observation time")
     offsets = step_sec * np.arange(window_sec // step_sec, -1, -1, dtype=np.int64)
     first = t_obs.min() - 1 - offsets[0] - series.t0
     last = t_obs.max() - 1 - series.t0
@@ -484,7 +510,7 @@ def rv_window(series: SecondSeries, t_obs: np.ndarray, window_sec: int, step_sec
 - [ ] **Step 4: Run the tests**
 
 Run: `uv run pytest tests/test_venue.py -q`
-Expected: `7 passed`.
+Expected: `9 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -560,16 +586,19 @@ def _get(url: str, timeout: int = 60) -> bytes:
 
 def _rpc(batch: list[dict]) -> list[dict]:
     body = json.dumps(batch).encode()
-    for attempt in range(6):
+    for attempt in range(8):
         try:
             req = urllib.request.Request(RPC, data=body, headers={**UA, "Content-Type": "application/json"})
             with urllib.request.urlopen(req, timeout=60) as r:
                 out = json.loads(r.read())
             if isinstance(out, dict):
                 raise RuntimeError(f"RPC error: {out.get('error')}")
+            bad = [x.get("error") for x in out if "result" not in x or x["result"] is None]
+            if bad:  # rate-limited items come back as per-item errors: retry the whole batch
+                raise RuntimeError(f"{len(bad)} batch items failed: {bad[0]}")
             return sorted(out, key=lambda x: x["id"])
         except Exception as e:
-            if attempt == 5:
+            if attempt == 7:
                 raise
             print(f"  rpc retry {attempt + 1} after {type(e).__name__}", file=sys.stderr)
             time.sleep(2**attempt)
@@ -610,9 +639,9 @@ def cmd_blocks(args) -> None:
     if numbers[-1] != last:
         numbers.append(last)
     rows: list[tuple[int, int]] = []
-    for i in range(0, len(numbers), 100):
-        rows += _blocks(numbers[i : i + 100])
-        if (i // 100) % 50 == 0:
+    for i in range(0, len(numbers), 50):
+        rows += _blocks(numbers[i : i + 50])
+        if (i // 50) % 100 == 0:
             print(f"  {len(rows)}/{len(numbers)} samples")
         time.sleep(0.2)
     RAW.mkdir(parents=True, exist_ok=True)
@@ -803,7 +832,7 @@ uv run python - <<'EOF'
 from clim_lab import robin
 from clim_lab.data import DATA_DIR
 c = robin.BlockClock.from_json(DATA_DIR / "fables2" / "blocks.json")
-s = robin.load_swaps(c.block_at(1_788_739_200), c.block_at(1_791_763_200))
+s = robin.load_swaps(c.block_at(1_788_739_200), c.block_after(1_791_763_200))
 print(len(s), "swaps", s.block[0], s.block[-1])
 EOF
 ```
@@ -995,6 +1024,13 @@ def test_solve_dt_rejects_out_of_model_rates():
         dteff.solve_dt(1e9, 0.0007, 0.0006)
 
 
+def test_solve_dt_rejects_non_finite_or_degenerate_inputs():
+    with pytest.raises(ValueError):
+        dteff.solve_dt(1.0, float("nan"), 0.0006)
+    with pytest.raises(ValueError):
+        dteff.solve_dt(1.0, 0.0007, 0.0)
+
+
 def test_delays_from_the_last_second_inside_the_band():
     # pool at 0 with band 1; venue inside at seconds 10..12, outside from 13; arbitrage at t = 16
     logp = np.array([0.0] * 13 + [2.0] * 7)
@@ -1013,6 +1049,16 @@ def test_delay_is_zero_in_the_same_second():
     v = SecondSeries(0, np.zeros(10))
     d = dteff.delays(np.array([5]), np.array([5]), np.array([0.0]), np.array([1.0]), v)
     assert list(d) == [0]
+
+
+def test_delays_reject_windows_outside_the_venue_series():
+    v = SecondSeries(10, np.zeros(10))  # covers seconds 10..19
+    p_pre, gamma = np.array([0.0]), np.array([1.0])
+    with pytest.raises(ValueError):  # the window starts before the series
+        dteff.delays(np.array([15]), np.array([5]), p_pre, gamma, v)
+    with pytest.raises(ValueError):  # the window reads past the series' last second
+        dteff.delays(np.array([25]), np.array([15]), p_pre, gamma, v)
+    assert list(dteff.delays(np.array([20]), np.array([15]), p_pre, gamma, v)) == [0]
 ```
 
 - [ ] **Step 2: Run the tests to see them fail**
@@ -1054,6 +1100,8 @@ def solve_dt(rate: float, gamma: float, sigma: float, c: float = 1.0) -> float:
     """The Δt (seconds) whose predicted arbitrage rate equals `rate` (events per second)."""
     if not rate > 0:
         raise ValueError("rate must be positive")
+    if not (math.isfinite(rate) and math.isfinite(gamma) and math.isfinite(sigma)) or gamma < 0 or sigma <= 0:
+        raise ValueError("rate, gamma and sigma must be finite, with gamma >= 0 and sigma > 0")
     if rate > arb_rate(DT_MIN, gamma, sigma, c) or rate < arb_rate(DT_MAX, gamma, sigma, c):
         raise ValueError("rate outside what the model can produce on [1 ms, 1e5 s]")
     lo, hi = math.log(DT_MIN), math.log(DT_MAX)
@@ -1081,6 +1129,8 @@ def delays(
         a = max(int(t_prev[i]), b - cap_sec)
         if b <= a:
             continue
+        if a < venue.t0 or b - 1 > venue.t1:
+            raise ValueError("the window reads outside the venue series")
         m = venue.logp[a - venue.t0 : b - venue.t0]
         inside = np.flatnonzero(np.abs(m - p_pre[i]) <= gamma[i])
         cross = a + int(inside[-1]) + 1 if len(inside) else a
@@ -1091,7 +1141,7 @@ def delays(
 - [ ] **Step 4: Run the tests**
 
 Run: `uv run pytest tests/test_dteff.py -q`
-Expected: `14 passed`.
+Expected: `16 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -1143,6 +1193,17 @@ def test_calibrate_eta_rejects_unreachable_targets():
         policy.calibrate_eta(sigma, 1.0, 700, 6000, target_mean_pips=7000)
 
 
+def test_calibrate_eta_rejects_non_finite_sigma():
+    with pytest.raises(ValueError):
+        policy.calibrate_eta(np.array([1e-4, np.nan]), 1.0, 700, 6000, target_mean_pips=1_480)
+
+
+def test_calibrate_eta_rejects_targets_the_sigma_cannot_reach():
+    # sigma = 0: every fee sits at the floor whatever eta is
+    with pytest.raises(ValueError):
+        policy.calibrate_eta(np.zeros(10), 1.0, 700, 6000, target_mean_pips=1_480)
+
+
 def test_pstar_from_eta():
     assert policy.pstar_from_eta(1.0, c=1.0) == pytest.approx(0.5)
 ```
@@ -1175,6 +1236,13 @@ def calibrate_eta(sigma, dt_sec: float, floor_pips: int, cap_pips: int, target_m
     """eta whose clamped fee averages target_mean_pips over the samples (equal average fee with Fables' keeper)."""
     if not floor_pips < target_mean_pips < cap_pips:
         raise ValueError("target mean must lie strictly between floor and cap")
+    if not np.all(np.isfinite(sigma)):
+        raise ValueError("sigma must be finite")
+    if (
+        policy_fee_pips(sigma, 1e6, dt_sec, floor_pips, cap_pips).mean() < target_mean_pips
+        or policy_fee_pips(sigma, 1e-6, dt_sec, floor_pips, cap_pips).mean() > target_mean_pips
+    ):
+        raise ValueError("target mean unreachable for this sigma")
     lo, hi = 1e-6, 1e6
     for _ in range(200):
         mid = math.sqrt(lo * hi)
@@ -1193,7 +1261,7 @@ def pstar_from_eta(eta: float, c: float = 1.0) -> float:
 - [ ] **Step 4: Run the tests**
 
 Run: `uv run pytest tests/test_policy.py -q`
-Expected: `4 passed`.
+Expected: `6 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -1388,7 +1456,7 @@ def _days(a: int, b: int) -> list[str]:
 
 def load_window() -> Window:
     clock = robin.BlockClock.from_json(RAW / "blocks.json")
-    swaps = robin.load_swaps(clock.block_at(START), clock.block_at(END))
+    swaps = robin.load_swaps(clock.block_at(START), clock.block_after(END))
     t = clock.time_of(swaps.block)
     keep = (t >= START) & (t < END)
     swaps, t = swaps.select(keep), t[keep]
@@ -1588,7 +1656,7 @@ def main() -> None:
             "medianSec": float(np.median(d)),
             "dtSecPoisson": float(d.mean()),
             "dtSecFixed": float(2 * d.mean()),
-            "note": "1 s timestamps: delays are whole seconds, so sub-second reactions read as 0",
+            "note": "lower bound: an arbitrage is only seen if the venue is still outside the band when it lands, and timestamps are whole seconds",
         },
         "holdout": {
             "fitWeeks": [0, 1, 2],
@@ -1802,7 +1870,7 @@ def test_direction_output():
 Two signals per swap: "instant" (venue at the last closed second before the swap) and "desk" (the gap clim's desk
 would have published at its last report, every 30 s with 2 s latency). Markouts at 5, 30 and 300 s measure the
 trader's edge after fee. The per-direction premium rule is fitted on the desk signal only, because that is what the
-desk can publish; it is enabled only if the top bucket's flow beats the fee it paid by at least 1 bp at 30 s on at
+desk can publish; it is enabled only if the top bucket's markout at 30 s (trader edge after fee) is at least 1 bp on at
 least 200 swaps.
 """
 
@@ -1829,7 +1897,7 @@ def main() -> None:
     s, t, v = w.swaps, w.t, w.venue
     side = s.side
     exec_log = s.log_exec_price
-    fut = {h: v.at(np.minimum(t + h, v.t1)) for h in mk.HORIZONS_SEC}
+    fut = {h: v.at(np.minimum(t + h - 1, v.t1)) for h in mk.HORIZONS_SEC}
     marks = {h: mk.markout_bp(side, fut[h], exec_log) for h in mk.HORIZONS_SEC}
     inst = mk.signal_bp(side, v.at(t - 1), s.log_price_before)
 
@@ -1838,7 +1906,6 @@ def main() -> None:
 
     ok = ~np.isnan(inst) & ~np.isnan(desk)
     weight = s.notional_usd
-    fee_bp = s.fee_pips / 100.0
     out_sig = {}
     for name, sig in (("instant", inst), ("desk", desk)):
         out_sig[name] = {
@@ -1846,7 +1913,7 @@ def main() -> None:
             "corrMarkout30": float(np.corrcoef(sig[ok], marks[30][ok])[0, 1]),
         }
 
-    excess30 = marks[30] - fee_bp
+    excess30 = marks[30]  # the execution price already includes the fee
     a = mk.slope_through_origin(desk[ok], excess30[ok], weight[ok])
     top = ok & (desk >= 10.0)
     top_excess = float(np.average(excess30[top], weights=weight[top])) if top.sum() else 0.0
@@ -1867,9 +1934,9 @@ def main() -> None:
             "enabled": enabled,
             "slopeE4": slope_e4,
             "maxPremiumPips": max_prem,
-            "fitOn": "desk signal (30 s reports, 2 s latency), markout at 30 s minus the fee paid, notional-weighted",
+            "fitOn": "desk signal (30 s reports, 2 s latency), markout at 30 s (trader edge after fee), notional-weighted",
             "topBucket": {"minSignalBp": 10.0, "swaps": int(top.sum()), "excessBp": top_excess},
-            "gate": f"enabled if >= {MIN_TOP_SWAPS} swaps in the top bucket, excess >= {MIN_EXCESS_BP} bp and slope > 0",
+            "gate": f"enabled if >= {MIN_TOP_SWAPS} swaps in the top bucket, markout at 30 s (trader edge after fee) >= {MIN_EXCESS_BP} bp and slope > 0",
             "meaning": "premium on the side the gap points to = slopeE4 * |gap in pips| / 1e4, capped at maxPremiumPips",
         },
     }

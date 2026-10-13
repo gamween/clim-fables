@@ -84,7 +84,11 @@ def test_select_keeps_alignment(tmp_path):
 def test_block_clock_interpolates_and_floors():
     c = robin.BlockClock(np.array([100, 110, 130]), np.array([1_000, 1_001, 1_003]))
     assert list(c.time_of([100, 105, 110, 120, 130])) == [1_000, 1_000, 1_001, 1_002, 1_003]
-    assert c.block_at(1_002) == 130
+    assert c.block_at(1_002) == 110
+    assert c.block_after(1_002) == 130
+    assert c.block_at(500) == 100
+    with pytest.raises(ValueError):
+        c.block_after(2_000)
     with pytest.raises(ValueError):
         c.time_of([99])
 

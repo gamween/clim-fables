@@ -35,6 +35,13 @@ def test_solve_dt_rejects_out_of_model_rates():
         dteff.solve_dt(1e9, 0.0007, 0.0006)
 
 
+def test_solve_dt_rejects_non_finite_or_degenerate_inputs():
+    with pytest.raises(ValueError):
+        dteff.solve_dt(1.0, float("nan"), 0.0006)
+    with pytest.raises(ValueError):
+        dteff.solve_dt(1.0, 0.0007, 0.0)
+
+
 def test_delays_from_the_last_second_inside_the_band():
     # pool at 0 with band 1; venue inside at seconds 10..12, outside from 13; arbitrage at t = 16
     logp = np.array([0.0] * 13 + [2.0] * 7)
@@ -53,3 +60,13 @@ def test_delay_is_zero_in_the_same_second():
     v = SecondSeries(0, np.zeros(10))
     d = dteff.delays(np.array([5]), np.array([5]), np.array([0.0]), np.array([1.0]), v)
     assert list(d) == [0]
+
+
+def test_delays_reject_windows_outside_the_venue_series():
+    v = SecondSeries(10, np.zeros(10))  # covers seconds 10..19
+    p_pre, gamma = np.array([0.0]), np.array([1.0])
+    with pytest.raises(ValueError):  # the window starts before the series
+        dteff.delays(np.array([15]), np.array([5]), p_pre, gamma, v)
+    with pytest.raises(ValueError):  # the window reads past the series' last second
+        dteff.delays(np.array([25]), np.array([15]), p_pre, gamma, v)
+    assert list(dteff.delays(np.array([20]), np.array([15]), p_pre, gamma, v)) == [0]

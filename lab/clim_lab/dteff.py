@@ -29,6 +29,8 @@ def solve_dt(rate: float, gamma: float, sigma: float, c: float = 1.0) -> float:
     """The Δt (seconds) whose predicted arbitrage rate equals `rate` (events per second)."""
     if not rate > 0:
         raise ValueError("rate must be positive")
+    if not (math.isfinite(rate) and math.isfinite(gamma) and math.isfinite(sigma)) or gamma < 0 or sigma <= 0:
+        raise ValueError("rate, gamma and sigma must be finite, with gamma >= 0 and sigma > 0")
     if rate > arb_rate(DT_MIN, gamma, sigma, c) or rate < arb_rate(DT_MAX, gamma, sigma, c):
         raise ValueError("rate outside what the model can produce on [1 ms, 1e5 s]")
     lo, hi = math.log(DT_MIN), math.log(DT_MAX)
@@ -56,6 +58,8 @@ def delays(
         a = max(int(t_prev[i]), b - cap_sec)
         if b <= a:
             continue
+        if a < venue.t0 or b - 1 > venue.t1:
+            raise ValueError("the window reads outside the venue series")
         m = venue.logp[a - venue.t0 : b - venue.t0]
         inside = np.flatnonzero(np.abs(m - p_pre[i]) <= gamma[i])
         cross = a + int(inside[-1]) + 1 if len(inside) else a
