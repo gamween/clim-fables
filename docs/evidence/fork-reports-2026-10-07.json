@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-10-13T21:12:16Z",
+  "generatedAt": "2026-10-13T21:28:26Z",
   "window": {
     "start": 1791337200,
     "end": 1791342600
   },
   "forkBlock": 82093378,
-  "note": "lab replay: Binance ETHUSDT 1 s converted to USD stands in for the live desk's four venues",
+  "note": "lab replay: Binance ETHUSDT 1 s converted to USD stands in for the live desk's four venues; because one venue stands in for four, the run fixes dispBp 3, nSources 4 and kE4 10000 in every report",
   "tObs": [
     1791337200,
     1791337230,

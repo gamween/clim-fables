@@ -2183,19 +2183,19 @@ git commit -m "test(contracts): ClimPoker drives Fables' real ETH/USDG hook on a
 **Files:**
 - Create: `lab/scripts/export_fork_reports.py`
 
-The run replays the 7 October 2026 storm, 01:00 to 02:30 UTC (`1791337200` to `1791342600`), the window `lab/out/fables-storm-2026-10-07.json` already studies.
+The run replays the 7 October 2026 storm, 01:40 to 03:10 UTC (`1791337200` to `1791342600`), the window `lab/out/fables-storm-2026-10-07.json` already studies.
 
 - [ ] **Step 1: Write the export**
 
 ```python
 """Desk reports for the fork run (offline): what clim's desk would have published every 30 s on 2026-10-07,
-01:00-02:30 UTC, from the lab's Binance 1 s (USD) data and Fables' pool prices.
+01:40-03:10 UTC, from the lab's Binance 1 s (USD) data and Fables' pool prices.
 
     uv run python scripts/export_fork_reports.py     # docs/evidence/fork-reports-2026-10-07.json
 
 Fields are parallel arrays so Foundry reads them with parseJsonUintArray / parseJsonIntArray. One venue
-(Binance, converted to USD) stands in for the live desk's four; nSources is reported as 4 so the desk accepts it, and
-the file says so.
+(Binance, converted to USD) stands in for the live desk's four; the run script (ForkRun.s.sol) fixes dispBp 3,
+nSources 4 and kE4 10000 in every report so the desk accepts it, and the file says so.
 """
 
 import sys
@@ -2214,8 +2214,8 @@ from clim_lab.report import now_iso, write_json  # noqa: E402
 from clim_lab.units import sigma_e9_from_per_sqrt_s  # noqa: E402
 from clim_lab.venue import rv_window  # noqa: E402
 
-START = 1_791_337_200  # 2026-10-07 01:00:00 UTC
-END = 1_791_342_600  # 2026-10-07 02:30:00 UTC
+START = 1_791_337_200  # 2026-10-07 01:40:00 UTC
+END = 1_791_342_600  # 2026-10-07 03:10:00 UTC
 OUT = LAB_DIR.parent / "docs" / "evidence" / "fork-reports-2026-10-07.json"
 
 
@@ -2231,7 +2231,10 @@ def main() -> None:
         "generatedAt": now_iso(),
         "window": {"start": int(START), "end": int(END)},
         "forkBlock": clock.block_at(START - 120),  # last sampled block at or before 2 minutes ahead of the first report, so the run only warps forward
-        "note": "lab replay: Binance ETHUSDT 1 s converted to USD stands in for the live desk's four venues",
+        "note": (
+            "lab replay: Binance ETHUSDT 1 s converted to USD stands in for the live desk's four venues; because one "
+            "venue stands in for four, the run fixes dispBp 3, nSources 4 and kE4 10000 in every report"
+        ),
         "tObs": [int(t) for t in t_obs],
         "sigma15E9": [sigma_e9_from_per_sqrt_s(float(x)) for x in s15],
         "sigma5E9": [sigma_e9_from_per_sqrt_s(float(x)) for x in s5],
