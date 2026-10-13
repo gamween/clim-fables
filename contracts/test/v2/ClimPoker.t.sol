@@ -34,7 +34,8 @@ contract ClimPokerTest is Test {
                 tauKillSec: 180,
                 shortWindow: false,
                 dirSlopeE4: 5_000,
-                dirMaxPremiumPips: 1_000
+                dirMaxPremiumPips: 1_000,
+                ethIsToken0: true
             })
         );
         desk.set(T0, SIGMA_48, SIGMA_48, 1_000, 0);

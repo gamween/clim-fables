@@ -7,7 +7,7 @@ pragma solidity ^0.8.26;
 ///      sigma (per sqrt-second, 1e9) * eta (1e4) * sqrt(blockTime / 2) (1e6) * k (1e4) = fee * 1e23,
 ///      and 1 pip = 1e-6, so dividing by 1e17 yields pips. The largest possible product is
 ///      (2^32)^3 * 2^16 = 2^112, far below 2^256: no overflow for any input.
-///      Precondition: feeMinPips <= feeMaxPips (checked by ClimHook's constructor).
+///      Precondition: feeMinPips <= feeMaxPips (its callers' constructors check it).
 library ClimFeeMath {
     uint256 internal constant SCALE = 1e17;
 

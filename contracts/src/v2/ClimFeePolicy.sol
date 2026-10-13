@@ -11,7 +11,9 @@ import {IRiskDeskV2} from "./interfaces/IRiskDeskV2.sol";
 /// @notice Turns the desk's state into the fee clim recommends for one Fables pool:
 ///         fee = clamp(ceil(eta * k * sigma * sqrt(dtEff / 2)), floor, cap), sigma from the 5- or 15-minute window,
 ///         at least `safe` when the desk is blind or degraded. quoteDirectional() adds a premium on the side the
-///         venue-pool gap points to: premium = min(dirMax, dirSlope * |gap|), still capped.
+///         venue-pool gap points to: premium = min(dirMax, dirSlope * |gap|), still capped. A positive gap (venue
+///         above the pool: ETH is cheap in the pool) makes ETH buyers toxic; they swap one-for-zero when ETH is
+///         currency0 and zero-for-one when ETH is currency1 (`ethIsToken0`).
 ///         Every parameter is immutable and comes from the lab (shared/params-fables.json).
 contract ClimFeePolicy {
     uint8 public constant MODE_NORMAL = 0;
@@ -28,6 +30,7 @@ contract ClimFeePolicy {
         bool shortWindow;
         uint32 dirSlopeE4;
         uint24 dirMaxPremiumPips;
+        bool ethIsToken0;
     }
 
     IRiskDeskV2 public immutable desk;
@@ -40,6 +43,7 @@ contract ClimFeePolicy {
     bool public immutable shortWindow;
     uint32 public immutable dirSlopeE4;
     uint24 public immutable dirMaxPremiumPips;
+    bool public immutable ethIsToken0;
 
     error InvalidParams();
 
@@ -59,6 +63,7 @@ contract ClimFeePolicy {
         shortWindow = p.shortWindow;
         dirSlopeE4 = p.dirSlopeE4;
         dirMaxPremiumPips = p.dirMaxPremiumPips;
+        ethIsToken0 = p.ethIsToken0;
     }
 
     /// @notice One fee for both directions, and the desk's mode.
@@ -66,7 +71,12 @@ contract ClimFeePolicy {
         (fee, mode,) = _quote();
     }
 
-    /// @notice One fee per swap direction (zero-for-one sells ETH, one-for-zero buys it), and the desk's mode.
+    /// @notice The desk's last observation time and report counter (0, 0 before the first report).
+    function lastObservation() external view returns (uint40 tObs, uint32 seq) {
+        (tObs,,,,,, seq) = desk.state();
+    }
+
+    /// @notice One fee per swap direction (zero-for-one pays currency0 for currency1), and the desk's mode.
     function quoteDirectional() external view returns (uint24 fee0For1, uint24 fee1For0, uint8 mode) {
         int32 dev;
         uint24 base;
@@ -79,8 +89,9 @@ contract ClimFeePolicy {
         if (premium > dirMaxPremiumPips) premium = dirMaxPremiumPips;
         uint256 toxic = uint256(base) + premium;
         if (toxic > capPips) toxic = capPips;
-        // venue above the pool: buyers of ETH (one-for-zero) are toxic; below: sellers (zero-for-one)
-        if (dev > 0) fee1For0 = uint24(toxic);
+        // venue above the pool: buyers of ETH are toxic; below: sellers. Buying ETH is one-for-zero when ETH is
+        // currency0 and zero-for-one when it is currency1.
+        if ((dev > 0) == ethIsToken0) fee1For0 = uint24(toxic);
         else fee0For1 = uint24(toxic);
     }
 

@@ -60,7 +60,8 @@ contract FablesForkTest is Test {
                 tauKillSec: 180,
                 shortWindow: false,
                 dirSlopeE4: 0,
-                dirMaxPremiumPips: 0
+                dirMaxPremiumPips: 0,
+                ethIsToken0: true
             })
         );
         poker = new ClimPoker(policy, HOOK, POOL_ID, false, 600, address(this));

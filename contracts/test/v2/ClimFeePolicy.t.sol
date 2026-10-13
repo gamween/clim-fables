@@ -27,6 +27,14 @@ contract ClimFeePolicyTest is Test {
         pure
         returns (ClimFeePolicy.Params memory)
     {
+        return _params(shortWindow, slopeE4, maxPrem, true);
+    }
+
+    function _params(bool shortWindow, uint32 slopeE4, uint24 maxPrem, bool ethIsToken0)
+        internal
+        pure
+        returns (ClimFeePolicy.Params memory)
+    {
         return ClimFeePolicy.Params({
             etaE4: ETA_E4,
             sqrtHalfDtE6: SQRT_HALF_DT_E6,
@@ -36,7 +44,8 @@ contract ClimFeePolicyTest is Test {
             tauKillSec: 180,
             shortWindow: shortWindow,
             dirSlopeE4: slopeE4,
-            dirMaxPremiumPips: maxPrem
+            dirMaxPremiumPips: maxPrem,
+            ethIsToken0: ethIsToken0
         });
     }
 
@@ -94,6 +103,54 @@ contract ClimFeePolicyTest is Test {
         (f01, f10,) = p.quoteDirectional();
         assertEq(f01, 1_200);
         assertEq(f10, 700);
+    }
+
+    function test_DirectionalPremiumWhenEthIsToken1() public {
+        ClimFeePolicy p = new ClimFeePolicy(desk, _params(false, 5_000, 1_000, false));
+        // ETH is currency1: buyers of ETH pay currency0, so they swap zero-for-one
+        desk.set(T0, SIGMA_48, SIGMA_48, 1_000, 0);
+        (uint24 f01, uint24 f10,) = p.quoteDirectional();
+        assertEq(f01, 1_200);
+        assertEq(f10, 700);
+        // venue below the pool: sellers of ETH (one-for-zero) are toxic
+        desk.set(T0, SIGMA_48, SIGMA_48, -1_000, 0);
+        (f01, f10,) = p.quoteDirectional();
+        assertEq(f01, 700);
+        assertEq(f10, 1_200);
+    }
+
+    function test_LastObservationReadsTheDesk() public {
+        ClimFeePolicy p = new ClimFeePolicy(desk, _params(false, 0, 0));
+        desk.set(T0 - 7, SIGMA_48, SIGMA_48, 0, 0);
+        desk.set(T0 - 3, SIGMA_48, SIGMA_48, 0, 0);
+        (uint40 tObs, uint32 seq) = p.lastObservation();
+        assertEq(tObs, T0 - 3);
+        assertEq(seq, 2);
+    }
+
+    function test_FreshUntilTauKillThenBlind() public {
+        ClimFeePolicy p = new ClimFeePolicy(desk, _params(false, 0, 0));
+        desk.set(T0, SIGMA_48, SIGMA_48, 0, 0);
+        vm.warp(T0 + 180);
+        (uint24 fee, uint8 mode) = p.quote();
+        assertEq(mode, p.MODE_NORMAL());
+        assertEq(fee, 700);
+        vm.warp(T0 + 181);
+        (fee, mode) = p.quote();
+        assertEq(mode, p.MODE_BLIND());
+        assertEq(fee, 3_000);
+    }
+
+    /// @dev The desk clamps k to [1, 2]; a desk that does not (here a mock) still cannot push the fee out of bounds.
+    function testFuzz_UnclampedKStaysWithinBounds(uint16 k, uint32 sigma, int32 dev) public {
+        ClimFeePolicy p = new ClimFeePolicy(desk, _params(true, 7_000, 2_000));
+        desk.set(T0, sigma, sigma, dev, 0);
+        desk.setK(k);
+        (uint24 f01, uint24 f10,) = p.quoteDirectional();
+        assertGe(f01, 700);
+        assertGe(f10, 700);
+        assertLe(f01, 6_000);
+        assertLe(f10, 6_000);
     }
 
     function test_DirectionalPremiumIsCappedTwice() public {
