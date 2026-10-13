@@ -4,7 +4,7 @@
 
 **Goal:** Turn clim into a showcase Fables' CTO can integrate: a verifiable volatility desk feeding Fables' dynamic fee on Robinhood Chain, with live reference pools, a recorded fork run against Fables' real hook, a one-to-one Fables-style app and a Figma deck.
 
-**Architecture:** The lab calibrates the fee policy on Fables' own ETH/USDG data. Contracts split data (`RiskDeskV2`), policy (`ClimFeePolicy`, immutable parameters from the lab) and action (`ClimPoker`, which calls Fables' `pokeFee`), plus a clean-room `PokeFeeHook` for our testnet pools. The CRE workflow writes to Robinhood Chain testnet; the app reads Fables mainnet (read only), the testnet desk and pools, and the recorded fork run.
+**Architecture:** The lab calibrates the fee policy on Fables' own ETH/USDG data. Contracts split data (`RiskDeskV2`), policy (`ClimFeePolicy`, immutable parameters from the lab) and action (`ClimPoker`, which calls Fables' `pokeFee`), plus an independent `PokeFeeHook` (written from Fables' published ABI) for our testnet pools. The CRE workflow writes to Robinhood Chain testnet; the app reads Fables mainnet (read only), the testnet desk and pools, and the recorded fork run.
 
 **Tech Stack:** Python 3.12 + numpy (lab, uv), Foundry + Solidity 0.8.26 + Uniswap v4 + OpenZeppelin 5.5 (contracts), Chainlink CRE TypeScript SDK (desk), Bun (bots), Next.js (app), Figma (deck).
 
@@ -121,7 +121,7 @@ git push
 
 ### Task 5: Write and execute plan 04 (app)
 
-- [ ] Write `docs/superpowers/plans/2026-10-13-clim-fables-04-app.md`. Its Task 1 is the Fables UI inventory (every page, component, state, motion and copy pattern of fables.fi and its app, read through the browser, screenshots kept in `.local/`, no wallet connected), written to `docs/research/fables-ui-inventory.md`. Inputs: spec §2 (Fables look), §5.5, §5.8, the brand files in `.local/research-2026-10-13/fables-brand/`. Plan 04 also owns, for the CTO checklist (spec §5.8): `docs/security.md` (threat model of `RiskDeskV2`, `ClimFeePolicy`, `ClimPoker` and the CRE path, each failure mode with the fee that results and the test that proves it), the exact level 1 keeper diff (`docs/integrate/keeper-read.ts`), the level 2 `grantRole` calldata, measured gas per poke and per report on Robinhood testnet, the GitHub Actions CI (forge, lab, app tests and lint), and the README's "Verify in 10 minutes" path.
+- [ ] Write `docs/superpowers/plans/2026-10-13-clim-fables-04-app.md`. Its Task 1 is the Fables UI inventory (every page, component, state, motion and copy pattern of fables.fi and its app, read through the browser, screenshots kept in `.local/`, no wallet connected), written to `docs/research/fables-ui-inventory.md`. Inputs: spec §2 (Fables look), §5.5, §5.8, the brand files in `.local/research-2026-10-13/fables-brand/`. Plan 04 also owns, for the CTO checklist (spec §5.8): `docs/security.md` (threat model of `RiskDeskV2`, `ClimFeePolicy`, `ClimPoker` and the CRE path, each failure mode with the fee that results and the test that proves it), the exact level 1 keeper diff (`docs/integrate/keeper-read.ts`), the level 2 AccessManager batch calldata (`grantRole`, `setTargetFunctionRole` for ClimPoker's restricted functions, the CLIM_RUNNER role), measured gas per poke and per report on Robinhood testnet, the GitHub Actions CI (forge, lab, app tests and lint), and the README's "Verify in 10 minutes" path.
 - [ ] Execute it. Gate as in the table above.
 
 ### Task 6: Write and execute plan 05 (deck and message)

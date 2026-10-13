@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the on-chain side of clim × Fables: `RiskDeskV2` (data), `ClimFeePolicy` (immutable parameters from the lab), `ClimPoker` (calls Fables' `pokeFee`), a clean-room `PokeFeeHook` for our testnet pools, fork tests against Fables' real ETH/USDG hook on Robinhood Chain mainnet, and a recorded run (`npm run demo:fork`).
+**Goal:** Build the on-chain side of clim × Fables: `RiskDeskV2` (data), `ClimFeePolicy` (immutable parameters from the lab), `ClimPoker` (calls Fables' `pokeFee`), an independent `PokeFeeHook` (written from Fables' published ABI) for our testnet pools, fork tests against Fables' real ETH/USDG hook on Robinhood Chain mainnet, and a recorded run (`npm run demo:fork`).
 
-**Architecture:** Data, policy and action are three contracts with one job each. `ClimPoker` holds Fables' FEE_POKER role and talks to Fables' hook through interfaces written from Fables' published ABI only. Everything is checked on an anvil fork of Robinhood Chain mainnet; nothing is sent to mainnet.
+**Architecture:** Data, policy and action are three contracts with one job each. `ClimPoker` holds Fables' FEE_POKER role, is governed by Fables' own AccessManager (only roles Fables grants can call it; clim holds no admin power), and talks to Fables' hook through interfaces written from Fables' published ABI only. Everything is checked on an anvil fork of Robinhood Chain mainnet; nothing is sent to mainnet.
 
-**Tech Stack:** Foundry (solc 0.8.26, cancun), Uniswap v4 core and periphery, OpenZeppelin Contracts 5.5 (`AccessManaged`, `Ownable2Step`), OpenZeppelin uniswap-hooks (`BaseOverrideFee`), the vendored Chainlink `ReceiverTemplate`.
+**Tech Stack:** Foundry (solc 0.8.26, cancun), Uniswap v4 core and periphery, OpenZeppelin Contracts 5.5 (`AccessManaged`, `AccessManager`), OpenZeppelin uniswap-hooks (`BaseOverrideFee`), the vendored Chainlink `ReceiverTemplate`.
 
 Spec: `docs/superpowers/specs/2026-10-13-clim-fables-design.md` §5.3, §5.4, §5.7, §5.8. Depends on plan 01 for `shared/params-fables.json` (Task 9 only).
 
@@ -27,14 +27,17 @@ Robinhood Chain mainnet (4663), read on 2026-10-13:
 | ETH/USDG PoolKey | currency0 `address(0)` (native ETH), currency1 USDG `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168`, fee `0x800000` (dynamic), tickSpacing `10`, hooks = the hook above |
 | Pool config | floor 100 pips, flat 700 pips, cap 6,000 pips; under an override the hook charges `max(poke, max(floor, flat × 50 %))`, capped |
 | Uniswap v4 PoolManager | `0x8366a39CC670B4001A1121B8F6A443A643e40951` |
+| CLIM_RUNNER role id | none yet: a new role Fables would create for who may call `ClimPoker.poke()`; `7` in the tests and the run |
+| Fork block for the fork suite | `87_780_000` (2026-10-13 19:59 UTC), pinned so runs are reproducible |
 
 Fables' published ABI (verified source on Sourcify; signatures only, no code copied):
 - old generation (ETH/USDG): `pokeFee(bytes32 poolId, uint24 fee, uint40 ttl)` selector `0x8aebf0c1`; `clearPoke(bytes32)` `0x5f4934a8`; `currentFee(bytes32 poolId, bool zeroForOne) view returns (uint24)` `0x15452022`; events `FeePoked(bytes32 indexed poolId, uint24 fee, uint40 expiry)`, `PokeCleared(bytes32 indexed poolId)`, `PoolConfigured(bytes32 indexed poolId, uint24 floorPips, uint24 flatPips, uint24 maxFee)`.
 - new generation: `pokeFee(bytes32 poolId, uint24 fee0For1, uint24 fee1For0, uint40 ttl)` selector `0x3f740010`; event `FeePoked(bytes32 indexed poolId, uint24 fee0For1, uint24 fee1For0, uint40 expiry)`.
 - `pokeFee` reverts above the cap, below the floor, or with a TTL of 0 or above 72 h.
-- AccessManager: `grantRole(uint64,address,uint32)` selector `0x25c471a0`.
+- `setPoolConfig((address,address,uint24,int24,address),uint24,uint24,uint24)` (PoolKey, floor, flat, max fee), callable by Fables' admin; a poke outside the band reverts with custom error `0x652853ee` (selector observed on the fork).
+- AccessManager: `grantRole(uint64,address,uint32)` selector `0x25c471a0`; `setTargetFunctionRole(address,bytes4[],uint64)`; `labelRole(uint64,string)`.
 
-Direction convention used everywhere: `devPips` = (venue price − pool price) / pool price × 1e6. A positive gap means the pool is cheap: buyers of ETH are the toxic side, and they swap one-for-zero (they pay USDG, currency1). So a positive gap puts the premium on `fee1For0`.
+Direction convention used everywhere: `devPips` = (venue price − pool price) / pool price × 1e6. A positive gap means the pool is cheap: buyers of ETH are the toxic side, and they swap one-for-zero (they pay USDG, currency1). So a positive gap puts the premium on `fee1For0` when ETH is currency0 (ETH/USDG); `ClimFeePolicy.Params.ethIsToken0 = false` flips it to `fee0For1` for a pool where ETH is currency1.
 
 Environment: `RH_MAINNET_RPC_URL` (an archive RPC, e.g. Alchemy `https://robinhood-mainnet.g.alchemy.com/v2/<key>`) in `contracts/.env`. Fork tests skip when it is unset.
 
@@ -46,8 +49,8 @@ Environment: `RH_MAINNET_RPC_URL` (an archive RPC, e.g. Alchemy `https://robinho
 | `contracts/src/v2/RiskDeskV2.sol` | Stores sigma 15 min, sigma 5 min and the venue-pool gap from CRE reports, with v1's guards |
 | `contracts/src/v2/ClimFeePolicy.sol` | Immutable parameters; `quote()` and `quoteDirectional()` from the desk |
 | `contracts/src/v2/interfaces/IOverrideFeeHook.sol` | `ISymmetricPokeHook` and `IDirectionalPokeHook`, from Fables' published ABI |
-| `contracts/src/v2/ClimPoker.sol` | Holds FEE_POKER; composes the desk's fee with the keeper's event override and calls `pokeFee` |
-| `contracts/src/v2/PokeFeeHook.sol` | Clean-room v4 hook with the same public override interface, for our testnet pools |
+| `contracts/src/v2/ClimPoker.sol` | Holds FEE_POKER, governed by Fables' AccessManager; composes the desk's fee with the keeper's event override and calls `pokeFee` |
+| `contracts/src/v2/PokeFeeHook.sol` | Independent v4 hook with the same public override interface (from the published ABI), for our testnet pools |
 | `contracts/test/v2/utils/DeskV2Helpers.sol` | Report encoding and delivery for v2 tests |
 | `contracts/test/v2/mocks/MockDeskV2.sol`, `MockPokeHook.sol` | Test doubles |
 | `contracts/test/v2/*.t.sol` | Unit tests |
@@ -87,6 +90,14 @@ robinhood_testnet = "${RH_TESTNET_RPC_URL}"
 anvil = "http://127.0.0.1:8545"
 ```
 
+Append, so `forge fmt --check` leaves the vendored Chainlink receiver and the fixtures byte-identical to upstream:
+
+```toml
+[fmt]
+# vendored code (Chainlink cre-templates) and fixtures keep their upstream formatting
+ignore = ["src/receiver/*.sol", "test/fixtures/**"]
+```
+
 - [ ] **Step 2: Document the variables**
 
 Append to `contracts/.env.example`:
@@ -115,6 +126,7 @@ git commit -m "chore(contracts): Robinhood Chain endpoints and evidence write pe
 **Files:**
 - Create: `contracts/src/v2/interfaces/IRiskDeskV2.sol`
 - Create: `contracts/src/v2/RiskDeskV2.sol`
+- Modify: `contracts/src/receiver/ReceiverTemplate.sol` (`setForwarderAddress` becomes `public`)
 - Create: `contracts/test/v2/utils/DeskV2Helpers.sol`
 - Test: `contracts/test/v2/RiskDeskV2.t.sol`
 
@@ -138,6 +150,7 @@ interface IRiskDeskV2 {
     /// @param dispBp Venue dispersion in basis points.
     /// @param nSources Venues that passed the freshness filter.
     /// @param kE4 Model-risk multiplier applied, times 1e4 (clamped to [10_000, 20_000]).
+    /// @param flags State flags after this report (bit 0: degraded, the venues disagree beyond DISP_MAX_BP).
     event RiskReportedV2(
         uint32 indexed seq,
         uint40 tObs,
@@ -148,22 +161,15 @@ interface IRiskDeskV2 {
         int32 devPips,
         uint16 dispBp,
         uint8 nSources,
-        uint16 kE4
+        uint16 kE4,
+        uint8 flags
     );
 
     /// @notice Latest accepted state, packed in one storage slot.
     function state()
         external
         view
-        returns (
-            uint40 tObs,
-            uint32 sigma15E9,
-            uint32 sigma5E9,
-            int32 devPips,
-            uint16 kE4,
-            uint8 flags,
-            uint32 seq
-        );
+        returns (uint40 tObs, uint32 sigma15E9, uint32 sigma5E9, int32 devPips, uint16 kE4, uint8 flags, uint32 seq);
 }
 ```
 
@@ -207,10 +213,12 @@ pragma solidity ^0.8.26;
 import {RiskDeskV2} from "../../src/v2/RiskDeskV2.sol";
 import {IRiskDeskV2} from "../../src/v2/interfaces/IRiskDeskV2.sol";
 import {FLAG_DEGRADED} from "../../src/interfaces/IRiskDesk.sol";
+import {ReceiverTemplate} from "../../src/receiver/ReceiverTemplate.sol";
 import {DeskV2Helpers} from "./utils/DeskV2Helpers.sol";
 
 contract RiskDeskV2Test is DeskV2Helpers {
     RiskDeskV2 internal desk;
+    address internal prodForwarder = makeAddr("keystoneForwarder");
 
     function setUp() public {
         vm.warp(T0);
@@ -243,8 +251,14 @@ contract RiskDeskV2Test is DeskV2Helpers {
 
     function test_EmitsRiskReportedV2() public {
         vm.expectEmit(true, false, false, true, address(desk));
-        emit IRiskDeskV2.RiskReportedV2(1, T0, SIGMA_100, SIGMA_48, SIGMA_100, SIGMA_48, 50, 3, 4, 10_000);
+        emit IRiskDeskV2.RiskReportedV2(1, T0, SIGMA_100, SIGMA_48, SIGMA_100, SIGMA_48, 50, 3, 4, 10_000, 0);
         _deliverV2(desk, _reportV2(T0, SIGMA_100, SIGMA_48, 50, 3, 4, 10_000));
+    }
+
+    function test_EmitsTheDegradedFlag() public {
+        vm.expectEmit(true, false, false, true, address(desk));
+        emit IRiskDeskV2.RiskReportedV2(1, T0, SIGMA_48, SIGMA_48, SIGMA_48, SIGMA_48, 0, 26, 4, 10_000, FLAG_DEGRADED);
+        _deliverV2(desk, _reportV2(T0, SIGMA_48, SIGMA_48, 0, 26, 4, 10_000));
     }
 
     function test_EnvelopeAppliesToEachWindowSeparately() public {
@@ -306,11 +320,101 @@ contract RiskDeskV2Test is DeskV2Helpers {
         desk.onReport("", _reportV2(T0, SIGMA_48, 0));
     }
 
+    function test_AcceptsAReportExactlyMinGapLater() public {
+        _deliverV2(desk, _reportV2(T0, SIGMA_48, 0));
+        vm.warp(T0 + 20);
+        _deliverV2(desk, _reportV2(T0 + 20, SIGMA_48, 0));
+        (uint40 tObs,,,,,, uint32 seq) = desk.state();
+        assertEq(tObs, T0 + 20);
+        assertEq(seq, 2);
+    }
+
+    function test_AcceptsAReportExactlyMaxSkewAhead() public {
+        _deliverV2(desk, _reportV2(T0 + 30, SIGMA_48, 0));
+        (uint40 tObs,,,,,,) = desk.state();
+        assertEq(tObs, T0 + 30);
+    }
+
+    function test_FirstReportIsClampedToTheAbsoluteBounds() public {
+        _deliverV2(desk, _reportV2(T0, type(uint32).max, 1, 0, 3, 4, 10_000));
+        (, uint32 s15, uint32 s5,,,,) = desk.state();
+        assertEq(s15, desk.SIGMA_MAX_E9());
+        assertEq(s5, desk.SIGMA_MIN_E9());
+    }
+
+    function test_ReportAfterAnOutageIsTakenAsIs() public {
+        _deliverV2(desk, _reportV2(T0, SIGMA_10, 0));
+        // more than RESET_GAP later: the measurement is not ramped from a stale value
+        uint40 t = T0 + desk.RESET_GAP() + 1;
+        vm.warp(t);
+        _deliverV2(desk, _reportV2(t, SIGMA_300, 0));
+        (, uint32 s15,,,,,) = desk.state();
+        assertEq(s15, SIGMA_300);
+    }
+
+    function test_ReportExactlyResetGapLaterIsStillRamped() public {
+        _deliverV2(desk, _reportV2(T0, SIGMA_10, 0));
+        uint40 t = T0 + desk.RESET_GAP();
+        vm.warp(t);
+        _deliverV2(desk, _reportV2(t, SIGMA_300, 0));
+        (, uint32 s15,,,,,) = desk.state();
+        assertEq(s15, SIGMA_10 * 2);
+    }
+
+    /// @dev Applied sigma stays in the absolute bounds, and inside x0.8 / x2 of the previous one unless RESET_GAP passed.
+    function testFuzz_AppliedSigmaStaysInTheEnvelope(uint32 first, uint32 second, uint40 gap) public {
+        gap = uint40(bound(gap, 20, 600));
+        _deliverV2(desk, _reportV2(T0, first, 0));
+        (, uint32 prev,,,,,) = desk.state();
+        assertGe(prev, desk.SIGMA_MIN_E9());
+        assertLe(prev, desk.SIGMA_MAX_E9());
+
+        vm.warp(T0 + gap);
+        _deliverV2(desk, _reportV2(T0 + gap, second, 0));
+        (, uint32 next,,,,,) = desk.state();
+        assertGe(next, desk.SIGMA_MIN_E9());
+        assertLe(next, desk.SIGMA_MAX_E9());
+        if (gap <= desk.RESET_GAP()) {
+            assertGe(uint256(next), (uint256(prev) * 8) / 10);
+            assertLe(uint256(next), uint256(prev) * 2);
+        }
+    }
+
     function test_DisableSimIsOwnerOnly() public {
+        desk.setExpectedAuthor(makeAddr("workflowOwner"));
         vm.prank(attacker);
         vm.expectRevert();
-        desk.disableSim();
-        desk.disableSim();
+        desk.disableSim(prodForwarder);
+    }
+
+    function test_RevertWhen_DisableSimWithoutAForwarder() public {
+        desk.setExpectedAuthor(makeAddr("workflowOwner"));
+        vm.expectRevert(ReceiverTemplate.InvalidForwarderAddress.selector);
+        desk.disableSim(address(0));
+    }
+
+    function test_RevertWhen_DisableSimWithoutAPinnedWorkflow() public {
+        vm.expectRevert(RiskDeskV2.WorkflowNotPinned.selector);
+        desk.disableSim(prodForwarder);
+        assertTrue(desk.simMode());
+    }
+
+    function test_DisableSimSwitchesToTheProductionForwarderAtOnce() public {
+        desk.setExpectedWorkflowId(keccak256("workflow"));
+        vm.expectEmit(address(desk));
+        emit RiskDeskV2.SimDisabled(prodForwarder);
+        desk.disableSim(prodForwarder);
+        assertFalse(desk.simMode());
+        assertEq(desk.getForwarderAddress(), prodForwarder);
+        // the simulation forwarder is no longer trusted
+        vm.prank(forwarder, operator);
+        vm.expectRevert(abi.encodeWithSelector(ReceiverTemplate.InvalidSender.selector, forwarder, prodForwarder));
+        desk.onReport("", _reportV2(T0, SIGMA_48, 0));
+    }
+
+    function test_DisableSimAcceptsAPinnedAuthorAlone() public {
+        desk.setExpectedAuthor(makeAddr("workflowOwner"));
+        desk.disableSim(prodForwarder);
         assertFalse(desk.simMode());
     }
 }
@@ -323,6 +427,8 @@ Expected: compilation error, `RiskDeskV2.sol` not found.
 
 - [ ] **Step 5: Implement `RiskDeskV2`**
 
+`disableSim(prodForwarder)` sets the production forwarder in the same call, so in the vendored `ReceiverTemplate.sol` change `setForwarderAddress` from `external` to `public` (no ABI change) and add above it the line `` ///      clim: `public` instead of upstream's `external`, so RiskDeskV2.disableSim() can set it in the same call. ``
+
 ```solidity
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
@@ -334,8 +440,10 @@ import {IRiskDeskV2} from "./interfaces/IRiskDeskV2.sol";
 /// @title RiskDeskV2
 /// @notice Stores what the clim CRE workflow measures for Fables' pool: 15-minute and 5-minute ETH realized
 ///         volatility and the venue-versus-pool price gap. Same guards as v1's RiskDesk: report spacing, clock skew,
-///         a quorum of venues, a volatility envelope per window, no setter for any value. The owner only chooses the
-///         forwarder and workflow to trust (ReceiverTemplate) and can end simulation mode for good.
+///         a quorum of venues, a volatility envelope per window. The owner cannot set sigma or the gap directly, but
+///         chooses which forwarder and workflow to trust (ReceiverTemplate), which decides what gets reported; so once
+///         the desk is configured, ownership should go to a timelock or be renounced (see docs/security.md).
+///         The owner can also end simulation mode for good, switching to the production forwarder in the same call.
 contract RiskDeskV2 is ReceiverTemplate, IRiskDeskV2 {
     /// @notice ABI layout of the CRE report: abi.encode(uint40,uint32,uint32,int32,uint16,uint8,uint16).
     struct Report {
@@ -367,6 +475,9 @@ contract RiskDeskV2 is ReceiverTemplate, IRiskDeskV2 {
     uint40 public constant MIN_GAP = 20;
     uint40 public constant MAX_SKEW = 30;
     uint8 public constant MIN_SOURCES = 3;
+    /// @notice A report more than this after the last one restarts the envelope: after an outage the measurement is
+    ///         taken as is (within the absolute bounds), not ramped from a stale value.
+    uint40 public constant RESET_GAP = 180;
 
     /// @notice EOA allowed to originate reports while simulation mode is on (the `cre workflow simulate --broadcast` key).
     address public immutable simOperator;
@@ -375,9 +486,10 @@ contract RiskDeskV2 is ReceiverTemplate, IRiskDeskV2 {
 
     State private s_state;
 
-    event SimDisabled();
+    event SimDisabled(address forwarder);
 
     error ZeroSimOperator();
+    error WorkflowNotPinned();
     error NotSimOperator(address origin);
     error StaleReport(uint40 tObs, uint40 lastTObs);
     error FutureReport(uint40 tObs, uint256 blockTimestamp);
@@ -399,10 +511,18 @@ contract RiskDeskV2 is ReceiverTemplate, IRiskDeskV2 {
         return (s.tObs, s.sigma15E9, s.sigma5E9, s.devPips, s.kE4, s.flags, s.seq);
     }
 
-    /// @notice Irreversibly stops accepting reports on the sole basis of tx.origin (switch to the production forwarder first).
-    function disableSim() external onlyOwner {
+    /// @notice Irreversibly stops accepting reports on the sole basis of tx.origin, and in the same call trusts the
+    ///         production forwarder, so the desk never accepts unsigned reports from the simulation forwarder without
+    ///         the tx.origin guard. The workflow must already be pinned (expected workflow id or author).
+    /// @param prodForwarder The production KeystoneForwarder, which verifies the DON's signatures.
+    function disableSim(address prodForwarder) external onlyOwner {
+        if (prodForwarder == address(0)) revert InvalidForwarderAddress();
+        if (this.getExpectedWorkflowId() == bytes32(0) && this.getExpectedAuthor() == address(0)) {
+            revert WorkflowNotPinned();
+        }
+        setForwarderAddress(prodForwarder);
         simMode = false;
-        emit SimDisabled();
+        emit SimDisabled(prodForwarder);
     }
 
     function _processReport(bytes calldata report) internal override {
@@ -415,7 +535,7 @@ contract RiskDeskV2 is ReceiverTemplate, IRiskDeskV2 {
         if (r.tObs > block.timestamp + MAX_SKEW) revert FutureReport(r.tObs, block.timestamp);
         if (r.nSources < MIN_SOURCES) revert TooFewSources(r.nSources);
 
-        bool first = s.seq == 0;
+        bool first = s.seq == 0 || r.tObs > s.tObs + RESET_GAP;
         State memory n = State({
             tObs: r.tObs,
             sigma15E9: _envelope(r.sigma15E9, s.sigma15E9, first),
@@ -429,14 +549,25 @@ contract RiskDeskV2 is ReceiverTemplate, IRiskDeskV2 {
         _emitReported(n, r);
     }
 
-    /// @dev Separate frame keeps the 10-field event under the stack limit without via-IR.
+    /// @dev Separate frame keeps the 11-field event under the stack limit without via-IR.
     function _emitReported(State memory n, Report memory r) private {
         emit RiskReportedV2(
-            n.seq, r.tObs, n.sigma15E9, n.sigma5E9, r.sigma15E9, r.sigma5E9, n.devPips, r.dispBp, r.nSources, n.kE4
+            n.seq,
+            r.tObs,
+            n.sigma15E9,
+            n.sigma5E9,
+            r.sigma15E9,
+            r.sigma5E9,
+            n.devPips,
+            r.dispBp,
+            r.nSources,
+            n.kE4,
+            n.flags
         );
     }
 
-    /// @dev Volatility rises fast (x2 per report) and decays slowly (x0.8 per report); the first report only gets the absolute bounds.
+    /// @dev Volatility rises fast (x2 per report) and decays slowly (x0.8 per report); the first report, and the
+    ///      first one after RESET_GAP of silence, only get the absolute bounds.
     function _envelope(uint32 reported, uint32 prev, bool first) internal pure returns (uint32) {
         uint256 lo = SIGMA_MIN_E9;
         uint256 hi = SIGMA_MAX_E9;
@@ -456,7 +587,7 @@ contract RiskDeskV2 is ReceiverTemplate, IRiskDeskV2 {
 - [ ] **Step 6: Run the tests**
 
 Run: `forge test --match-path test/v2/RiskDeskV2.t.sol -q`
-Expected: `13 passed`. If `test_EmitsRiskReportedV2` fails with "stack too deep", compile once with `forge build --sizes` to read the error location and move the decode into a separate `private` function returning `Report memory`; do not enable via-IR (v1 builds without it).
+Expected: `24 passed` (the envelope fuzz test runs 1,000 cases). The 11-field `RiskReportedV2` is emitted from its own `private` frame (`_emitReported`) to stay under the stack limit; do not enable via-IR (v1 builds without it).
 
 - [ ] **Step 7: Commit**
 
@@ -541,6 +672,14 @@ contract ClimFeePolicyTest is Test {
         pure
         returns (ClimFeePolicy.Params memory)
     {
+        return _params(shortWindow, slopeE4, maxPrem, true);
+    }
+
+    function _params(bool shortWindow, uint32 slopeE4, uint24 maxPrem, bool ethIsToken0)
+        internal
+        pure
+        returns (ClimFeePolicy.Params memory)
+    {
         return ClimFeePolicy.Params({
             etaE4: ETA_E4,
             sqrtHalfDtE6: SQRT_HALF_DT_E6,
@@ -550,7 +689,8 @@ contract ClimFeePolicyTest is Test {
             tauKillSec: 180,
             shortWindow: shortWindow,
             dirSlopeE4: slopeE4,
-            dirMaxPremiumPips: maxPrem
+            dirMaxPremiumPips: maxPrem,
+            ethIsToken0: ethIsToken0
         });
     }
 
@@ -608,6 +748,54 @@ contract ClimFeePolicyTest is Test {
         (f01, f10,) = p.quoteDirectional();
         assertEq(f01, 1_200);
         assertEq(f10, 700);
+    }
+
+    function test_DirectionalPremiumWhenEthIsToken1() public {
+        ClimFeePolicy p = new ClimFeePolicy(desk, _params(false, 5_000, 1_000, false));
+        // ETH is currency1: buyers of ETH pay currency0, so they swap zero-for-one
+        desk.set(T0, SIGMA_48, SIGMA_48, 1_000, 0);
+        (uint24 f01, uint24 f10,) = p.quoteDirectional();
+        assertEq(f01, 1_200);
+        assertEq(f10, 700);
+        // venue below the pool: sellers of ETH (one-for-zero) are toxic
+        desk.set(T0, SIGMA_48, SIGMA_48, -1_000, 0);
+        (f01, f10,) = p.quoteDirectional();
+        assertEq(f01, 700);
+        assertEq(f10, 1_200);
+    }
+
+    function test_LastObservationReadsTheDesk() public {
+        ClimFeePolicy p = new ClimFeePolicy(desk, _params(false, 0, 0));
+        desk.set(T0 - 7, SIGMA_48, SIGMA_48, 0, 0);
+        desk.set(T0 - 3, SIGMA_48, SIGMA_48, 0, 0);
+        (uint40 tObs, uint32 seq) = p.lastObservation();
+        assertEq(tObs, T0 - 3);
+        assertEq(seq, 2);
+    }
+
+    function test_FreshUntilTauKillThenBlind() public {
+        ClimFeePolicy p = new ClimFeePolicy(desk, _params(false, 0, 0));
+        desk.set(T0, SIGMA_48, SIGMA_48, 0, 0);
+        vm.warp(T0 + 180);
+        (uint24 fee, uint8 mode) = p.quote();
+        assertEq(mode, p.MODE_NORMAL());
+        assertEq(fee, 700);
+        vm.warp(T0 + 181);
+        (fee, mode) = p.quote();
+        assertEq(mode, p.MODE_BLIND());
+        assertEq(fee, 3_000);
+    }
+
+    /// @dev The desk clamps k to [1, 2]; a desk that does not (here a mock) still cannot push the fee out of bounds.
+    function testFuzz_UnclampedKStaysWithinBounds(uint16 k, uint32 sigma, int32 dev) public {
+        ClimFeePolicy p = new ClimFeePolicy(desk, _params(true, 7_000, 2_000));
+        desk.set(T0, sigma, sigma, dev, 0);
+        desk.setK(k);
+        (uint24 f01, uint24 f10,) = p.quoteDirectional();
+        assertGe(f01, 700);
+        assertGe(f10, 700);
+        assertLe(f01, 6_000);
+        assertLe(f10, 6_000);
     }
 
     function test_DirectionalPremiumIsCappedTwice() public {
@@ -668,16 +856,24 @@ import {FLAG_DEGRADED} from "../interfaces/IRiskDesk.sol";
 import {ClimFeeMath} from "../libraries/ClimFeeMath.sol";
 import {IRiskDeskV2} from "./interfaces/IRiskDeskV2.sol";
 
+/// @dev Policy modes, file-level so other contracts compare against them without a call (solc does not expose another
+///      contract's constants); ClimFeePolicy re-exports them as MODE_* for off-chain readers.
+uint8 constant POLICY_MODE_NORMAL = 0;
+uint8 constant POLICY_MODE_DEGRADED = 1;
+uint8 constant POLICY_MODE_BLIND = 2;
+
 /// @title ClimFeePolicy
 /// @notice Turns the desk's state into the fee clim recommends for one Fables pool:
 ///         fee = clamp(ceil(eta * k * sigma * sqrt(dtEff / 2)), floor, cap), sigma from the 5- or 15-minute window,
 ///         at least `safe` when the desk is blind or degraded. quoteDirectional() adds a premium on the side the
-///         venue-pool gap points to: premium = min(dirMax, dirSlope * |gap|), still capped.
+///         venue-pool gap points to: premium = min(dirMax, dirSlope * |gap|), still capped. A positive gap (venue
+///         above the pool: ETH is cheap in the pool) makes ETH buyers toxic; they swap one-for-zero when ETH is
+///         currency0 and zero-for-one when ETH is currency1 (`ethIsToken0`).
 ///         Every parameter is immutable and comes from the lab (shared/params-fables.json).
 contract ClimFeePolicy {
-    uint8 public constant MODE_NORMAL = 0;
-    uint8 public constant MODE_DEGRADED = 1;
-    uint8 public constant MODE_BLIND = 2;
+    uint8 public constant MODE_NORMAL = POLICY_MODE_NORMAL;
+    uint8 public constant MODE_DEGRADED = POLICY_MODE_DEGRADED;
+    uint8 public constant MODE_BLIND = POLICY_MODE_BLIND;
 
     struct Params {
         uint32 etaE4;
@@ -689,6 +885,7 @@ contract ClimFeePolicy {
         bool shortWindow;
         uint32 dirSlopeE4;
         uint24 dirMaxPremiumPips;
+        bool ethIsToken0;
     }
 
     IRiskDeskV2 public immutable desk;
@@ -701,6 +898,7 @@ contract ClimFeePolicy {
     bool public immutable shortWindow;
     uint32 public immutable dirSlopeE4;
     uint24 public immutable dirMaxPremiumPips;
+    bool public immutable ethIsToken0;
 
     error InvalidParams();
 
@@ -720,6 +918,7 @@ contract ClimFeePolicy {
         shortWindow = p.shortWindow;
         dirSlopeE4 = p.dirSlopeE4;
         dirMaxPremiumPips = p.dirMaxPremiumPips;
+        ethIsToken0 = p.ethIsToken0;
     }
 
     /// @notice One fee for both directions, and the desk's mode.
@@ -727,7 +926,12 @@ contract ClimFeePolicy {
         (fee, mode,) = _quote();
     }
 
-    /// @notice One fee per swap direction (zero-for-one sells ETH, one-for-zero buys it), and the desk's mode.
+    /// @notice The desk's last observation time and report counter (0, 0 before the first report).
+    function lastObservation() external view returns (uint40 tObs, uint32 seq) {
+        (tObs,,,,,, seq) = desk.state();
+    }
+
+    /// @notice One fee per swap direction (zero-for-one pays currency0 for currency1), and the desk's mode.
     function quoteDirectional() external view returns (uint24 fee0For1, uint24 fee1For0, uint8 mode) {
         int32 dev;
         uint24 base;
@@ -740,8 +944,9 @@ contract ClimFeePolicy {
         if (premium > dirMaxPremiumPips) premium = dirMaxPremiumPips;
         uint256 toxic = uint256(base) + premium;
         if (toxic > capPips) toxic = capPips;
-        // venue above the pool: buyers of ETH (one-for-zero) are toxic; below: sellers (zero-for-one)
-        if (dev > 0) fee1For0 = uint24(toxic);
+        // venue above the pool: buyers of ETH are toxic; below: sellers. Buying ETH is one-for-zero when ETH is
+        // currency0 and zero-for-one when it is currency1.
+        if ((dev > 0) == ethIsToken0) fee1For0 = uint24(toxic);
         else fee0For1 = uint24(toxic);
     }
 
@@ -764,7 +969,7 @@ contract ClimFeePolicy {
 - [ ] **Step 5: Run the tests**
 
 Run: `forge test --match-path test/v2/ClimFeePolicy.t.sol -q`
-Expected: `9 passed` (the fuzz test runs 1,000 cases).
+Expected: `13 passed` (the two fuzz tests run 1,000 cases each).
 
 - [ ] **Step 6: Commit**
 
@@ -788,7 +993,7 @@ git commit -m "feat(contracts): ClimFeePolicy, clim's fee for a Fables pool with
 pragma solidity ^0.8.26;
 
 /// @notice The public override entry points of Fables' hooks, written from their published ABI (function
-///         signatures only; Fables' source is not used). `poolId` is a Uniswap v4 PoolId (bytes32 in the ABI).
+///         signatures only; no Fables code is copied). `poolId` is a Uniswap v4 PoolId (bytes32 in the ABI).
 
 /// @dev Fables' first-generation hooks (e.g. ETH/USDG): one fee for both directions.
 interface ISymmetricPokeHook {
@@ -824,6 +1029,10 @@ contract MockPokeHook {
 
     error FeeAboveCap();
 
+    function setCap(uint24 cap_) external {
+        cap = cap_;
+    }
+
     function pokeFee(bytes32 poolId, uint24 fee, uint40 ttl) external {
         if (fee > cap) revert FeeAboveCap();
         (lastPool, last0For1, last1For0, lastTtl) = (poolId, fee, fee, ttl);
@@ -845,25 +1054,37 @@ contract MockPokeHook {
 pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 import {ClimFeePolicy} from "../../src/v2/ClimFeePolicy.sol";
 import {ClimPoker} from "../../src/v2/ClimPoker.sol";
+import {FLAG_DEGRADED} from "../../src/interfaces/IRiskDesk.sol";
 import {MockDeskV2} from "./mocks/MockDeskV2.sol";
 import {MockPokeHook} from "./mocks/MockPokeHook.sol";
 
+/// @notice ClimPoker under an AccessManager set up the way Fables would: FEE_POKER (1) on postEvent and
+///         postEventAndPoke, CLIM_RUNNER (7, a role Fables creates) on poke.
 contract ClimPokerTest is Test {
+    uint64 internal constant FEE_POKER = 1;
+    uint64 internal constant CLIM_RUNNER = 7;
     uint40 internal constant T0 = 1_760_000_000;
     uint32 internal constant SIGMA_48 = 85_475;
-    uint32 internal constant SIGMA_300 = 534_217;
     bytes32 internal constant POOL = keccak256("pool");
 
+    AccessManager internal am;
     MockDeskV2 internal desk;
     MockPokeHook internal hook;
     ClimFeePolicy internal policy;
     address internal keeper = makeAddr("fablesKeeper");
+    address internal runner = makeAddr("climRunner");
     address internal anyone = makeAddr("anyone");
 
     function setUp() public {
         vm.warp(T0);
+        am = new AccessManager(address(this));
+        am.grantRole(FEE_POKER, keeper, 0);
+        am.grantRole(CLIM_RUNNER, keeper, 0);
+        am.grantRole(CLIM_RUNNER, runner, 0);
         desk = new MockDeskV2();
         hook = new MockPokeHook();
         policy = new ClimFeePolicy(
@@ -877,20 +1098,31 @@ contract ClimPokerTest is Test {
                 tauKillSec: 180,
                 shortWindow: false,
                 dirSlopeE4: 5_000,
-                dirMaxPremiumPips: 1_000
+                dirMaxPremiumPips: 1_000,
+                ethIsToken0: true
             })
         );
         desk.set(T0, SIGMA_48, SIGMA_48, 1_000, 0);
     }
 
-    function _poker(bool directional) internal returns (ClimPoker p) {
-        p = new ClimPoker(policy, address(hook), POOL, directional, 600, address(this));
-        p.setEventKeeper(keeper);
+    function _poker(bool directional, uint40 ttl) internal returns (ClimPoker p) {
+        p = new ClimPoker(policy, address(hook), POOL, directional, ttl, address(am));
+        bytes4[] memory keeperSel = new bytes4[](2);
+        keeperSel[0] = ClimPoker.postEvent.selector;
+        keeperSel[1] = ClimPoker.postEventAndPoke.selector;
+        am.setTargetFunctionRole(address(p), keeperSel, FEE_POKER);
+        bytes4[] memory runnerSel = new bytes4[](1);
+        runnerSel[0] = ClimPoker.poke.selector;
+        am.setTargetFunctionRole(address(p), runnerSel, CLIM_RUNNER);
+    }
+
+    function _poker(bool directional) internal returns (ClimPoker) {
+        return _poker(directional, 600);
     }
 
     function test_SymmetricPokeSendsTheHigherSideToTheOldHook() public {
         ClimPoker p = _poker(false);
-        vm.prank(anyone);
+        vm.prank(runner);
         p.poke();
         assertEq(hook.lastPool(), POOL);
         assertEq(hook.last0For1(), 1_200); // max of 700 and 1_200: a symmetric hook gets the toxic side's fee
@@ -900,26 +1132,73 @@ contract ClimPokerTest is Test {
 
     function test_DirectionalPokeSendsBothSides() public {
         ClimPoker p = _poker(true);
+        vm.prank(runner);
         p.poke();
         assertEq(hook.last0For1(), 700);
         assertEq(hook.last1For0(), 1_200);
     }
 
+    function test_FablesKeeperCanPokeToo() public {
+        ClimPoker p = _poker(true);
+        vm.prank(keeper);
+        p.poke();
+        assertEq(hook.pokes(), 1);
+    }
+
     function test_RevertWhen_DeskIsBlind() public {
         ClimPoker p = _poker(false);
         vm.warp(T0 + 181);
+        vm.prank(runner);
         vm.expectRevert(ClimPoker.DeskBlind.selector);
         p.poke();
         assertEq(hook.pokes(), 0);
+    }
+
+    function test_DegradedDeskPokesAtLeastTheSafeFee() public {
+        ClimPoker p = _poker(true);
+        desk.set(T0, SIGMA_48, SIGMA_48, 0, FLAG_DEGRADED);
+        vm.expectEmit(true, false, false, true, address(p));
+        emit ClimPoker.Poked(2, T0, 3_000, 3_000, policy.MODE_DEGRADED(), false, T0 + 600, runner);
+        vm.prank(runner);
+        p.poke();
+        assertEq(hook.last0For1(), 3_000);
+        assertEq(hook.last1For0(), 3_000);
     }
 
     function test_EventOverrideComposesWithMax() public {
         ClimPoker p = _poker(true);
         vm.prank(keeper);
         p.postEvent(4_000, 900, T0 + 300);
+        vm.prank(runner);
         p.poke();
         assertEq(hook.last0For1(), 4_000);
         assertEq(hook.last1For0(), 1_200);
+    }
+
+    function test_SymmetricPokeWithAnEvent() public {
+        ClimPoker p = _poker(false);
+        vm.prank(keeper);
+        p.postEvent(4_000, 900, T0 + 300);
+        vm.prank(runner);
+        p.poke();
+        assertEq(hook.last0For1(), 4_000);
+        assertEq(hook.last1For0(), 4_000);
+        assertEq(hook.lastTtl(), 300); // the event raised the fee, so the override ends with the event
+    }
+
+    function test_PostEventAndPoke() public {
+        ClimPoker p = _poker(true);
+        vm.prank(keeper);
+        (uint24 f01, uint24 f10) = p.postEventAndPoke(5_000, 5_000, T0 + 300);
+        assertEq(f01, 5_000);
+        assertEq(f10, 5_000);
+        assertEq(hook.last0For1(), 5_000);
+        assertEq(hook.last1For0(), 5_000);
+        assertEq(hook.lastTtl(), 300);
+        (uint24 e01, uint24 e10, uint40 expiry) = p.eventOverride();
+        assertEq(e01, 5_000);
+        assertEq(e10, 5_000);
+        assertEq(expiry, T0 + 300);
     }
 
     function test_ExpiredEventIsIgnored() public {
@@ -928,44 +1207,130 @@ contract ClimPokerTest is Test {
         p.postEvent(4_000, 4_000, T0 + 100);
         vm.warp(T0 + 101);
         desk.set(T0 + 101, SIGMA_48, SIGMA_48, 0, 0);
+        vm.prank(runner);
         p.poke();
         assertEq(hook.last0For1(), 700);
+        assertEq(hook.lastTtl(), 600);
     }
 
     function test_EventFeeIsClampedToThePolicyCap() public {
         ClimPoker p = _poker(true);
         vm.prank(keeper);
         p.postEvent(9_000, 9_000, T0 + 300);
+        vm.prank(runner);
         p.poke();
         assertEq(hook.last0For1(), 6_000);
     }
 
-    function test_OnlyTheEventKeeperPostsEvents() public {
+    function test_RevertWhen_TheHookRejectsTheFee() public {
+        ClimPoker p = _poker(true);
+        hook.setCap(1_000);
+        vm.prank(runner);
+        vm.expectRevert(MockPokeHook.FeeAboveCap.selector);
+        p.poke();
+    }
+
+    function test_TtlIsAnchoredToTheObservation() public {
+        ClimPoker p = _poker(true);
+        vm.warp(T0 + 150); // still fresh (tauKillSec 180), but the observation is 150 s old
+        vm.prank(runner);
+        p.poke();
+        assertEq(hook.lastTtl(), 450);
+    }
+
+    function test_TtlFromAFutureObservationNeverExceedsTheConfiguredTtl() public {
+        ClimPoker p = _poker(true);
+        desk.set(T0 + 30, SIGMA_48, SIGMA_48, 0, 0);
+        vm.prank(runner);
+        p.poke();
+        assertEq(hook.lastTtl(), 600);
+    }
+
+    function test_TtlIsAtLeastOneSecond() public {
+        ClimPoker p = _poker(true, 60);
+        vm.warp(T0 + 100); // fresh for the policy, but past tObs + ttl
+        vm.prank(runner);
+        p.poke();
+        assertEq(hook.lastTtl(), 1);
+    }
+
+    function test_TtlIsLimitedByARaisingEvent() public {
+        ClimPoker p = _poker(true);
+        vm.prank(keeper);
+        p.postEvent(4_000, 0, T0 + 100);
+        vm.prank(runner);
+        p.poke();
+        assertEq(hook.lastTtl(), 100);
+    }
+
+    function test_TtlIgnoresAnEventBelowTheDeskFee() public {
+        ClimPoker p = _poker(true);
+        vm.prank(keeper);
+        p.postEvent(500, 500, T0 + 100);
+        vm.expectEmit(true, false, false, true, address(p));
+        emit ClimPoker.Poked(1, T0, 700, 1_200, 0, false, T0 + 600, runner);
+        vm.prank(runner);
+        p.poke();
+        assertEq(hook.lastTtl(), 600);
+    }
+
+    function test_RevertWhen_AStrangerPokes() public {
         ClimPoker p = _poker(true);
         vm.prank(anyone);
-        vm.expectRevert(abi.encodeWithSelector(ClimPoker.NotEventKeeper.selector, anyone));
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, anyone));
+        p.poke();
+        assertEq(hook.pokes(), 0);
+    }
+
+    function test_RevertWhen_AStrangerPostsAnEvent() public {
+        ClimPoker p = _poker(true);
+        vm.startPrank(anyone);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, anyone));
         p.postEvent(4_000, 4_000, T0 + 300);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, anyone));
+        p.postEventAndPoke(4_000, 4_000, T0 + 300);
+        vm.stopPrank();
     }
 
-    function test_OnlyTheOwnerSetsTheEventKeeper() public {
+    function test_RevertWhen_TheRunnerPostsAnEvent() public {
         ClimPoker p = _poker(true);
-        vm.prank(anyone);
-        vm.expectRevert();
-        p.setEventKeeper(anyone);
+        vm.prank(runner);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, runner));
+        p.postEvent(500, 500, T0 + 300);
     }
 
-    function test_RevertWhen_TtlIsZeroOrAbove72h() public {
-        vm.expectRevert(ClimPoker.InvalidConfig.selector);
-        new ClimPoker(policy, address(hook), POOL, false, 0, address(this));
-        vm.expectRevert(ClimPoker.InvalidConfig.selector);
-        new ClimPoker(policy, address(hook), POOL, false, 72 hours + 1, address(this));
+    function test_RevertWhen_EventExpiryIsBeyondMaxTtl() public {
+        ClimPoker p = _poker(true);
+        vm.startPrank(keeper);
+        p.postEvent(4_000, 4_000, T0 + 72 hours);
+        vm.expectRevert(abi.encodeWithSelector(ClimPoker.InvalidExpiry.selector, T0 + 72 hours + 1));
+        p.postEvent(4_000, 4_000, T0 + 72 hours + 1);
+        vm.stopPrank();
+    }
+
+    function test_EventPostedCarriesTheSender() public {
+        ClimPoker p = _poker(true);
+        vm.expectEmit(true, false, false, true, address(p));
+        emit ClimPoker.EventPosted(keeper, 4_000, 900, T0 + 300);
+        vm.prank(keeper);
+        p.postEvent(4_000, 900, T0 + 300);
     }
 
     function test_PokedEventCarriesWhatWasSent() public {
         ClimPoker p = _poker(true);
-        vm.expectEmit(false, false, false, true, address(p));
-        emit ClimPoker.Poked(700, 1_200, 0, false, uint40(T0 + 600));
+        vm.expectEmit(true, false, false, true, address(p));
+        emit ClimPoker.Poked(1, T0, 700, 1_200, 0, false, T0 + 600, runner);
+        vm.prank(runner);
         p.poke();
+    }
+
+    function test_RevertWhen_ConfigIsInvalid() public {
+        vm.expectRevert(ClimPoker.InvalidConfig.selector);
+        new ClimPoker(policy, address(hook), POOL, false, 0, address(am));
+        vm.expectRevert(ClimPoker.InvalidConfig.selector);
+        new ClimPoker(policy, address(hook), POOL, false, 72 hours + 1, address(am));
+        vm.expectRevert(ClimPoker.InvalidConfig.selector);
+        new ClimPoker(policy, address(hook), POOL, false, 600, address(0));
     }
 }
 ```
@@ -981,19 +1346,27 @@ Expected: compilation error, `ClimPoker.sol` not found.
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {AccessManaged} from "@openzeppelin/contracts/access/manager/AccessManaged.sol";
 
-import {ClimFeePolicy} from "./ClimFeePolicy.sol";
+import {ClimFeePolicy, POLICY_MODE_BLIND} from "./ClimFeePolicy.sol";
 import {ISymmetricPokeHook, IDirectionalPokeHook} from "./interfaces/IOverrideFeeHook.sol";
 
 /// @title ClimPoker
-/// @notice The adapter a Fables pool grants its FEE_POKER role to. Anyone may call poke(): the fee always comes from
-///         clim's policy (the desk's public state), never from the caller. Fables' keeper keeps posting event
-///         overrides (CPI, FOMC...) through postEvent(); poke() sends max(clim's fee, live event fee) per direction.
+/// @notice The adapter a Fables pool grants its FEE_POKER role to. It is governed by Fables' own AccessManager (the
+///         one that guards their hook): clim holds no admin power over it, and only the roles Fables grants can call
+///         it. The fee always comes from clim's policy (the desk's public state), never from the caller; Fables'
+///         keeper adds event overrides (CPI, FOMC...) and the poke sends max(clim's fee, live event fee) per direction.
 ///         Fables' hook still enforces its own floor, cap and TTL. A blind desk means no poke: the last override
-///         expires after `ttl` and the pool falls back to its flat fee. Revoking the role stops everything.
-contract ClimPoker is Ownable2Step {
+///         expires and the pool falls back to its flat fee.
+///
+///         Intended setup, one AccessManager batch by Fables' admin:
+///         - grantRole(FEE_POKER, poker, 0): the poker may call the hook's pokeFee;
+///         - setTargetFunctionRole(poker, [postEvent, postEventAndPoke], FEE_POKER): Fables' keeper posts its event
+///           overrides through the poker, so they compose with clim's fee in the hook's one override slot;
+///         - setTargetFunctionRole(poker, [poke], CLIM_RUNNER) with a role id Fables picks, granted to clim's runner
+///           bot and to Fables' keeper.
+///         Revoking FEE_POKER from the poker stops everything at once.
+contract ClimPoker is AccessManaged {
     struct EventOverride {
         uint24 fee0For1;
         uint24 fee1For0;
@@ -1008,21 +1381,42 @@ contract ClimPoker is Ownable2Step {
     bool public immutable directional;
     uint40 public immutable ttl;
 
-    address public eventKeeper;
     EventOverride public eventOverride;
 
-    event Poked(uint24 fee0For1, uint24 fee1For0, uint8 mode, bool eventApplied, uint40 expiry);
-    event EventKeeperSet(address keeper);
-    event EventPosted(uint24 fee0For1, uint24 fee1For0, uint40 expiry);
+    /// @param seq Desk report the fee comes from.
+    /// @param tObs Observation time of that report.
+    /// @param mode Policy mode (0 normal, 1 degraded).
+    /// @param eventApplied True when a live event override raised at least one side above clim's fee.
+    /// @param expiry When the override sent to the hook ends.
+    /// @param caller Who triggered the poke.
+    event Poked(
+        uint32 indexed seq,
+        uint40 tObs,
+        uint24 fee0For1,
+        uint24 fee1For0,
+        uint8 mode,
+        bool eventApplied,
+        uint40 expiry,
+        address caller
+    );
+    event EventPosted(address indexed by, uint24 fee0For1, uint24 fee1For0, uint40 expiry);
 
     error InvalidConfig();
     error DeskBlind();
-    error NotEventKeeper(address caller);
+    error InvalidExpiry(uint40 expiry);
 
-    constructor(ClimFeePolicy policy_, address hook_, bytes32 poolId_, bool directional_, uint40 ttl_, address owner_)
-        Ownable(owner_)
-    {
-        if (address(policy_) == address(0) || hook_ == address(0) || ttl_ == 0 || ttl_ > MAX_TTL) {
+    constructor(
+        ClimFeePolicy policy_,
+        address hook_,
+        bytes32 poolId_,
+        bool directional_,
+        uint40 ttl_,
+        address authority_
+    ) AccessManaged(authority_) {
+        if (
+            address(policy_) == address(0) || hook_ == address(0) || authority_ == address(0) || ttl_ == 0
+                || ttl_ > MAX_TTL
+        ) {
             revert InvalidConfig();
         }
         policy = policy_;
@@ -1032,43 +1426,81 @@ contract ClimPoker is Ownable2Step {
         ttl = ttl_;
     }
 
-    function setEventKeeper(address keeper) external onlyOwner {
-        eventKeeper = keeper;
-        emit EventKeeperSet(keeper);
+    /// @notice Records an event fee per direction, live until `expiry`; the next poke sends max(clim's fee, event fee).
+    ///         It replaces any previous event. A zero fee leaves that side to clim, and a past expiry clears the event.
+    ///         Restricted to the roles Fables assigns (FEE_POKER in the intended setup).
+    function postEvent(uint24 fee0For1, uint24 fee1For0, uint40 expiry) external restricted {
+        _postEvent(fee0For1, fee1For0, expiry);
     }
 
-    /// @notice Fables' keeper posts an event fee per direction until `expiry` (0 fees clear nothing: max() ignores them).
-    function postEvent(uint24 fee0For1, uint24 fee1For0, uint40 expiry) external {
-        if (msg.sender != eventKeeper) revert NotEventKeeper(msg.sender);
+    /// @notice postEvent() then poke() in one call, so an event fee reaches the hook at once.
+    function postEventAndPoke(uint24 fee0For1, uint24 fee1For0, uint40 expiry)
+        external
+        restricted
+        returns (uint24, uint24)
+    {
+        _postEvent(fee0For1, fee1For0, expiry);
+        return _poke();
+    }
+
+    /// @notice Sends clim's current fee, composed with any live event fee, to the hook. Restricted to the roles Fables
+    ///         assigns (CLIM_RUNNER in the intended setup).
+    function poke() external restricted returns (uint24 fee0For1, uint24 fee1For0) {
+        return _poke();
+    }
+
+    function _postEvent(uint24 fee0For1, uint24 fee1For0, uint40 expiry) private {
+        if (expiry > block.timestamp + MAX_TTL) revert InvalidExpiry(expiry);
         eventOverride = EventOverride(fee0For1, fee1For0, expiry);
-        emit EventPosted(fee0For1, fee1For0, expiry);
+        emit EventPosted(msg.sender, fee0For1, fee1For0, expiry);
     }
 
-    /// @notice Sends clim's current fee (composed with any live event fee) to the hook.
-    function poke() external returns (uint24 fee0For1, uint24 fee1For0) {
-        uint8 mode;
-        (fee0For1, fee1For0, mode) = policy.quoteDirectional();
-        if (mode == policy.MODE_BLIND()) revert DeskBlind();
+    function _poke() private returns (uint24 fee0For1, uint24 fee1For0) {
+        (uint24 d01, uint24 d10, uint8 mode) = policy.quoteDirectional();
+        if (mode == POLICY_MODE_BLIND) revert DeskBlind();
+        if (!directional) {
+            // one fee for both sides: the toxic side's
+            if (d10 > d01) d01 = d10;
+            else d10 = d01;
+        }
+        uint40 eventExpiry;
+        (fee0For1, fee1For0, eventExpiry) = _withEvent(d01, d10);
+        bool applied = fee0For1 != d01 || fee1For0 != d10;
 
+        (uint40 tObs, uint32 seq) = policy.lastObservation();
+        uint40 ttlSend = _ttlSend(tObs, applied ? eventExpiry : 0);
+        if (directional) IDirectionalPokeHook(hook).pokeFee(poolId, fee0For1, fee1For0, ttlSend);
+        else ISymmetricPokeHook(hook).pokeFee(poolId, fee0For1, ttlSend);
+        emit Poked(seq, tObs, fee0For1, fee1For0, mode, applied, uint40(block.timestamp) + ttlSend, msg.sender);
+    }
+
+    /// @dev max(clim's fee, live event fee) per side, the event clamped to the policy cap; a symmetric hook gets the
+    ///      higher side on both.
+    function _withEvent(uint24 d01, uint24 d10) private view returns (uint24 f01, uint24 f10, uint40 expiry) {
+        (f01, f10) = (d01, d10);
         EventOverride memory e = eventOverride;
-        bool applied = e.expiry > block.timestamp;
-        if (applied) {
-            uint24 cap = policy.capPips();
-            uint24 e01 = e.fee0For1 > cap ? cap : e.fee0For1;
-            uint24 e10 = e.fee1For0 > cap ? cap : e.fee1For0;
-            if (e01 > fee0For1) fee0For1 = e01;
-            if (e10 > fee1For0) fee1For0 = e10;
+        if (e.expiry <= block.timestamp) return (f01, f10, 0);
+        uint24 cap = policy.capPips();
+        uint24 e01 = e.fee0For1 > cap ? cap : e.fee0For1;
+        uint24 e10 = e.fee1For0 > cap ? cap : e.fee1For0;
+        if (e01 > f01) f01 = e01;
+        if (e10 > f10) f10 = e10;
+        if (!directional) {
+            if (f10 > f01) f01 = f10;
+            else f10 = f01;
         }
+        expiry = e.expiry;
+    }
 
-        if (directional) {
-            IDirectionalPokeHook(hook).pokeFee(poolId, fee0For1, fee1For0, ttl);
-        } else {
-            uint24 f = fee0For1 > fee1For0 ? fee0For1 : fee1For0;
-            fee0For1 = f;
-            fee1For0 = f;
-            ISymmetricPokeHook(hook).pokeFee(poolId, f, ttl);
-        }
-        emit Poked(fee0For1, fee1For0, mode, applied, uint40(block.timestamp) + ttl);
+    /// @dev The override lives until tObs + ttl (a fee is never trusted longer than its observation allows), never
+    ///      longer than `ttl` (a future tObs within the desk's skew does not extend it), ends with an event that
+    ///      raised it, and lasts at least 1 s (the hook rejects 0).
+    function _ttlSend(uint40 tObs, uint40 eventExpiry) private view returns (uint40) {
+        uint256 end = uint256(tObs) + ttl;
+        if (eventExpiry != 0 && eventExpiry < end) end = eventExpiry;
+        if (end <= block.timestamp) return 1;
+        uint256 left = end - block.timestamp;
+        return left > ttl ? ttl : uint40(left);
     }
 }
 ```
@@ -1076,7 +1508,7 @@ contract ClimPoker is Ownable2Step {
 - [ ] **Step 6: Run the tests**
 
 Run: `forge test --match-path test/v2/ClimPoker.t.sol -q`
-Expected: `10 passed`.
+Expected: `23 passed`.
 
 - [ ] **Step 7: Commit**
 
@@ -1085,7 +1517,7 @@ git add contracts/src/v2/interfaces/IOverrideFeeHook.sol contracts/src/v2/ClimPo
 git commit -m "feat(contracts): ClimPoker, the FEE_POKER adapter composing clim's fee with Fables' event overrides"
 ```
 
-### Task 5: Clean-room `PokeFeeHook` for our testnet pools
+### Task 5: Independent `PokeFeeHook` for our testnet pools
 
 **Files:**
 - Create: `contracts/src/v2/PokeFeeHook.sol`
@@ -1108,6 +1540,7 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
 import {ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
 
 import {PokeFeeHook} from "../../src/v2/PokeFeeHook.sol";
 
@@ -1135,7 +1568,8 @@ contract PokeFeeHookTest is Deployers {
         sel[2] = PokeFeeHook.clearPoke.selector;
         am.setTargetFunctionRole(address(hook), sel, FEE_POKER);
         am.grantRole(FEE_POKER, poker, 0);
-        (key, id) = initPool(currency0, currency1, IHooks(address(hook)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 10, SQRT_PRICE_1_1);
+        (key, id) =
+            initPool(currency0, currency1, IHooks(address(hook)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 10, SQRT_PRICE_1_1);
         hook.setPoolConfig(key, 100, 700, 6_000);
         modifyLiquidityRouter.modifyLiquidity(
             key,
@@ -1232,6 +1666,52 @@ contract PokeFeeHookTest is Deployers {
         hook.pokeFee(_id(), 2_500, 600);
     }
 
+    function test_EmitsTheDirectionalEvent() public {
+        vm.expectEmit(true, false, false, true, address(hook));
+        emit PokeFeeHook.FeePoked(_id(), 900, 3_000, uint40(T0 + 600));
+        vm.prank(poker);
+        hook.pokeFee(_id(), 900, 3_000, 600);
+    }
+
+    /// @dev Same topic0 as Fables' hooks, so one indexer reads both.
+    function test_EventTopicsMatchFablesSignatures() public {
+        vm.recordLogs();
+        vm.startPrank(poker);
+        hook.pokeFee(_id(), 2_500, 600);
+        hook.pokeFee(_id(), 900, 3_000, 600);
+        vm.stopPrank();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(logs.length, 2);
+        assertEq(logs[0].topics[0], keccak256("FeePoked(bytes32,uint24,uint40)"));
+        assertEq(logs[1].topics[0], keccak256("FeePoked(bytes32,uint24,uint24,uint40)"));
+        assertEq(logs[0].topics[1], _id());
+    }
+
+    function test_RevertWhen_AStrangerConfiguresAPool() public {
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger));
+        hook.setPoolConfig(key, 100, 700, 6_000);
+    }
+
+    function test_RevertWhen_PoolConfigIsInvalid() public {
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(key, 0, 700, 6_000);
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(key, 800, 700, 6_000);
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(key, 100, 700, 600);
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(key, 100, 700, uint24(LPFeeLibrary.MAX_LP_FEE) + 1);
+    }
+
+    function test_RevertWhen_PoolKeyUsesAnotherHook() public {
+        PoolKey memory other = key;
+        other.hooks = IHooks(makeAddr("otherHook"));
+        vm.expectRevert(PokeFeeHook.InvalidConfig.selector);
+        hook.setPoolConfig(other, 100, 700, 6_000);
+    }
+
     function test_RevertWhen_PoolIsNotConfigured() public {
         (PoolKey memory k2,) =
             initPool(currency0, currency1, IHooks(address(hook)), LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, SQRT_PRICE_1_1);
@@ -1264,8 +1744,8 @@ import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 /// @title PokeFeeHook
 /// @notice A Uniswap v4 hook with a flat LP fee and bounded, expiring overrides ("pokes"), exposing the same public
 ///         interface as Fables' override hooks so clim's live reference pools on Robinhood Chain testnet behave like
-///         Fables' pools. Clean-room: written from Fables' published ABI and observed on-chain behavior only, none
-///         of Fables' source (which is not open source) was used.
+///         Fables' pools. Independent implementation written from Fables' published ABI and documented behavior (fee
+///         bounds, TTL, the half-flat floor under an override); no Fables code is copied.
 ///         Fee rule: flat; under a live poke, max(poke, max(floor, flat / 2)); never above the cap.
 contract PokeFeeHook is BaseOverrideFee, AccessManaged {
     struct Config {
@@ -1303,6 +1783,7 @@ contract PokeFeeHook is BaseOverrideFee, AccessManaged {
         external
         restricted
     {
+        if (address(key.hooks) != address(this)) revert InvalidConfig();
         if (floorPips == 0 || floorPips > flatPips || flatPips > capPips || capPips > LPFeeLibrary.MAX_LP_FEE) {
             revert InvalidConfig();
         }
@@ -1365,13 +1846,13 @@ contract PokeFeeHook is BaseOverrideFee, AccessManaged {
 - [ ] **Step 4: Run the tests**
 
 Run: `forge test --match-path test/v2/PokeFeeHook.t.sol -q`
-Expected: `10 passed`. If the compiler rejects the two `FeePoked` overloads at the `emit` sites, keep both event declarations and write the emits as `emit FeePoked(poolId, fee, expiry);` with explicitly typed local variables (`uint24 f = fee; uint40 e = expiry;`), which resolves the overload by argument count; do not rename the events, their topics must match Fables' so one decoder reads both.
+Expected: `15 passed`. If the compiler rejects the two `FeePoked` overloads at the `emit` sites, keep both event declarations and write the emits as `emit FeePoked(poolId, fee, expiry);` with explicitly typed local variables (`uint24 f = fee; uint40 e = expiry;`), which resolves the overload by argument count; do not rename the events, their topics must match Fables' so one decoder reads both.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add contracts/src/v2/PokeFeeHook.sol contracts/test/v2/PokeFeeHook.t.sol
-git commit -m "feat(contracts): clean-room PokeFeeHook with Fables' public override interface, for testnet pools"
+git commit -m "feat(contracts): independent PokeFeeHook with Fables' public override interface, for testnet pools"
 ```
 
 ### Task 6: Fork tests against Fables' real hook
@@ -1387,7 +1868,10 @@ pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
@@ -1401,19 +1885,35 @@ import {RiskDeskV2} from "../../src/v2/RiskDeskV2.sol";
 import {ClimFeePolicy} from "../../src/v2/ClimFeePolicy.sol";
 import {ClimPoker} from "../../src/v2/ClimPoker.sol";
 import {ClimFeeMath} from "../../src/libraries/ClimFeeMath.sol";
+import {PokeFeeHook} from "../../src/v2/PokeFeeHook.sol";
 import {ISymmetricPokeHook} from "../../src/v2/interfaces/IOverrideFeeHook.sol";
 
+/// @notice Fables' pool configuration entry point, from their published ABI
+///         (`setPoolConfig((address,address,uint24,int24,address),uint24,uint24,uint24)`).
+interface IFablesPoolConfig {
+    function setPoolConfig(PoolKey calldata key, uint24 floorPips, uint24 flatPips, uint24 maxFee) external;
+}
+
 /// @notice Runs against Fables' deployed ETH/USDG hook on a fork of Robinhood Chain mainnet (nothing is sent to
-///         mainnet). Proves that a ClimPoker granted FEE_POKER drives the real hook within its bounds, composes with
-///         an event override, stops when the desk is blind, and stops for good when the role is revoked.
+///         mainnet), pinned to FORK_BLOCK so the run is reproducible. Fables' admin sends the AccessManager batch the
+///         integration asks for; the tests prove that ClimPoker drives the real hook within its bounds, only for the
+///         roles Fables grants, composes with an event override, stops when the desk is blind, and stops for good
+///         when the role is revoked.
 contract FablesForkTest is Test {
+    /// @dev A Robinhood Chain mainnet block of 2026-10-13, after the ETH/USDG config of 2026-09-06.
+    uint256 internal constant FORK_BLOCK = 87_780_000;
     address internal constant HOOK = 0x06a889870C8f83640D6816319f72e2aA579b6080;
     address internal constant ACCESS_MANAGER = 0xA362D98B33A7bb5B5E2180a05f995A70FB404f30;
     address internal constant POKER_ADMIN = 0x359856655934338d798F9ccE1f181486301D36a5;
     address internal constant POOL_MANAGER = 0x8366a39CC670B4001A1121B8F6A443A643e40951;
     address internal constant USDG = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168;
     bytes32 internal constant POOL_ID = 0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551;
+    address internal constant FABLES_KEEPER = 0x1B6a8808E1D26dba66bA11E52997803C43CAd429;
+    /// @dev Custom error Fables' hook reverts with when a poked fee is outside its band.
+    bytes4 internal constant FABLES_FEE_OUT_OF_BOUNDS = 0x652853ee;
     uint64 internal constant FEE_POKER = 1;
+    /// @dev A role id Fables would pick for who may trigger ClimPoker.poke() (clim's runner and their keeper).
+    uint64 internal constant CLIM_RUNNER = 7;
     uint32 internal constant SIGMA_48 = 85_475;
     uint32 internal constant SIGMA_1000 = 1_780_730;
     uint32 internal constant ETA_E4 = 25_093;
@@ -1421,7 +1921,8 @@ contract FablesForkTest is Test {
 
     address internal forwarder = makeAddr("forwarder");
     address internal operator = makeAddr("operator");
-    address internal keeper = makeAddr("fablesKeeper");
+    address internal keeper = FABLES_KEEPER;
+    address internal runner = makeAddr("climRunner");
     RiskDeskV2 internal desk;
     ClimFeePolicy internal policy;
     ClimPoker internal poker;
@@ -1430,7 +1931,7 @@ contract FablesForkTest is Test {
     function setUp() public {
         string memory rpc = vm.envOr("RH_MAINNET_RPC_URL", string(""));
         if (bytes(rpc).length == 0) vm.skip(true);
-        vm.createSelectFork(rpc);
+        vm.createSelectFork(rpc, FORK_BLOCK);
         t0 = uint40(block.timestamp);
         desk = new RiskDeskV2(forwarder, operator);
         policy = new ClimFeePolicy(
@@ -1444,18 +1945,37 @@ contract FablesForkTest is Test {
                 tauKillSec: 180,
                 shortWindow: false,
                 dirSlopeE4: 0,
-                dirMaxPremiumPips: 0
+                dirMaxPremiumPips: 0,
+                ethIsToken0: true
             })
         );
-        poker = new ClimPoker(policy, HOOK, POOL_ID, false, 600, address(this));
-        poker.setEventKeeper(keeper);
-        vm.prank(POKER_ADMIN);
-        IAccessManager(ACCESS_MANAGER).grantRole(FEE_POKER, address(poker), 0);
+        poker = new ClimPoker(policy, HOOK, POOL_ID, false, 600, ACCESS_MANAGER);
+        _fablesGrants();
+    }
+
+    /// @dev The AccessManager batch Fables' admin would send (impersonated on the fork).
+    function _fablesGrants() internal {
+        IAccessManager am = IAccessManager(ACCESS_MANAGER);
+        bytes4[] memory keeperSel = new bytes4[](2);
+        keeperSel[0] = ClimPoker.postEvent.selector;
+        keeperSel[1] = ClimPoker.postEventAndPoke.selector;
+        bytes4[] memory runnerSel = new bytes4[](1);
+        runnerSel[0] = ClimPoker.poke.selector;
+        vm.startPrank(POKER_ADMIN);
+        am.grantRole(FEE_POKER, address(poker), 0);
+        am.setTargetFunctionRole(address(poker), keeperSel, FEE_POKER);
+        am.labelRole(CLIM_RUNNER, "CLIM_RUNNER");
+        am.setTargetFunctionRole(address(poker), runnerSel, CLIM_RUNNER);
+        am.grantRole(CLIM_RUNNER, runner, 0);
+        am.grantRole(CLIM_RUNNER, keeper, 0);
+        vm.stopPrank();
     }
 
     function _report(uint32 sigma) internal {
         vm.prank(forwarder, operator);
-        desk.onReport("", abi.encode(uint40(block.timestamp), sigma, sigma, int32(0), uint16(3), uint8(4), uint16(10_000)));
+        desk.onReport(
+            "", abi.encode(uint40(block.timestamp), sigma, sigma, int32(0), uint16(3), uint8(4), uint16(10_000))
+        );
     }
 
     function _expected(uint32 sigma) internal pure returns (uint24) {
@@ -1478,6 +1998,7 @@ contract FablesForkTest is Test {
 
     function test_PokeSetsTheRealHooksFee() public {
         _report(SIGMA_48);
+        vm.prank(runner);
         poker.poke();
         assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), _expected(SIGMA_48));
         assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, false), _expected(SIGMA_48));
@@ -1486,6 +2007,7 @@ contract FablesForkTest is Test {
     function test_StormRaisesTheFee() public {
         // a first report gets only the absolute bounds, so a storm shows at once (later ones move at most x2)
         _report(SIGMA_1000 / 2);
+        vm.prank(runner);
         poker.poke();
         uint24 fee = ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true);
         assertEq(fee, _expected(SIGMA_1000 / 2));
@@ -1495,6 +2017,7 @@ contract FablesForkTest is Test {
 
     function test_OverrideExpiresBackToFablesFlatFee() public {
         _report(SIGMA_48);
+        vm.prank(runner);
         poker.poke();
         vm.warp(block.timestamp + 600);
         assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 700);
@@ -1503,6 +2026,7 @@ contract FablesForkTest is Test {
     function test_BlindDeskDoesNotPoke() public {
         _report(SIGMA_48);
         vm.warp(block.timestamp + 181);
+        vm.prank(runner);
         vm.expectRevert(ClimPoker.DeskBlind.selector);
         poker.poke();
     }
@@ -1511,6 +2035,7 @@ contract FablesForkTest is Test {
         _report(SIGMA_48);
         vm.prank(keeper);
         poker.postEvent(6_000, 6_000, uint40(block.timestamp + 300));
+        vm.prank(runner);
         poker.poke();
         assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 6_000);
     }
@@ -1519,20 +2044,26 @@ contract FablesForkTest is Test {
         _report(SIGMA_48);
         vm.prank(POKER_ADMIN);
         IAccessManager(ACCESS_MANAGER).revokeRole(FEE_POKER, address(poker));
+        vm.prank(runner);
         vm.expectRevert();
         poker.poke();
     }
 
     function test_ASwapPaysThePokedFee() public {
         _report(SIGMA_1000 / 2);
+        vm.prank(runner);
         poker.poke();
         uint24 expected = ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true);
         PoolSwapTest router = new PoolSwapTest(IPoolManager(POOL_MANAGER));
         vm.deal(address(this), 1 ether);
         vm.recordLogs();
-        router.swap{value: 0.01 ether}(
+        router.swap{
+            value: 0.01 ether
+        }(
             _key(),
-            SwapParams({zeroForOne: true, amountSpecified: -0.01 ether, sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1}),
+            SwapParams({
+                zeroForOne: true, amountSpecified: -0.01 ether, sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             ""
         );
@@ -1546,23 +2077,98 @@ contract FablesForkTest is Test {
         assertEq(paid, expected);
     }
 
+    function test_FablesKeeperHoldsFeePokerAtTheForkBlock() public view {
+        (bool isMember,) = IAccessManager(ACCESS_MANAGER).hasRole(FEE_POKER, FABLES_KEEPER);
+        assertTrue(isMember);
+    }
+
+    /// @dev Review finding C1: with a permissionless poke, anyone could overwrite the keeper's override (Fables' hook
+    ///      has one slot per pool) with clim's lower fee. Now only the roles Fables grants can poke.
+    function test_AStrangerCannotOverwriteTheKeepersOverride() public {
+        _report(SIGMA_48);
+        vm.prank(keeper);
+        ISymmetricPokeHook(HOOK).pokeFee(POOL_ID, 5_000, 7_200);
+        assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 5_000);
+
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger));
+        poker.poke();
+        assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 5_000);
+    }
+
+    function test_KeeperPostsAnEventAndPokesInOneCall() public {
+        _report(SIGMA_48);
+        vm.prank(keeper);
+        (uint24 f01, uint24 f10) = poker.postEventAndPoke(5_000, 5_000, uint40(block.timestamp + 300));
+        assertEq(f01, 5_000);
+        assertEq(f10, 5_000);
+        assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 5_000);
+        assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, false), 5_000);
+    }
+
+    /// @dev Documented deployment invariant: the policy's band [floor, cap] must sit inside the hook's. If Fables lowers
+    ///      the hook's cap below the policy's (or raises its floor above), a poke outside the new band reverts in the
+    ///      hook: the pool keeps its last override until it expires, then its flat fee. Nothing worse happens.
+    function test_PokeAboveALoweredHookCapReverts() public {
+        vm.prank(POKER_ADMIN);
+        IFablesPoolConfig(HOOK).setPoolConfig(_key(), 100, 700, 3_000);
+
+        _report(SIGMA_1000);
+        assertGt(_expected(SIGMA_1000), 3_000);
+        vm.prank(runner);
+        // the hook's own fee-bound error (selector observed on the fork at FORK_BLOCK: pokeFee(pool, 3_160, 600))
+        vm.expectRevert(FABLES_FEE_OUT_OF_BOUNDS);
+        poker.poke();
+    }
+
+    /// @dev Fables' hook and PokeFeeHook emit the same symmetric FeePoked topic, so one indexer reads both.
+    function test_FeePokedTopicMatchesPokeFeeHook() public {
+        bytes32 expected = keccak256("FeePoked(bytes32,uint24,uint40)");
+        _report(SIGMA_48);
+        vm.recordLogs();
+        vm.prank(runner);
+        poker.poke();
+        assertEq(_firstTopic(HOOK), expected);
+
+        address ours = address(uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG) ^ (0x5555 << 144));
+        AccessManager am = new AccessManager(address(this));
+        deployCodeTo("PokeFeeHook.sol:PokeFeeHook", abi.encode(POOL_MANAGER, address(am)), ours);
+        PoolKey memory key = _key();
+        key.hooks = IHooks(ours);
+        PokeFeeHook(ours).setPoolConfig(key, 100, 700, 6_000);
+        vm.recordLogs();
+        PokeFeeHook(ours).pokeFee(PoolId.unwrap(key.toId()), 1_000, 600);
+        assertEq(_firstTopic(ours), expected);
+    }
+
+    function _firstTopic(address emitter) internal returns (bytes32) {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].emitter == emitter) return logs[i].topics[0];
+        }
+        revert("no log");
+    }
+
     receive() external payable {}
 }
 ```
 
 - [ ] **Step 2: Run without the RPC to see the suite skip**
 
-Run: `forge test --match-path test/fork/FablesFork.t.sol -q`
-Expected: every test skipped (`RH_MAINNET_RPC_URL` unset in the shell).
+Run: `RH_MAINNET_RPC_URL= forge test --match-path test/fork/FablesFork.t.sol -q`
+Expected: every test skipped (forge loads `contracts/.env` by itself, so the variable is emptied on the command line).
 
 - [ ] **Step 3: Run on the fork**
 
-Run: `set -a; source .env; set +a; forge test --match-path test/fork/FablesFork.t.sol -vv`
-Expected: `8 passed`.
+Run: `forge test --match-path test/fork/FablesFork.t.sol -vv`
+Expected: `13 passed`.
 
 If a test fails, read the revert before changing anything:
 - `grantRole` reverting means POKER_ADMIN is not the admin of role 1 at the fork block: read `getRoleAdmin(1)` with `cast call 0xA362D98B33A7bb5B5E2180a05f995A70FB404f30 "getRoleAdmin(uint64)(uint64)" 1 --rpc-url $RH_MAINNET_RPC_URL`, then `getRoleMembers` is not in AccessManager, so read `RoleGranted` logs for that admin role and prank its holder instead. Record the finding in the session log.
 - `test_ASwapPaysThePokedFee` reverting inside the hook means Fables gates who may swap (for example through its router). Keep the test, change it to `vm.expectRevert()` around the swap with a comment naming the revert data, and add to the session log that swaps on the fork go through Fables' router only; the run in Task 8 then records `currentFee` instead of swap fees.
+- `setTargetFunctionRole` or `labelRole` reverting means `0x3598…36a5` no longer holds ADMIN (role 0) at the fork block: prank the current ADMIN holder instead and record it.
+- `test_PokeAboveALoweredHookCapReverts` failing on `setPoolConfig` means the hook restricts it to another role or the selector changed: read the revert, prank the right holder, or skip the test with a comment if the selector is gone.
 - `test_OverrideExpiresBackToFablesFlatFee` returning a different value means the pool config changed since 2026-10-13: read `PoolConfigured` logs and update the expected flat fee.
 
 - [ ] **Step 4: Commit**
@@ -1682,9 +2288,9 @@ import {ClimPoker} from "../../src/v2/ClimPoker.sol";
 import {ISymmetricPokeHook} from "../../src/v2/interfaces/IOverrideFeeHook.sol";
 
 /// @notice The recorded run: on a fork of Robinhood Chain mainnet at the start of the 7 October 2026 storm, deploy
-///         clim, grant FEE_POKER to ClimPoker (as Fables' POKER_ADMIN, impersonated on the fork), replay the desk's
-///         reports every 30 s, poke Fables' real ETH/USDG hook and swap both ways every 5 minutes. Writes
-///         docs/evidence/fork-run-2026-10-07.json. Simulation only: never run with --broadcast.
+///         clim, send the AccessManager batch the integration asks of Fables (as Fables' admin, impersonated on the
+///         fork), replay the desk's reports every 30 s, poke Fables' real ETH/USDG hook and swap both ways every
+///         5 minutes. Writes docs/evidence/fork-run-2026-10-07.json. Simulation only: never run with --broadcast.
 contract ForkRun is Script {
     using stdJson for string;
 
@@ -1695,6 +2301,7 @@ contract ForkRun is Script {
     address internal constant USDG = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168;
     bytes32 internal constant POOL_ID = 0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551;
     uint64 internal constant FEE_POKER = 1;
+    uint64 internal constant CLIM_RUNNER = 7; // a role id Fables would pick for who may call ClimPoker.poke()
 
     string internal constant REPORTS = "../docs/evidence/fork-reports-2026-10-07.json";
     string internal constant PARAMS = "../shared/params-fables.json";
@@ -1725,9 +2332,28 @@ contract ForkRun is Script {
                 tauKillSec: uint32(p.readUint(".tauKillSec")),
                 shortWindow: p.readUint(".sigmaWindowSec") == 300,
                 dirSlopeE4: uint32(p.readUint(".dirSlopeE4")),
-                dirMaxPremiumPips: uint24(p.readUint(".dirMaxPremiumPips"))
+                dirMaxPremiumPips: uint24(p.readUint(".dirMaxPremiumPips")),
+                ethIsToken0: true // native ETH is currency0 in the ETH/USDG pool key
             })
         );
+    }
+
+    /// @dev The batch Fables' admin would send: FEE_POKER for the poker, postEvent and postEventAndPoke behind
+    ///      FEE_POKER, poke behind CLIM_RUNNER, granted here to this script (which plays clim's runner).
+    function _fablesGrants(ClimPoker poker) internal {
+        IAccessManager am = IAccessManager(ACCESS_MANAGER);
+        bytes4[] memory keeperSel = new bytes4[](2);
+        keeperSel[0] = ClimPoker.postEvent.selector;
+        keeperSel[1] = ClimPoker.postEventAndPoke.selector;
+        bytes4[] memory runnerSel = new bytes4[](1);
+        runnerSel[0] = ClimPoker.poke.selector;
+        vm.startPrank(POKER_ADMIN);
+        am.grantRole(FEE_POKER, address(poker), 0);
+        am.setTargetFunctionRole(address(poker), keeperSel, FEE_POKER);
+        am.labelRole(CLIM_RUNNER, "CLIM_RUNNER");
+        am.setTargetFunctionRole(address(poker), runnerSel, CLIM_RUNNER);
+        am.grantRole(CLIM_RUNNER, address(this), 0);
+        vm.stopPrank();
     }
 
     function _key() internal pure returns (PoolKey memory) {
@@ -1739,9 +2365,13 @@ contract ForkRun is Script {
         vm.recordLogs();
         bool ok;
         if (zeroForOne) {
-            try router.swap{value: 0.01 ether}(
+            try router.swap{
+                value: 0.01 ether
+            }(
                 _key(),
-                SwapParams({zeroForOne: true, amountSpecified: -0.01 ether, sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1}),
+                SwapParams({
+                    zeroForOne: true, amountSpecified: -0.01 ether, sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+                }),
                 s,
                 ""
             ) {
@@ -1781,9 +2411,8 @@ contract ForkRun is Script {
 
         RiskDeskV2 desk = new RiskDeskV2(forwarder, operator);
         ClimFeePolicy policy = _policy(desk);
-        ClimPoker poker = new ClimPoker(policy, HOOK, POOL_ID, false, 600, address(this));
-        vm.prank(POKER_ADMIN);
-        IAccessManager(ACCESS_MANAGER).grantRole(FEE_POKER, address(poker), 0);
+        ClimPoker poker = new ClimPoker(policy, HOOK, POOL_ID, false, 600, ACCESS_MANAGER);
+        _fablesGrants(poker);
 
         PoolSwapTest router = new PoolSwapTest(IPoolManager(POOL_MANAGER));
         vm.deal(address(this), 10 ether);
@@ -1793,7 +2422,9 @@ contract ForkRun is Script {
             vm.prank(forwarder, operator);
             desk.onReport(
                 "",
-                abi.encode(uint40(tObs[i]), uint32(s15[i]), uint32(s5[i]), int32(dev[i]), uint16(3), uint8(4), uint16(10_000))
+                abi.encode(
+                    uint40(tObs[i]), uint32(s15[i]), uint32(s5[i]), int32(dev[i]), uint16(3), uint8(4), uint16(10_000)
+                )
             );
             (uint24 poked,) = poker.poke();
             tArr.push(block.timestamp);
@@ -1804,7 +2435,9 @@ contract ForkRun is Script {
                 _swap(router, true);
                 if (i == 0) {
                     // the first ETH sale funds the USDG side; approve once
-                    (bool ok,) = USDG.call(abi.encodeWithSignature("approve(address,uint256)", address(router), type(uint256).max));
+                    (bool ok,) = USDG.call(
+                        abi.encodeWithSignature("approve(address,uint256)", address(router), type(uint256).max)
+                    );
                     require(ok, "approve");
                 }
                 _swap(router, false);
@@ -1868,7 +2501,7 @@ Run:
 ```bash
 jq -e '[.pokedPips, .currentFee0For1Pips] | transpose | all(.[0] == .[1])' docs/evidence/fork-run-2026-10-07.json
 ```
-Expected: `true` (Fables' hook charges exactly what ClimPoker posted, since clim never posts below Fables' flat fee).
+Expected: `true` (Fables' hook charges exactly what ClimPoker posted, since clim never posts below Fables' flat fee). Each poke is 2 s after its report, so the override sent lasts 598 s (anchored to the observation).
 
 - [ ] **Step 6: Commit**
 

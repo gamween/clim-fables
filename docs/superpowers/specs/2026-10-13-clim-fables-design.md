@@ -107,15 +107,17 @@ Coinbase · Kraken · Binance · Hyperliquid
   Chainlink CRE risk desk, every 30 s, Robinhood Chain testnet (46630)
               │ signed report (KeystoneForwarder; mock forwarder in simulation)
               ▼
-  RiskDesk v2 (testnet): sigma 5 min, sigma 15 min, venue mid vs pool mid per direction,
-                         recommendedFee() bounded like Fables' hook
+  RiskDeskV2 (testnet): sigma 5 min, sigma 15 min, venue mid vs pool mid
+              │
+  ClimFeePolicy: quote() / quoteDirectional(), bounded like Fables' hook
               │
    ┌──────────┼─────────────────────────────┐
    ▼          ▼                             ▼
  Level 0    Level 1                       Level 2
- Shadow     Fables' keeper reads          ClimPoker adapter holding FEE_POKER:
- (reads     recommendedFee() over RPC     fee = max(desk, keeper's event override)
- mainnet)   and composes                  -> pokeFee(poolId, fee, ttl) on Fables' hook
+ Shadow     Fables' keeper reads          ClimPoker adapter holding FEE_POKER,
+ (reads     ClimFeePolicy.quote()         governed by Fables' AccessManager:
+ mainnet)   over RPC and composes         fee = max(policy, keeper's event override)
+                                          -> pokeFee(poolId, fee, ttl) on Fables' hook
                                           (shown on a Robinhood mainnet fork against
                                           the real ETH/USDG hook)
 ```
@@ -125,8 +127,8 @@ Coinbase · Kraken · Binance · Hyperliquid
 | Level | Fables' work | Risk to Fables |
 |---|---|---|
 | 0. Shadow | None: the showcase compares their live overrides with clim's recommendation | None |
-| 1. Keeper input | A few lines in their off-chain keeper: read `recommendedFee()` over RPC and compose | No contract touched |
-| 2. On-chain adapter | One `grantRole(FEE_POKER, ClimPoker, 0)`, revocable at any time | Bounded by their hook's floor, cap and TTL; a silent desk means no poke and a return to the flat fee after the TTL |
+| 1. Keeper input | A few lines in their off-chain keeper: read `ClimFeePolicy.quote()` (or `quoteDirectional()`) over RPC and compose | No contract touched |
+| 2. On-chain adapter | One AccessManager batch: `grantRole(FEE_POKER, ClimPoker, 0)`; `setTargetFunctionRole(ClimPoker, [postEvent, postEventAndPoke], FEE_POKER)`; `setTargetFunctionRole(ClimPoker, [poke], CLIM_RUNNER)` with a new role they create and grant to clim's runner and their keeper. Revocable at any time | Bounded by their hook's floor, cap and TTL; only roles they grant can call ClimPoker, and clim holds no admin power; a silent desk means no poke and a return to the flat fee after the TTL |
 
 Level 1 works while CRE has no mainnet write: an off-chain keeper can read the testnet desk. When CRE writes to
 mainnet, the desk is redeployed there unchanged.
@@ -168,31 +170,39 @@ Three studies, each a script, a JSON output and tests, each published as measure
 
 ### 5.3 Contracts (`contracts/`, Foundry)
 
-**`RiskDesk` v2:**
-- same guards as v1: report spacing, skew, quorum, volatility envelope, no setter for sigma or the fee;
-- adds `recommendedFee()` (single fee) and `recommendedFees()` (`fee0For1`, `fee1For0`), already clamped to the
-  target pool's band;
-- has a `blind` state when stale.
+**`RiskDeskV2` (data):**
+- same guards as v1: report spacing, skew, quorum, volatility envelope (restarted after 180 s of silence);
+- no setter for sigma or the gap: the owner only picks the forwarder and workflow to trust, so once configured its
+  ownership goes to a timelock or is renounced;
+- leaves simulation mode in one call that also sets the production forwarder, once the workflow is pinned.
 
-**`ClimPoker`:**
-- holds FEE_POKER;
-- `poke(PoolId)` reads the desk, takes `max(desk fee, keeper event override)` where the keeper may post an event
-  override with its own expiry, and calls `pokeFee` with a TTL;
-- does nothing when the desk is blind;
-- is permissionless to trigger, so anyone can poke and the fee always comes from the desk;
+**`ClimFeePolicy` (immutable parameters from the lab):**
+- `quote()` (one fee) and `quoteDirectional()` (`fee0For1`, `fee1For0`), clamped to the target pool's band; the
+  directional premium goes to the side the venue-pool gap makes toxic, for either currency order (`ethIsToken0`);
+- modes: normal; degraded (venues disagree: at least the safe fee); blind (stale desk).
+
+**`ClimPoker` (action):**
+- holds FEE_POKER and is governed by Fables' own AccessManager: `poke()`, `postEvent()` and `postEventAndPoke()`
+  are `restricted`, so only roles Fables grants can call them, and clim holds no admin power;
+- `poke()` takes `max(policy fee, live event fee)` per direction, where Fables' keeper posts an event override with
+  its own expiry, and calls `pokeFee` with a TTL anchored to the desk's observation (and ending with a raising event);
+- does nothing when the desk is blind; no caller chooses the fee;
+- level 2 is one AccessManager batch on Fables' side, revocable: revoking FEE_POKER from ClimPoker stops everything;
 - talks to Fables' hook through a minimal interface that we write: the function signatures are public, but their
   source is UNLICENSED and is never copied.
 
 **Tests:**
 - unit tests for both contracts;
-- fork tests on Robinhood mainnet against the real ETH/USDG hook (impersonate POKER_ADMIN, grant the role, poke,
-  check `currentFee`), covering bounds, TTL expiry, a blind desk, and the composition with an event override;
+- fork tests on Robinhood mainnet, pinned to one block, against the real ETH/USDG hook (impersonate Fables' admin,
+  send the AccessManager batch, poke, check `currentFee`), covering bounds, TTL expiry, a blind desk, the composition
+  with an event override, and who may poke;
 - verification on Sourcify and Blockscout.
 
 ### 5.4 The run (`npm run demo:fork`)
 
 1. Fork Robinhood mainnet at a block inside a real volatile window.
-2. Deploy `RiskDesk` v2 and `ClimPoker`, and grant FEE_POKER by impersonating POKER_ADMIN.
+2. Deploy `RiskDeskV2`, `ClimFeePolicy` and `ClimPoker`, and send the AccessManager batch by impersonating Fables'
+   admin.
 3. Replay the desk's reports for that window, call `poke`, and send swaps both ways.
 4. Record every transaction, `currentFee` and `Swap.fee` into `docs/evidence/fork-run-<date>.json`.
 
@@ -253,9 +263,10 @@ alongside.
 
 The maintainer wants Fables' CTO to see the whole loop running, not only a replay. On testnet:
 
-- **`PokeFeeHook`:** our own clean-room Uniswap v4 hook with the same public interface as Fables' override hooks
+- **`PokeFeeHook`:** our own Uniswap v4 hook with the same public interface as Fables' override hooks
   (`pokeFee` single and per-direction, `clearPoke`, `currentFee`, floor, flat, cap, TTL, AccessManager roles). It is
-  written from the public signatures and the observed behavior only, never from their UNLICENSED source, and says so.
+  an independent implementation from the published ABI and documented behavior; no Fables code is copied, and it
+  says so.
 - **Pools, with test tokens (tETH/tUSDG):**
   - **D:** driven by `ClimPoker` from the live CRE desk;
   - **K:** a keeper-style twin, poked by a simple off-chain keeper that mimics the observed Fables pattern;
@@ -271,17 +282,17 @@ The README opens with a "Verify in 10 minutes" path, and `/integrate` mirrors it
 | His question | Where the answer is |
 |---|---|
 | Is the code real and verified? | Every contract verified on Sourcify and Blockscout (testnet), linked from the README and the app |
-| Can it set a dangerous fee or grief my pool? | Threat model in `docs/security.md`: `ClimPoker` can only post inside the hook's own floor, cap and TTL; permissionless poke cannot choose the fee; a blind desk means no poke; role revocation is one call; poke spam costs only gas |
-| Who can move sigma? Is the desk trustworthy? | Desk guards (quorum 3 of 4, envelope, spacing, skew, no setter); DON signatures on a DON, operator key in simulation, stated plainly; ownership path to renounce |
+| Can it set a dangerous fee or grief my pool? | Threat model in `docs/security.md`: `ClimPoker` can only post inside the hook's own floor, cap and TTL; only roles he grants can poke, and no caller chooses the fee; a blind desk means no poke; role revocation is one call |
+| Who can move sigma? Is the desk trustworthy? | Desk guards (quorum 3 of 4, envelope, spacing, skew, no setter for sigma or the gap); the owner picks the forwarder and workflow, so ownership goes to a timelock or is renounced; DON signatures on a DON, operator key in simulation, stated plainly |
 | What happens when it fails? | Tested failure modes: stale venues, venue disagreement, desk silent, CRE outage, chain reorg; each with the resulting fee |
 | How does it compose with my keeper's event overrides? | `max(desk, event)` rule, tested on the fork against his real hook |
-| What exactly do I change? | Level 1: the exact keeper diff (TypeScript, a few lines). Level 2: the exact `grantRole` call data |
+| What exactly do I change? | Level 1: the exact keeper diff (TypeScript, a few lines). Level 2: the exact AccessManager batch call data |
 | Does it work on my data? | Lab studies on his ETH/USDG pool since 2026-09-06, one command to rerun, results published as measured, keeper wins included |
 | Latency and cadence? | Report age against his 179 s median poke gap, measured live |
 | Cost to run? | Gas per poke and per report on Robinhood Chain, measured; CRE costs as published by Chainlink |
 | Code quality? | CI green (forge, lab, app tests, lint), coverage reported, MIT license, no copied Fables code |
 | Path to mainnet? | What changes when CRE writes to `robinhood-mainnet` (configuration only), and what stays |
-| Per-direction fees for the new hooks? | Directional study result and the `recommendedFees()` rule, live on pool D |
+| Per-direction fees for the new hooks? | Directional study result and the `ClimFeePolicy.quoteDirectional()` rule, live on pool D |
 
 ## 6. Repository and clim closure
 
