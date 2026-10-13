@@ -1,6 +1,6 @@
 # clim × Fables: design
 
-Date: 2026-10-13. Status: approved in brainstorming, pending the maintainer's review of this file.
+Date: 2026-10-13. Status: approved by the maintainer (with live reference pools and the CTO checklist added).
 
 ## 1. Goal
 
@@ -12,8 +12,9 @@ product's look, what clim would do on his live ETH/USDG pool, how it plugs in, a
 No deadline: everything is built cleanly, and the deck is sent when it is ready.
 
 Non-goals:
-- no clim hook or pool of our own (clim plugs into Fables, it does not compete with it);
-- nothing written to Robinhood Chain mainnet (mainnet is read only; actions happen on a mainnet fork and on testnet);
+- no competing product: clim's own pools (§5.7) are a live reference of the integration on testnet, not a DEX;
+- nothing written to Robinhood Chain mainnet in this phase (mainnet is read only; actions happen on a mainnet fork and
+  on testnet; a small mainnet pool is an open point, §8);
 - never claim that clim sets better fees than Fables' keeper (see §3);
 - no "ask" in the deck.
 
@@ -248,6 +249,40 @@ alongside.
 - Then a Telegram draft to Fables' CTO, shown to the maintainer as plain text and never sent without his explicit go on
   the exact text.
 
+### 5.7 Live reference pools (Robinhood Chain testnet)
+
+The maintainer wants Fables' CTO to see the whole loop running, not only a replay. On testnet:
+
+- **`PokeFeeHook`:** our own clean-room Uniswap v4 hook with the same public interface as Fables' override hooks
+  (`pokeFee` single and per-direction, `clearPoke`, `currentFee`, floor, flat, cap, TTL, AccessManager roles). It is
+  written from the public signatures and the observed behavior only, never from their UNLICENSED source, and says so.
+- **Pools, with test tokens (tETH/tUSDG):**
+  - **D:** driven by `ClimPoker` from the live CRE desk;
+  - **K:** a keeper-style twin, poked by a simple off-chain keeper that mimics the observed Fables pattern;
+  - **F:** a flat 7 bp twin.
+- **Traffic:** v1's arbitrage and noise bots, ported, trade all three against real venue prices, so the live dashboard
+  compares D, K and F on fees earned and loss to arbitrage, every number checkable on the explorer.
+- This is level 2 of the ladder running live, end to end, under the CTO's eyes.
+
+### 5.8 What Fables' CTO will check (and where he finds it)
+
+The README opens with a "Verify in 10 minutes" path, and `/integrate` mirrors it.
+
+| His question | Where the answer is |
+|---|---|
+| Is the code real and verified? | Every contract verified on Sourcify and Blockscout (testnet), linked from the README and the app |
+| Can it set a dangerous fee or grief my pool? | Threat model in `docs/security.md`: `ClimPoker` can only post inside the hook's own floor, cap and TTL; permissionless poke cannot choose the fee; a blind desk means no poke; role revocation is one call; poke spam costs only gas |
+| Who can move sigma? Is the desk trustworthy? | Desk guards (quorum 3 of 4, envelope, spacing, skew, no setter); DON signatures on a DON, operator key in simulation, stated plainly; ownership path to renounce |
+| What happens when it fails? | Tested failure modes: stale venues, venue disagreement, desk silent, CRE outage, chain reorg; each with the resulting fee |
+| How does it compose with my keeper's event overrides? | `max(desk, event)` rule, tested on the fork against his real hook |
+| What exactly do I change? | Level 1: the exact keeper diff (TypeScript, a few lines). Level 2: the exact `grantRole` call data |
+| Does it work on my data? | Lab studies on his ETH/USDG pool since 2026-09-06, one command to rerun, results published as measured, keeper wins included |
+| Latency and cadence? | Report age against his 179 s median poke gap, measured live |
+| Cost to run? | Gas per poke and per report on Robinhood Chain, measured; CRE costs as published by Chainlink |
+| Code quality? | CI green (forge, lab, app tests, lint), coverage reported, MIT license, no copied Fables code |
+| Path to mainnet? | What changes when CRE writes to `robinhood-mainnet` (configuration only), and what stays |
+| Per-direction fees for the new hooks? | Directional study result and the `recommendedFees()` rule, live on pool D |
+
 ## 6. Repository and clim closure
 
 - `DVB-ANS/clim` is frozen. Tag `token2049-submission` points at `c17da92`, the commit submitted 2026-10-07 23:51 SGT.
@@ -262,9 +297,9 @@ alongside.
 ## 7. Order of work
 
 1. Lab: the three studies, which set the parameters.
-2. Contracts and fork tests, then the run.
-3. CRE workflow v2 on Robinhood testnet, and the desk going live.
-4. Fables UI inventory, then the showcase app.
+2. Contracts (`RiskDesk` v2, `ClimPoker`, `PokeFeeHook`) and fork tests, then the run.
+3. CRE workflow v2 on Robinhood testnet, the desk going live, then pools D, K and F with their bots.
+4. Fables UI inventory, then the showcase app, CI and the "Verify in 10 minutes" path.
 5. Deck, then the Telegram draft.
 
 ## 8. Open points
@@ -272,5 +307,8 @@ alongside.
 - Louize is a commercial font. The maintainer chose to use it; licensing is his call.
 - Fables' docs block AI agents in robots.txt, so the maintainer reads the fees and security pages himself before the
   deck.
+- A small clim-driven pool on Robinhood mainnet (real arbitrageurs, checkable on robin.etherscan.io) would be stronger
+  than testnet, but CRE cannot write to mainnet yet, so its pokes would come from a relayer key. Decide after the
+  testnet loop runs.
 - CRE deploy access to a DON (requested 2026-10-06) is still pending, so the desk runs in the CRE simulator, as in v1,
   until then.
