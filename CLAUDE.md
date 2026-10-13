@@ -1,36 +1,23 @@
-# clim
+# clim × Fables
 
-Storm insurance for Uniswap v4 LPs: a Chainlink CRE "risk desk" publishes multi-venue ETH realized volatility on-chain every 30 s, and a v4 hook sets a symmetric dynamic LP fee on every swap from it. Built at TOKEN2049 Origins (Singapore, 2026-10-06 to 08). Main track plus Chainlink "Best workflow with CRE".
+A verifiable volatility desk for Fables' dynamic fees on Robinhood Chain. clim's Chainlink CRE "risk desk" measures ETH volatility and the venue-versus-pool price gap on four exchanges every 30 s; `ClimPoker` turns it into Fables' `pokeFee` calls. This repository continues clim, built at TOKEN2049 Origins (Singapore, 2026-10-06 to 08; submitted state frozen at tag `token2049-submission` in DVB-ANS/clim). It is a showcase, not affiliated with Fables.
 
 ## Where things are
-- Design spec: `docs/superpowers/specs/2026-10-06-clim-design.md`.
-- Plans:
-  - `docs/superpowers/plans/2026-10-06-clim-00-master.md` gives the order and the gates;
-  - `01` to `06` are the per-subsystem plans.
-- Session logs (decisions, feedback, open questions): `docs/sessions/YYYY-MM-DD.md`.
-- Chainlink CRE friction log (developer-experience feedback for the Chainlink team): `docs/feedback/cre-friction-log.md`.
-- FAQ: `docs/faq.md`.
-- Shared single source of truth for addresses, parameters and ABIs: `shared/`.
-- Dashboard (Next.js, live at https://clim-zeta.vercel.app): `app/`. It was built after kickoff in DVB-ANS/clim-front and imported into `app/` with `git subtree`, history kept, on 2026-10-07 (master plan Task 14). Production deploys from the repo root (Vercel Root Directory `app`).
+- Spec: `docs/superpowers/specs/2026-10-13-clim-fables-design.md` (the hackathon spec `2026-10-06-clim-design.md` is history).
+- Plans: `docs/superpowers/plans/2026-10-13-clim-fables-00-master.md` gives the order and the gates; `01` to `05` are per subsystem.
+- Session logs: `docs/sessions/YYYY-MM-DD.md`.
+- Lab (Python, uv): `lab/`. Fables studies write `lab/out/fables-*.json`; decided parameters go to `shared/params-fables.json`.
+- Contracts (Foundry): `contracts/`. v1 (Sepolia) in `src/*.sol`, clim × Fables in `src/v2/`.
+- CRE workflow: `cre/`. Bots: `bots/`. App: `app/`.
+- Raw research data (not published): `.local/research-2026-10-13/`.
 
 ## Working rules
-- **Start of every session:** read `CLAUDE.local.md` (if present), every `docs/sessions/*.md`, then the master plan.
-- **The dashboard changes only in `app/` from now on.** DVB-ANS/clim-front is frozen since the import; do not rebuild the dashboard from plan 05 Tasks 1 to 24.
-- **Hackathon rule:** all code is written after kickoff (2026-10-06 12:00 SGT). Never import code from outside this repo written before that time. Public libraries and templates are fine.
-- **Living docs:** the spec and plans are living documents. When the build or new research contradicts them, update them and add a line to today's session log.
-- **Log as you go:**
-  - feedback from mentors, judges or partners, decisions and surprises go in `docs/sessions/<today>.md`;
-  - every Chainlink CRE friction goes in `docs/feedback/cre-friction-log.md`.
-- **Plans carry no clock times or per-person time budgets**, only ordered steps.
-- **Hook parameters are immutable:**
-  - P\* and the fee floor are decided in the lab (`shared/params.json`) before the hook is deployed;
-  - changing them means a new hook and a new pool.
-- **Never commit secrets.**
-  - `.env` and `secrets.yaml` are gitignored;
-  - use `.env.example` and `secrets.example.yaml`;
-  - testnet keys only.
-- **Git:** commit often with clear messages. Push only when the maintainer asks.
-- **Submission (2026-10-07 23:59 SGT, no late entries):**
-  - a public repo;
-  - a live URL;
-  - the deck as **.ppt or .keynote** via a Google Drive link, with the demo as an embedded screen recording (no live demo on stage).
+- Start of every session: read `CLAUDE.local.md` if present, the latest `docs/sessions/*.md`, then the master plan.
+- Never copy Fables source code (SPDX UNLICENSED). Interfaces come from the published ABI only.
+- Never write to Robinhood Chain mainnet. Read it; act on an anvil fork or on testnet (chain 46630).
+- Every published number comes from a script output or a live chain read. Results are published as measured, including where Fables' keeper does better.
+- Never claim clim sets better fees than Fables' keeper. The pitch is verifiability, redundancy and the per-direction signal.
+- The app is a showcase: own domain, permanent non-affiliation banner, no wallet connection, no real transaction.
+- Never commit secrets: `.env`, `secrets.yaml` are gitignored; testnet keys only.
+- Git: conventional commits in English; push to `main`.
+- Any message to Fables (Telegram, email) is a draft shown to the maintainer as plain text and is never sent without his explicit go on the exact text.

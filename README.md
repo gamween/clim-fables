@@ -1,20 +1,12 @@
 <div align="center">
 
-# ⛈️ clim
+# ⛈️ clim × Fables
 
-**Storm insurance for Uniswap v4 LPs: a Chainlink CRE risk desk measures ETH volatility on four exchanges every 30 seconds, and a Uniswap v4 hook prices every swap from it.**
+**A verifiable volatility desk for Fables' dynamic fees on Robinhood Chain. Showcase, not affiliated with Fables.**
 
-[![Ethereum Sepolia](https://img.shields.io/badge/Ethereum-Sepolia%20(11155111)-627eea?style=flat-square)](https://sepolia.etherscan.io/address/0x89f04C14f8fAbb5c9202F6B972F940C02AF79080)
-[![Chainlink CRE](https://img.shields.io/badge/Chainlink-CRE%20workflow-375bd2?style=flat-square)](cre/)
-[![Uniswap v4](https://img.shields.io/badge/Uniswap%20v4-hook-ff007a?style=flat-square)](contracts/src/ClimHook.sol)
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.26%20%C2%B7%20Foundry-363636?style=flat-square)](contracts/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
-
-**TOKEN2049 Origins · Singapore, October 2026 · Main track and Chainlink "Best workflow with CRE"**
-
-<!-- clim:begin links -->
-**[Open the dashboard](https://clim-zeta.vercel.app/app)** · **[Video demo](https://youtu.be/xbfjvNv6KR0)** · **[Deck](https://docs.google.com/presentation/d/1ktPLaCSCa0LhAjOQRrdwIbGRDE_GyBZI/edit?slide=id.p1#slide=id.p1)** · **[CRE evidence](docs/evidence/)** · **[CRE DevEx report](docs/feedback/cre-devex-report.md)** · **[CRE friction log](docs/feedback/cre-friction-log.md)**
-<!-- clim:end links -->
+Work in progress. The state submitted to TOKEN2049 Origins (Singapore, October 2026) is frozen at
+[DVB-ANS/clim @ token2049-submission](https://github.com/DVB-ANS/clim/tree/token2049-submission); the sections below
+still describe that version until plan 04 rewrites this README.
 
 </div>
 
