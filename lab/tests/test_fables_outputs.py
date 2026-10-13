@@ -43,6 +43,20 @@ def test_window_output():
         assert w["meanFeeBp"] == pytest.approx(d["keeper"]["meanFeeBp"], rel=0.01)
     assert d["chosenWindowSec"] in (300, 900)
     assert "flat7" in d["arbVsKeeperPct"]
+    sens = d["sensitivity"]
+    assert set(sens["arbCadenceSec"]) == {"1", "2", "15"}
+    for step in sens["arbCadenceSec"].values():
+        assert set(step["arbVsKeeperPct"]) == {"300", "900", "flat7"}
+    assert sens["arbCadenceSec"]["1"]["arbVsKeeperPct"] == d["arbVsKeeperPct"]
+    assert len(sens["weekly"]) == 5 and all("arbVsKeeperPct" in r for r in sens["weekly"])
+    fpd = sens["feePerDollar"]
+    assert fpd["keeperPaidBp"] > 0 and fpd["keeperPostedBp"] > 0 and fpd["climBp"] > 0
+    assert set(sens["sigmaEnvelope"]) == {"300", "900"}
+    caveats = " ".join(d["caveats"])
+    for word in ("in-sample", "confidence interval", "same Binance", "envelope"):
+        assert word in caveats
+    assert d["framing"].startswith("At equal time-average fee") and d["framing"].endswith("Not a claim of better fees.")
+    assert "<" not in d["framing"]
 
 
 def test_direction_output():

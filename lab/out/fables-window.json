@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-13T21:09:47Z",
+  "generatedAt": "2026-10-13T21:27:07Z",
   "dtEffSec": 1.4480277,
   "keeper": {
     "meanFeeBp": 10.383346,
@@ -34,8 +34,94 @@
   },
   "chosenWindowSec": 300,
   "rule": "lower arbitrage loss at equal average fee; within 1 point, higher Pearson correlation with the keeper",
+  "sensitivity": {
+    "arbCadenceSec": {
+      "1": {
+        "keeperRelStep1": 1.0,
+        "arbVsKeeperPct": {
+          "300": -4.3837777,
+          "900": -2.8571314,
+          "flat7": 63.733182
+        }
+      },
+      "2": {
+        "keeperRelStep1": 1.1854672,
+        "arbVsKeeperPct": {
+          "300": -4.008508,
+          "900": -1.9962179,
+          "flat7": 67.513872
+        }
+      },
+      "15": {
+        "keeperRelStep1": 1.8790338,
+        "arbVsKeeperPct": {
+          "300": 4.6101482,
+          "900": 6.8897022,
+          "flat7": 76.421391
+        }
+      }
+    },
+    "arbCadenceNote": "arbitrageur acting every 1, 2 or 15 s: venue path and per-second fees subsampled at that step; percentages against the keeper at the same step; keeperRelStep1 is the keeper's loss relative to step 1",
+    "weekly": [
+      {
+        "weekStart": "2026-09-07T00:00:00Z",
+        "keeperMeanFeeBp": 9.8247345,
+        "climMeanFeeBp": 10.047299,
+        "arbVsKeeperPct": -3.4662115
+      },
+      {
+        "weekStart": "2026-09-14T00:00:00Z",
+        "keeperMeanFeeBp": 12.131442,
+        "climMeanFeeBp": 11.758294,
+        "arbVsKeeperPct": 1.8258957
+      },
+      {
+        "weekStart": "2026-09-21T00:00:00Z",
+        "keeperMeanFeeBp": 11.091018,
+        "climMeanFeeBp": 11.182013,
+        "arbVsKeeperPct": -5.9692513
+      },
+      {
+        "weekStart": "2026-09-28T00:00:00Z",
+        "keeperMeanFeeBp": 9.7260207,
+        "climMeanFeeBp": 9.8257703,
+        "arbVsKeeperPct": -11.51505
+      },
+      {
+        "weekStart": "2026-10-05T00:00:00Z",
+        "keeperMeanFeeBp": 9.143516,
+        "climMeanFeeBp": 9.1033542,
+        "arbVsKeeperPct": -7.6993526
+      }
+    ],
+    "weeklyNote": "chosen window (300 s) against the keeper, each week simulated on its own; eta stays the five-week value, so weekly mean fees differ",
+    "feePerDollar": {
+      "keeperPaidBp": 10.773526,
+      "keeperPostedBp": 10.820984,
+      "climBp": 11.961649,
+      "note": "notional-weighted mean fee over the window's swaps: keeperPaid is the fee each swap paid, keeperPosted the keeper's resolved fee at the swap's second, clim the fee clim's rule would have posted at that second"
+    },
+    "sigmaEnvelope": {
+      "300": {
+        "etaE4": 174922,
+        "reportsClampedPct": 9.9760915,
+        "arbVsKeeperPct": -4.6676921
+      },
+      "900": {
+        "etaE4": 172697,
+        "reportsClampedPct": 4.4483686,
+        "arbVsKeeperPct": -2.8692094
+      }
+    },
+    "sigmaEnvelopeNote": "RiskDeskV2's envelope (x2 up, x0.8 down per report, absolute bounds) applied to each report, eta recalibrated at equal average fee"
+  },
   "caveats": [
     "1 s grid: the simulator cannot see sub-second races; it ranks policies, it does not predict dollars",
-    "the keeper's path is replayed as posted; clim's fee follows reports every 30 s with 2 s latency"
-  ]
+    "the keeper's path is replayed as posted; clim's fee follows reports every 30 s with 2 s latency",
+    "in-sample: eta is fitted on the same five weeks the comparison runs on",
+    "no confidence interval: one price path and one run per policy",
+    "sigma comes from the same Binance (USD) path that drives the simulated arbitrageur, which can favour a sigma-driven fee; the live desk reads four venues",
+    "the on-chain sigma envelope is not modelled in the headline numbers; applied, it moves the 5-minute result from -4.38 % to -4.67 % (sensitivity.sigmaEnvelope)"
+  ],
+  "framing": "At equal time-average fee, clim's 5-minute rule and the keeper are comparable: -4.4 % arbitrage loss with arbitrage every second, +4.6 % every 15 s; clim charges 11.96 bp per dollar traded vs the keeper's 10.77 bp. Not a claim of better fees."
 }
