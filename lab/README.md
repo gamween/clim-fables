@@ -111,3 +111,33 @@ Sources: Binance `GET /api/v3/klines` (intervals `1s` and `1m`, symbol `ETHUSDT`
 - The year sample is bridged from 1-minute data, not observed at 12 s.
 
 `scratch/` holds the exploration scripts written during the hack before this package existed. They are kept for provenance; nothing imports them.
+
+## clim × Fables studies (Robinhood Chain, 2026-09-07 to 2026-10-12)
+
+Raw data (gitignored, re-downloadable, read only):
+
+    uv run python scripts/fables_fetch.py blocks        # block-time samples; then check-clock must PASS
+    uv run python scripts/fables_fetch.py check-clock
+    uv run python scripts/fables_fetch.py logs          # needs ETHERSCAN_API_KEY (env or contracts/.env)
+    uv run python scripts/fables_fetch.py binance
+    uv run python scripts/fables_fetch.py usdt
+
+The swap history comes from fables-farming's download (`FABLES_HISTORY_DIR`, default
+`~/Development/projects/fables-farming/data/history/0xbac3aa3b`).
+
+Studies (offline), in order:
+
+    uv run python scripts/study_dt.py               # lab/out/fables-dt-eff.json
+    uv run python scripts/study_window.py           # lab/out/fables-window.json
+    uv run python scripts/study_direction.py        # lab/out/fables-direction.json
+    uv run python scripts/decide_fables_params.py   # shared/params-fables.json
+
+What each one answers:
+
+1. **Effective arbitrage interval.** Robinhood Chain makes a block every ~0.1 s; arbitrageurs do not trade every
+   block. Δt is solved from the observed arbitrage rate (MMR 2023 with c = 1, Nezlobin-Tassy 2025 with c = 0.824),
+   fitted on three weeks and checked on the next two, with the venue-exit-to-arbitrage delays as a second estimate.
+2. **Volatility window.** 5 or 15 minutes, at the same average fee as Fables' keeper: correlation with the keeper
+   and arbitrage loss on a 1 s grid, published as measured.
+3. **Per-direction signal.** Whether the venue-versus-pool gap the desk can publish every 30 s predicts flow that
+   beats the fee (markouts at 5, 30 and 300 s). The premium rule is enabled only if it clears a stated gate.
