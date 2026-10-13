@@ -3,7 +3,10 @@ pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
 import {IAccessManager} from "@openzeppelin/contracts/access/manager/IAccessManager.sol";
+import {IAccessManaged} from "@openzeppelin/contracts/access/manager/IAccessManaged.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
@@ -17,12 +20,23 @@ import {RiskDeskV2} from "../../src/v2/RiskDeskV2.sol";
 import {ClimFeePolicy} from "../../src/v2/ClimFeePolicy.sol";
 import {ClimPoker} from "../../src/v2/ClimPoker.sol";
 import {ClimFeeMath} from "../../src/libraries/ClimFeeMath.sol";
+import {PokeFeeHook} from "../../src/v2/PokeFeeHook.sol";
 import {ISymmetricPokeHook} from "../../src/v2/interfaces/IOverrideFeeHook.sol";
 
+/// @notice Fables' pool configuration entry point, from their published ABI
+///         (`setPoolConfig((address,address,uint24,int24,address),uint24,uint24,uint24)`).
+interface IFablesPoolConfig {
+    function setPoolConfig(PoolKey calldata key, uint24 floorPips, uint24 flatPips, uint24 maxFee) external;
+}
+
 /// @notice Runs against Fables' deployed ETH/USDG hook on a fork of Robinhood Chain mainnet (nothing is sent to
-///         mainnet). Proves that a ClimPoker granted FEE_POKER drives the real hook within its bounds, composes with
-///         an event override, stops when the desk is blind, and stops for good when the role is revoked.
+///         mainnet), pinned to FORK_BLOCK so the run is reproducible. Fables' admin sends the AccessManager batch the
+///         integration asks for; the tests prove that ClimPoker drives the real hook within its bounds, only for the
+///         roles Fables grants, composes with an event override, stops when the desk is blind, and stops for good
+///         when the role is revoked.
 contract FablesForkTest is Test {
+    /// @dev A Robinhood Chain mainnet block of 2026-10-13, after the ETH/USDG config of 2026-09-06.
+    uint256 internal constant FORK_BLOCK = 87_780_000;
     address internal constant HOOK = 0x06a889870C8f83640D6816319f72e2aA579b6080;
     address internal constant ACCESS_MANAGER = 0xA362D98B33A7bb5B5E2180a05f995A70FB404f30;
     address internal constant POKER_ADMIN = 0x359856655934338d798F9ccE1f181486301D36a5;
@@ -30,6 +44,8 @@ contract FablesForkTest is Test {
     address internal constant USDG = 0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168;
     bytes32 internal constant POOL_ID = 0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551;
     address internal constant FABLES_KEEPER = 0x1B6a8808E1D26dba66bA11E52997803C43CAd429;
+    /// @dev Custom error Fables' hook reverts with when a poked fee is outside its band.
+    bytes4 internal constant FABLES_FEE_OUT_OF_BOUNDS = 0x652853ee;
     uint64 internal constant FEE_POKER = 1;
     /// @dev A role id Fables would pick for who may trigger ClimPoker.poke() (clim's runner and their keeper).
     uint64 internal constant CLIM_RUNNER = 7;
@@ -50,7 +66,7 @@ contract FablesForkTest is Test {
     function setUp() public {
         string memory rpc = vm.envOr("RH_MAINNET_RPC_URL", string(""));
         if (bytes(rpc).length == 0) vm.skip(true);
-        vm.createSelectFork(rpc);
+        vm.createSelectFork(rpc, FORK_BLOCK);
         t0 = uint40(block.timestamp);
         desk = new RiskDeskV2(forwarder, operator);
         policy = new ClimFeePolicy(
@@ -83,6 +99,7 @@ contract FablesForkTest is Test {
         vm.startPrank(POKER_ADMIN);
         am.grantRole(FEE_POKER, address(poker), 0);
         am.setTargetFunctionRole(address(poker), keeperSel, FEE_POKER);
+        am.labelRole(CLIM_RUNNER, "CLIM_RUNNER");
         am.setTargetFunctionRole(address(poker), runnerSel, CLIM_RUNNER);
         am.grantRole(CLIM_RUNNER, runner, 0);
         am.grantRole(CLIM_RUNNER, keeper, 0);
@@ -193,6 +210,79 @@ contract FablesForkTest is Test {
             }
         }
         assertEq(paid, expected);
+    }
+
+    function test_FablesKeeperHoldsFeePokerAtTheForkBlock() public view {
+        (bool isMember,) = IAccessManager(ACCESS_MANAGER).hasRole(FEE_POKER, FABLES_KEEPER);
+        assertTrue(isMember);
+    }
+
+    /// @dev Review finding C1: with a permissionless poke, anyone could overwrite the keeper's override (Fables' hook
+    ///      has one slot per pool) with clim's lower fee. Now only the roles Fables grants can poke.
+    function test_AStrangerCannotOverwriteTheKeepersOverride() public {
+        _report(SIGMA_48);
+        vm.prank(keeper);
+        ISymmetricPokeHook(HOOK).pokeFee(POOL_ID, 5_000, 7_200);
+        assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 5_000);
+
+        address stranger = makeAddr("stranger");
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(IAccessManaged.AccessManagedUnauthorized.selector, stranger));
+        poker.poke();
+        assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 5_000);
+    }
+
+    function test_KeeperPostsAnEventAndPokesInOneCall() public {
+        _report(SIGMA_48);
+        vm.prank(keeper);
+        (uint24 f01, uint24 f10) = poker.postEventAndPoke(5_000, 5_000, uint40(block.timestamp + 300));
+        assertEq(f01, 5_000);
+        assertEq(f10, 5_000);
+        assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, true), 5_000);
+        assertEq(ISymmetricPokeHook(HOOK).currentFee(POOL_ID, false), 5_000);
+    }
+
+    /// @dev Documented deployment invariant: the policy's band [floor, cap] must sit inside the hook's. If Fables lowers
+    ///      the hook's cap below the policy's (or raises its floor above), a poke outside the new band reverts in the
+    ///      hook: the pool keeps its last override until it expires, then its flat fee. Nothing worse happens.
+    function test_PokeAboveALoweredHookCapReverts() public {
+        vm.prank(POKER_ADMIN);
+        IFablesPoolConfig(HOOK).setPoolConfig(_key(), 100, 700, 3_000);
+
+        _report(SIGMA_1000);
+        assertGt(_expected(SIGMA_1000), 3_000);
+        vm.prank(runner);
+        // the hook's own fee-bound error (selector observed on the fork at FORK_BLOCK: pokeFee(pool, 3_160, 600))
+        vm.expectRevert(FABLES_FEE_OUT_OF_BOUNDS);
+        poker.poke();
+    }
+
+    /// @dev Fables' hook and PokeFeeHook emit the same symmetric FeePoked topic, so one indexer reads both.
+    function test_FeePokedTopicMatchesPokeFeeHook() public {
+        bytes32 expected = keccak256("FeePoked(bytes32,uint24,uint40)");
+        _report(SIGMA_48);
+        vm.recordLogs();
+        vm.prank(runner);
+        poker.poke();
+        assertEq(_firstTopic(HOOK), expected);
+
+        address ours = address(uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG) ^ (0x5555 << 144));
+        AccessManager am = new AccessManager(address(this));
+        deployCodeTo("PokeFeeHook.sol:PokeFeeHook", abi.encode(POOL_MANAGER, address(am)), ours);
+        PoolKey memory key = _key();
+        key.hooks = IHooks(ours);
+        PokeFeeHook(ours).setPoolConfig(key, 100, 700, 6_000);
+        vm.recordLogs();
+        PokeFeeHook(ours).pokeFee(PoolId.unwrap(key.toId()), 1_000, 600);
+        assertEq(_firstTopic(ours), expected);
+    }
+
+    function _firstTopic(address emitter) internal returns (bytes32) {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].emitter == emitter) return logs[i].topics[0];
+        }
+        revert("no log");
     }
 
     receive() external payable {}
