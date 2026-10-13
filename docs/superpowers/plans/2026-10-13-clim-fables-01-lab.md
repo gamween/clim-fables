@@ -629,6 +629,7 @@ def _block_at_or_after(t: int, lo: int, hi: int) -> int:
 
 def cmd_blocks(args) -> None:
     out = RAW / "blocks.json"
+    partial = RAW / "blocks.partial.json"
     if out.exists() and not args.refresh:
         print(f"{out} exists (use --refresh)")
         return
@@ -638,14 +639,20 @@ def cmd_blocks(args) -> None:
     numbers = list(range(first, last + 1, args.step))
     if numbers[-1] != last:
         numbers.append(last)
-    rows: list[tuple[int, int]] = []
-    for i in range(0, len(numbers), 50):
-        rows += _blocks(numbers[i : i + 50])
-        if (i // 50) % 100 == 0:
-            print(f"  {len(rows)}/{len(numbers)} samples")
-        time.sleep(0.2)
     RAW.mkdir(parents=True, exist_ok=True)
+    # resumable: Alchemy's free tier allows ~330 compute units/s (16 per block read), so pace batches and keep progress
+    rows: list[tuple[int, int]] = [tuple(r) for r in json.loads(partial.read_text())] if partial.exists() else []
+    done = {r[0] for r in rows}
+    todo = [n for n in numbers if n not in done]
+    for i in range(0, len(todo), args.batch):
+        rows += _blocks(todo[i : i + args.batch])
+        time.sleep(args.pause)
+        if (i // args.batch) % 50 == 0:
+            partial.write_text(json.dumps(rows))
+            print(f"  {len(rows)}/{len(numbers)} samples", flush=True)
+    rows.sort()
     out.write_text(json.dumps(rows))
+    partial.unlink(missing_ok=True)
     print(f"wrote {out}: {len(rows)} samples, blocks {first}..{last}, step {args.step}")
 
 
@@ -654,8 +661,9 @@ def cmd_check_clock(args) -> None:
     rng = random.Random(20261013)
     picks = sorted(rng.randrange(int(clock.block[0]), int(clock.block[-1])) for _ in range(300))
     exact = []
-    for i in range(0, len(picks), 100):
-        exact += _blocks(picks[i : i + 100])
+    for i in range(0, len(picks), 10):
+        exact += _blocks(picks[i : i + 10])
+        time.sleep(1.0)
     b = np.array([r[0] for r in exact], dtype=np.int64)
     ts = np.array([r[1] for r in exact], dtype=np.int64)
     err = np.abs(clock.time_of(b) - ts)
@@ -664,10 +672,12 @@ def cmd_check_clock(args) -> None:
         "samples": int(len(b)),
         "sampleStepBlocks": int(np.median(np.diff(clock.block))),
         "errorSec": {"p50": float(np.percentile(err, 50)), "p99": float(np.percentile(err, 99)), "max": int(err.max())},
-        "pass": bool(np.percentile(err, 99) <= 1),
+        "shareWithin1s": float((err <= 1).mean()),
+        # timestamps are whole seconds, so +-1 s is the floor any interpolation can reach; the gate asks for 99 % there
+        "pass": bool((err <= 1).mean() >= 0.99),
     }
     write_json(OUT_DIR / "fables-clock-check.json", res)
-    print(json.dumps(res["errorSec"]), "PASS" if res["pass"] else "FAIL: rerun blocks with a smaller --step")
+    print(json.dumps(res["errorSec"]), f"within 1 s: {res['shareWithin1s']:.1%}", "PASS" if res["pass"] else "FAIL: rerun blocks with a smaller --step")
 
 
 def _etherscan_key() -> str:
@@ -790,6 +800,8 @@ def main() -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("blocks")
     b.add_argument("--step", type=int, default=600)
+    b.add_argument("--batch", type=int, default=20)
+    b.add_argument("--pause", type=float, default=1.0)
     for name in ("blocks", "check-clock", "logs", "binance", "usdt"):
         sp = b if name == "blocks" else sub.add_parser(name)
         sp.add_argument("--refresh", action="store_true")

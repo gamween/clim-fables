@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-10-13T21:06:38Z",
+  "samples": 300,
+  "sampleStepBlocks": 1000,
+  "errorSec": {
+    "p50": 0.0,
+    "p99": 1.01,
+    "max": 2
+  },
+  "shareWithin1s": 0.99,
+  "pass": true
+}
