@@ -1,0 +1,290 @@
+/* Page-level layouts: markets head, pool header and stat row, row tables, params card (inventory §2.2, §2.3). */
+
+.pageHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+.pageTitle {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 33.6px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.pageDesc {
+  margin-top: 8px;
+  color: var(--ink-muted);
+  line-height: 18.9px;
+}
+.headStats {
+  display: flex;
+  gap: 32px;
+}
+.headStats > * + * {
+  border-left: 1px solid var(--line-light);
+  padding-left: 32px;
+}
+.headValue {
+  font-size: 24px;
+  line-height: 24px;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+.filterBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Pool page: content 1040 wide inside the 1200 column (padding 80 on each side), top 144 from the page top. */
+.pool {
+  width: 100%;
+  max-width: 1040px;
+  margin: -24px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+.poolHead {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-secondary);
+  width: fit-content;
+}
+.back:hover {
+  color: var(--ink);
+}
+.identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.identityLeft {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.pairTitle {
+  font-size: 28px;
+  line-height: 33.6px;
+  font-weight: 500;
+}
+.pairSub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-weight: 500;
+  flex-wrap: wrap;
+}
+.pairSubMuted {
+  font-weight: 400;
+  color: var(--ink-secondary);
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+.statRow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 32px;
+}
+.statRow > * {
+  padding-right: 32px;
+  border-right: 1px solid var(--line-light);
+}
+.statRow > *:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+@media (max-width: 1140px) {
+  .statRow {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .statRow > * {
+    border-right: 0;
+    padding-right: 0;
+  }
+}
+@media (max-width: 575px) {
+  .statRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Row table: separate rows 8 px apart, head cells on canvas, body cells on surface, rounded row ends. */
+.tableWrap {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 8px;
+  margin: -8px 0;
+}
+.table th {
+  height: 50px;
+  padding: 12px 16px;
+  background: var(--canvas);
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: -0.13px;
+  text-align: left;
+  white-space: nowrap;
+}
+.table th:first-child,
+.table td:first-child {
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+.table th:last-child,
+.table td:last-child {
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.table td {
+  height: 56px;
+  padding: 0 16px;
+  background: var(--surface);
+  transition: background-color var(--dur);
+  white-space: nowrap;
+}
+.table tbody tr:hover td {
+  background: var(--canvas);
+}
+.tall td {
+  height: 76px;
+}
+.num {
+  text-align: right !important;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.marketCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.marketName {
+  font-weight: 500;
+  display: block;
+  margin-bottom: 4px;
+}
+.chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius);
+  color: var(--ink-secondary);
+}
+.chevron:hover {
+  background: var(--raised-hover);
+  color: var(--ink);
+}
+.typeDot {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.typeDot::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot, var(--ink-faint));
+}
+.muted {
+  color: var(--ink-secondary);
+}
+.txCard {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px 20px 12px;
+  box-shadow: var(--shadow-table);
+}
+.txCard .table td {
+  background: var(--surface);
+}
+.txCard .table tbody tr:hover td {
+  background: var(--canvas);
+}
+
+/* Params card: two columns, rows padding 10 0, odd rows with a right hairline. */
+.params {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 10px 20px;
+  background: var(--card);
+  border-radius: var(--radius);
+}
+.param {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+.param:nth-child(odd) {
+  border-right: 1px solid var(--line-light);
+  padding-right: 20px;
+}
+.param:nth-child(even) {
+  padding-left: 20px;
+}
+.paramLabel {
+  color: var(--ink-secondary);
+  text-decoration: underline dashed var(--line-interactive);
+  text-underline-offset: 4px;
+}
+.paramValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+@media (max-width: 640px) {
+  .params {
+    grid-template-columns: 1fr;
+  }
+  .param:nth-child(odd) {
+    border-right: 0;
+    padding-right: 0;
+  }
+  .param:nth-child(even) {
+    padding-left: 0;
+  }
+}
+
+.note {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+.split {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.splitLabel {
+  color: var(--ink-secondary);
+  font-size: 14px;
+  font-weight: 400;
+}
