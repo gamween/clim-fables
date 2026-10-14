@@ -3,7 +3,13 @@
 // echoes its output. For each run it writes the transcript to bots/out/desk-sim/<run start>.log and appends one line to
 // bots/out/desk-runs.jsonl: status, tx hash, receipt and gas, the forwarder's ReportProcessed.result and the decoded
 // RiskReportedV2. The receipt decides `applied` (simParse.receiptStatus).
-// Usage: bun src/live/desk-loop.ts [--target rh-testnet-settings] [--once]
+// Outages (plan 03 Task 23): each `cre workflow simulate` is a fresh process that reads its nonce and the venues itself,
+// so nothing is replayed after a sleep; a run cut by the sleep can only deliver a real observation stamped with its own
+// tObs, which the policy trusts for tauKillSec after tObs and to which ClimPoker anchors its TTL, so a late delivery
+// cannot extend a fee. This recorder writes a local outage record on a wall-clock jump and on restart, and logs the desk
+// state re-read from the chain. If the loop exits (the CRE CLI or the network failing at start), this process exits 1
+// and launchd starts it again 30 s later (ThrottleInterval).
+// Usage: bun src/live/desk-loop.ts [--target rh-testnet-settings] [--cre-bin /absolute/path/to/cre] [--once]
 import { mockForwarderAbi, riskDeskV2Abi } from "@clim/shared";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -13,8 +19,10 @@ import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
 import { loopCommand, receiptStatus, RunTracker, type RunResult } from "../lib/simParse";
 import { liveClient } from "./lib/chain";
 import { loadLiveDeployments, REPO_ROOT } from "./lib/deployments";
+import { recordStart, watchClock } from "./lib/supervisor";
 
 const target = argValue("--target") ?? "rh-testnet-settings";
+const creBin = argValue("--cre-bin");
 const once = hasFlag("--once");
 const creDir = envStr("CRE_PROJECT_DIR", join(REPO_ROOT, "cre"));
 const d = loadLiveDeployments();
@@ -69,9 +77,26 @@ async function record(run: RunResult): Promise<void> {
   }
 }
 
+/** The desk as the chain sees it, printed on start and after a wall-clock jump (desk-runs.jsonl keeps one line per run). */
+async function logDeskState(why: string): Promise<void> {
+  try {
+    const st = await client.readContract({ address: d.riskDesk, abi: riskDeskV2Abi, functionName: "state" });
+    const age = st[6] === 0 ? null : Math.floor(Date.now() / 1000) - st[0];
+    console.log(`[desk] ${why}: desk seq ${st[6]}, last report ${age === null ? "never" : `${age} s ago`}`);
+  } catch (e) {
+    console.error(`[desk] ${why}: desk state unreadable: ${shortError(e)}`);
+  }
+}
+
+recordStart("desk", runsFile);
+await logDeskState("start");
+watchClock("desk", () => {
+  void logDeskState("resume");
+});
+
 const cmd = loopCommand(target);
-console.log(`[desk] ${cmd.join(" ")} (cwd ${creDir}), recording to ${runsFile}`);
-const proc = Bun.spawn(cmd, { cwd: creDir, stdout: "pipe", stderr: "inherit", env: process.env });
+console.log(`[desk] ${cmd.join(" ")} (cwd ${creDir}, cre ${creBin ?? "from PATH"}), recording to ${runsFile}`);
+const proc = Bun.spawn(cmd, { cwd: creDir, stdout: "pipe", stderr: "inherit", env: creBin ? { ...process.env, CRE_BIN: creBin } : process.env });
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
     proc.kill();

@@ -23,7 +23,11 @@
     "live:fund": "bun src/live/scripts/fund.ts",
     "live:status": "bun src/live/scripts/status.ts",
     "live:gas": "bun src/live/scripts/gas.ts",
-    "live:verify": "bun src/live/scripts/verify-live.ts"
+    "live:verify": "bun src/live/scripts/verify-live.ts",
+    "live:outages": "bun src/live/scripts/outages.ts",
+    "live:install": "bun src/live/scripts/launchd.ts install",
+    "live:uninstall": "bun src/live/scripts/launchd.ts uninstall",
+    "live:logs": "bun src/live/scripts/launchd.ts logs"
   },
   "dependencies": {
     "@clim/shared": "workspace:*",

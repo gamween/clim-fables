@@ -15,6 +15,7 @@
     "./config": "./src/config.ts",
     "./live": "./src/live.ts",
     "./abis-v2": "./src/abisV2.ts",
+    "./outages": "./src/outages.ts",
     "./params-fables.json": "./params-fables.json",
     "./keeper-map-fables.json": "./keeper-map-fables.json",
     "./deployments/sepolia.json": "./deployments/sepolia.json",

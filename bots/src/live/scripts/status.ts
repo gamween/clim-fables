@@ -1,8 +1,10 @@
 // Health of the live stack on Robinhood Chain testnet: desk seq and age, the policy's quote and mode, each pool's fee
-// both ways and price against the venues, the last pokes on D (ClimPoker) and K (keeper), every key's balances, and the
-// age of each bot's last log line. Exits 1 on a problem; --watch prints a snapshot every 15 s instead.
+// both ways and price against the venues, the last pokes on D (ClimPoker) and K (keeper), every key's balances, the
+// age of each bot's last log line, the launchd jobs (plan 03 Task 23) and the outage record. Exits 1 on a problem;
+// --watch prints a snapshot every 15 s instead.
 // Usage: bun src/live/scripts/status.ts [--watch]
 import { climPokerAbi, FeeMode, LIVE_POOLS, pipsToBp, pokeFeeHookAbi, sigmaE9ToAnnual, stateViewAbi } from "@clim/shared";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { formatEther, formatUnits, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -12,6 +14,7 @@ import { aggregate, fetchVenueQuotes } from "../../lib/market";
 import { liveClient, readLiveBalances, readLiveState } from "../lib/chain";
 import { loadLiveDeployments } from "../lib/deployments";
 import { liveKey, type LiveRole } from "../lib/env";
+import { jobLabel, jobState, LIVE_JOB_NAMES } from "../lib/launchd";
 import { lastTs } from "../lib/tail";
 
 const d = loadLiveDeployments();
@@ -90,6 +93,31 @@ async function snapshot(): Promise<string[]> {
     const a = ts === null ? null : Math.round((Date.now() - Date.parse(ts)) / 1000);
     console.log(`  bot ${name}: last log ${a === null ? "never" : `${a} s ago`}`);
     if (a === null || a > maxAge) problems.push(`bot ${name} silent (${a === null ? "no log" : `${a} s`} > ${maxAge} s)`);
+  }
+  const jobs = LIVE_JOB_NAMES.map((name) => ({ name, st: jobState(name) }));
+  if (jobs.every((j) => j.st === null)) {
+    console.log("  launchd: no fi.clim-fables.* job loaded (bun run live:install starts them)");
+  } else {
+    for (const { name, st } of jobs) {
+      console.log(`  job ${jobLabel(name)}: ${st === null ? "not loaded" : `${st.state ?? "?"}${st.pid ? ` pid ${st.pid}` : ""}, last exit ${st.lastExitCode ?? "?"}`}`);
+      if (st === null) problems.push(`job ${name} not loaded (bun run live:install ${name})`);
+      else if (st.state !== "running") problems.push(`job ${name} ${st.state ?? "in an unknown state"} (last exit ${st.lastExitCode ?? "?"}; bun run live:logs ${name})`);
+    }
+  }
+  const outagesFile = join(OUT_DIR, "outages.json");
+  if (existsSync(outagesFile)) {
+    try {
+      const o = JSON.parse(readFileSync(outagesFile, "utf8")) as { generatedAt: string; windows: Array<{ from: number; durationSec: number; ongoing: boolean; reason: string }> };
+      const last = o.windows[o.windows.length - 1];
+      const at = (t: number) => new Date(t * 1000).toISOString().slice(0, 19);
+      console.log(
+        `  outages: ${o.windows.length} recorded (as of ${o.generatedAt})${last ? `, last from ${at(last.from)} UTC, ${last.durationSec} s${last.ongoing ? " and ongoing" : ""}: ${last.reason}` : ""}`,
+      );
+    } catch {
+      console.log("  outages: bots/out/outages.json unreadable");
+    }
+  } else {
+    console.log("  outages: no record yet (bun run live:outages)");
   }
   for (const p of problems) console.log(`  PROBLEM: ${p}`);
   return problems;
