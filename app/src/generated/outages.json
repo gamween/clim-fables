@@ -1,16 +1,16 @@
 {
   "source": "bots/out/outages.json",
-  "generatedAt": "2026-10-14T14:18:58.293Z",
+  "generatedAt": "2026-10-14T15:36:30.205Z",
   "chainId": 46630,
   "riskDesk": "0x63f543430982685387C83e4ec55E5a26fd1371Ef",
   "gapSec": 90,
   "deployBlock": 134885665,
-  "scannedToBlock": 135103814,
-  "chainTimeSec": 1791987534,
-  "reportCount": 636,
+  "scannedToBlock": 135145013,
+  "chainTimeSec": 1791992186,
+  "reportCount": 789,
   "lastReport": {
-    "seq": 636,
-    "tObs": 1791987529
+    "seq": 789,
+    "tObs": 1791992169
   },
   "windows": [
     {
