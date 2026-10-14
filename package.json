@@ -2,7 +2,7 @@
   "name": "clim",
   "private": true,
   "license": "MIT",
-  "workspaces": ["shared", "bots"],
+  "workspaces": ["shared", "bots", "docs/integrate"],
   "scripts": {
     "test": "bun run --filter '*' test",
     "typecheck": "bun run --filter '*' typecheck",

@@ -17,6 +17,18 @@
         "typescript": "5.9.3",
       },
     },
+    "docs/integrate": {
+      "name": "@clim/integrate",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "^1.4.2",
+        "typescript": "5.9.3",
+        "viem": "^2.57.3",
+      },
+      "peerDependencies": {
+        "viem": "^2.57.3",
+      },
+    },
     "shared": {
       "name": "@clim/shared",
       "version": "0.1.0",
@@ -34,6 +46,8 @@
     "@adraffy/ens-normalize": ["@adraffy/ens-normalize@1.11.1", "", {}, "sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ=="],
 
     "@clim/bots": ["@clim/bots@workspace:bots"],
+
+    "@clim/integrate": ["@clim/integrate@workspace:docs/integrate"],
 
     "@clim/shared": ["@clim/shared@workspace:shared"],
 
