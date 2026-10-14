@@ -48,13 +48,13 @@ const TOKENS = [
   { route: "/", what: "hero leading", sel: '[data-qa="headline"]', prop: "lineHeight", want: "56px" },
 ] as const;
 
-test.use({ viewport: { width: 1450, height: 838 } });
-
-test("screenshots next to Fables' and the token checklist", async ({ page }) => {
+test("screenshots next to Fables' and the token checklist", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "desktop only");
+  await page.setViewportSize({ width: 1450, height: 838 });
   mkdirSync(OUT, { recursive: true });
   for (const p of PAIRS) {
     await page.goto(p.route);
-    await page.waitForTimeout(12_000);
+    await page.waitForTimeout(6_000);
     await page.screenshot({ path: join(OUT, `${p.slug}.png`) });
     await page.screenshot({ path: join(OUT, `${p.slug}-full.png`), fullPage: true });
   }
@@ -80,4 +80,44 @@ ${results.map((r) => `<tr><td>${r.route}</td><td>${r.what}</td><td><code>${r.sel
 ${PAIRS.map((p) => `<h2>${p.route}</h2><div class="pair"><div><p>Showcase</p><img src="${p.slug}.png"></div><div><p>Fables</p>${p.fables.map((f) => `<img src="${rel(f)}">`).join("")}</div></div>`).join("\n")}`;
   writeFileSync(join(OUT, "index.html"), html);
   for (const r of results) expect.soft(r.got, `${r.route} ${r.what} (${r.sel} ${r.prop})`).toBe(r.pass ? r.got : r.want);
+});
+
+/** Phone width (Fables' own breakpoints, .local/fables-ui/css-readable/): no horizontal page scroll, nothing wider than
+ *  the screen outside a scrolling table, no text under 10 px (Fables' smallest size, --text-xs, on its asset badges).
+ *  Screenshots go to .local/app-qa/<slug>-390.png. */
+test("390 px: no overflow, legible text", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile", "mobile only");
+  mkdirSync(OUT, { recursive: true });
+  const problems: string[] = [];
+  for (const p of [...PAIRS, { route: "/markets/k", slug: "pool-k" }, { route: "/credits", slug: "credits" }]) {
+    await page.goto(p.route);
+    await page.waitForTimeout(6_000);
+    await page.screenshot({ path: join(OUT, `${p.slug}-390.png`) });
+    await page.screenshot({ path: join(OUT, `${p.slug}-390-full.png`), fullPage: true });
+    const found = await page.evaluate(() => {
+      const out: string[] = [];
+      const vw = document.documentElement.clientWidth;
+      if (document.documentElement.scrollWidth > vw) out.push(`page scrolls sideways: ${document.documentElement.scrollWidth} px`);
+      const scrolls = (el: Element | null): boolean => {
+        for (let e = el; e && e !== document.body; e = e.parentElement) {
+          const o = getComputedStyle(e).overflowX;
+          if (o === "auto" || o === "scroll" || o === "hidden") return true;
+        }
+        return false;
+      };
+      const name = (el: Element) => `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? `.${el.className.split(" ")[0]}` : ""} "${(el.textContent ?? "").trim().slice(0, 30)}"`;
+      for (const el of document.querySelectorAll("body *")) {
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        if (r.width === 0 || r.height === 0 || cs.visibility === "hidden" || cs.position === "fixed") continue;
+        if ((r.right > vw + 0.5 || r.left < -0.5) && !scrolls(el.parentElement)) out.push(`wider than the screen: ${name(el)} ${Math.round(r.left)} to ${Math.round(r.right)}`);
+        const direct = [...el.childNodes].some((n) => n.nodeType === 3 && (n.textContent ?? "").trim().length > 0);
+        if (direct && parseFloat(cs.fontSize) < 10) out.push(`text under 10 px: ${name(el)} ${cs.fontSize}`);
+      }
+      return [...new Set(out)].slice(0, 15);
+    });
+    for (const f of found) problems.push(`${p.route}: ${f}`);
+  }
+  if (problems.length) console.log(problems.join("\n"));
+  expect(problems).toEqual([]);
 });
