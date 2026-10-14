@@ -19,7 +19,11 @@
     "live:runner": "bun src/live/runner.ts",
     "live:keeper": "bun src/live/keeper.ts",
     "live:arb": "bun src/live/arb.ts",
-    "live:noise": "bun src/live/noise.ts"
+    "live:noise": "bun src/live/noise.ts",
+    "live:fund": "bun src/live/scripts/fund.ts",
+    "live:status": "bun src/live/scripts/status.ts",
+    "live:gas": "bun src/live/scripts/gas.ts",
+    "live:verify": "bun src/live/scripts/verify-live.ts"
   },
   "dependencies": {
     "@clim/shared": "workspace:*",
