@@ -1,7 +1,7 @@
-// Venue requests, response parsers and the node-mode fetch. Parsers are pure and tested on
-// fixtures captured from the real endpoints (fixtures/, see scripts/capture-fixtures.sh).
+// Venue requests, response parsers and the node-mode fetch. Parsers are pure and tested on fixtures captured from
+// the real endpoints (fixtures/) and on trimmed real responses (venues.test.ts).
 import { HTTPClient, type NodeRuntime, ok, text } from '@chainlink/cre-sdk'
-import type { Candle, Quote, VenueSeries } from './estimator'
+import type { Candle, Quote, VenueSeries, VenueTicker } from './estimator'
 
 export const VENUES = ['coinbase', 'kraken', 'binance', 'hyperliquid'] as const
 export type VenueName = (typeof VENUES)[number]
@@ -13,7 +13,7 @@ export const VENUE_QUOTE: Record<VenueName, Quote> = {
 	hyperliquid: 'USD', // USDC-margined perp, treated as USD
 }
 
-const LOOKBACK_SEC = 1200 // 20 minutes: covers the 16 closes of RV15 plus the staleness margin
+const LOOKBACK_SEC = 1200 // 20 minutes: the 16 closes of the 15-minute window plus the staleness margin
 
 export interface HttpReq {
 	url: string
@@ -29,39 +29,39 @@ export function venueRequest(venue: VenueName, nowSec: number): HttpReq {
 				method: 'GET',
 			}
 		case 'kraken':
-			return {
-				url: `https://api.kraken.com/0/public/OHLC?pair=ETHUSD&interval=1&since=${nowSec - LOOKBACK_SEC}`,
-				method: 'GET',
-			}
+			return { url: `https://api.kraken.com/0/public/OHLC?pair=ETHUSD&interval=1&since=${nowSec - LOOKBACK_SEC}`, method: 'GET' }
 		case 'binance':
-			return {
-				url: 'https://data-api.binance.vision/api/v3/klines?symbol=ETHUSDT&interval=1m&limit=20',
-				method: 'GET',
-			}
+			return { url: 'https://data-api.binance.vision/api/v3/klines?symbol=ETHUSDT&interval=1m&limit=20', method: 'GET' }
 		case 'hyperliquid':
 			return {
 				url: 'https://api.hyperliquid.xyz/info',
 				method: 'POST',
 				body: JSON.stringify({
 					type: 'candleSnapshot',
-					req: {
-						coin: 'ETH',
-						interval: '1m',
-						startTime: (nowSec - LOOKBACK_SEC) * 1000,
-						endTime: nowSec * 1000,
-					},
+					req: { coin: 'ETH', interval: '1m', startTime: (nowSec - LOOKBACK_SEC) * 1000, endTime: nowSec * 1000 },
 				}),
 			}
 	}
 }
 
-export function dvolRequest(dvolUrl: string, nowSec: number): HttpReq {
-	const end = nowSec * 1000
-	const start = end - 600_000
-	return {
-		url: `${dvolUrl}?currency=ETH&start_timestamp=${start}&end_timestamp=${end}&resolution=60`,
-		method: 'GET',
+/** Real-time price per venue, for the venue mid that devPips compares with the pool (the lab used 1 s prices). */
+export function tickerRequest(venue: VenueName): HttpReq {
+	switch (venue) {
+		case 'coinbase':
+			return { url: 'https://api.coinbase.com/api/v3/brokerage/market/products/ETH-USD', method: 'GET' }
+		case 'kraken':
+			return { url: 'https://api.kraken.com/0/public/Ticker?pair=ETHUSD,USDTUSD', method: 'GET' }
+		case 'binance':
+			return { url: 'https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDT', method: 'GET' }
+		case 'hyperliquid':
+			return { url: 'https://api.hyperliquid.xyz/info', method: 'POST', body: JSON.stringify({ type: 'allMids' }) }
 	}
+}
+
+/** 1 s klines, only for the binance-1s estimator: 1,000 seconds cover the 900 s window and its first price. */
+export const BINANCE_1S_REQUEST: HttpReq = {
+	url: 'https://data-api.binance.vision/api/v3/klines?symbol=ETHUSDT&interval=1s&limit=1000',
+	method: 'GET',
 }
 
 // ---------- parsing helpers ----------
@@ -69,6 +69,12 @@ export function dvolRequest(dvolUrl: string, nowSec: number): HttpReq {
 function num(x: unknown, what: string): number {
 	const n = typeof x === 'string' ? Number(x) : x
 	if (typeof n !== 'number' || !Number.isFinite(n)) throw new Error(`${what}: not a number: ${String(x)}`)
+	return n
+}
+
+function positive(x: unknown, what: string): number {
+	const n = num(x, what)
+	if (!(n > 0)) throw new Error(`${what}: not positive: ${String(x)}`)
 	return n
 }
 
@@ -84,15 +90,20 @@ function arr(x: unknown, what: string): unknown[] {
 
 const ascending = (cs: Candle[]): Candle[] => cs.sort((a, b) => a.t - b.t)
 
-// ---------- venue parsers (all return candles ascending by open time, seconds) ----------
+// ---------- candle parsers (ascending by open time, seconds; close, high and low) ----------
 
-// {"candles":[{"start":"1791282180","close":"2713.98",...}, ...]} newest first
+// {"candles":[{"start":"1791282180","low":"..","high":"..","open":"..","close":"2713.98",...}, ...]} newest first
 export function parseCoinbase(json: unknown): Candle[] {
 	const rows = arr(obj(json, 'coinbase').candles, 'coinbase.candles')
 	return ascending(
 		rows.map((r) => {
 			const o = obj(r, 'coinbase.candle')
-			return { t: num(o.start, 'coinbase.start'), close: num(o.close, 'coinbase.close') }
+			return {
+				t: num(o.start, 'coinbase.start'),
+				close: num(o.close, 'coinbase.close'),
+				high: num(o.high, 'coinbase.high'),
+				low: num(o.low, 'coinbase.low'),
+			}
 		}),
 	)
 }
@@ -108,27 +119,42 @@ export function parseKraken(json: unknown): Candle[] {
 	return ascending(
 		arr(result[key], 'kraken.rows').map((r) => {
 			const row = arr(r, 'kraken.row')
-			return { t: num(row[0], 'kraken.time'), close: num(row[4], 'kraken.close') }
+			return {
+				t: num(row[0], 'kraken.time'),
+				close: num(row[4], 'kraken.close'),
+				high: num(row[2], 'kraken.high'),
+				low: num(row[3], 'kraken.low'),
+			}
 		}),
 	)
 }
 
-// [[openTimeMs,"open","high","low","close","volume",closeTimeMs,...], ...]
+// [[openTimeMs,"open","high","low","close","volume",closeTimeMs,...], ...] (1m and 1s klines)
 export function parseBinance(json: unknown): Candle[] {
 	return ascending(
 		arr(json, 'binance').map((r) => {
 			const row = arr(r, 'binance.row')
-			return { t: num(row[0], 'binance.openTime') / 1000, close: num(row[4], 'binance.close') }
+			return {
+				t: num(row[0], 'binance.openTime') / 1000,
+				close: num(row[4], 'binance.close'),
+				high: num(row[2], 'binance.high'),
+				low: num(row[3], 'binance.low'),
+			}
 		}),
 	)
 }
 
-// [{"t":openMs,"T":closeMs,"s":"ETH","i":"1m","o":"..","c":"..",...}, ...]
+// [{"t":openMs,"T":closeMs,"s":"ETH","i":"1m","o":"..","c":"..","h":"..","l":"..",...}, ...]
 export function parseHyperliquid(json: unknown): Candle[] {
 	return ascending(
 		arr(json, 'hyperliquid').map((r) => {
 			const o = obj(r, 'hyperliquid.candle')
-			return { t: num(o.t, 'hyperliquid.t') / 1000, close: num(o.c, 'hyperliquid.c') }
+			return {
+				t: num(o.t, 'hyperliquid.t') / 1000,
+				close: num(o.c, 'hyperliquid.c'),
+				high: num(o.h, 'hyperliquid.h'),
+				low: num(o.l, 'hyperliquid.l'),
+			}
 		}),
 	)
 }
@@ -146,43 +172,45 @@ export function parseVenue(venue: VenueName, json: unknown): Candle[] {
 	}
 }
 
-// {"result":{"data":[[tsMs,open,high,low,close],...]}} -> last close (DVOL in vol points, e.g. 47.55)
-export function parseDvol(json: unknown): number {
-	const data = arr(obj(obj(json, 'deribit').result, 'deribit.result').data, 'deribit.data')
-	if (data.length === 0) throw new Error('deribit: empty data')
-	const last = arr(data[data.length - 1], 'deribit.row')
-	return num(last[4], 'deribit.close')
+// ---------- ticker parsers ----------
+
+// {"product_id":"ETH-USD","price":"2713.33",...}
+export function parseCoinbaseTicker(json: unknown): number {
+	return positive(obj(json, 'coinbase').price, 'coinbase.price')
 }
 
-// {"error":[],"result":{"USDTZUSD":{"c":["0.99966000","5.19"],...}}} -> last trade price
-export function parseUsdtUsd(json: unknown): number {
-	const result = obj(obj(json, 'kraken-usdt').result, 'kraken-usdt.result')
-	const key = Object.keys(result)[0]
-	if (key === undefined) throw new Error('kraken-usdt: empty result')
-	const c = arr(obj(result[key], 'kraken-usdt.pair').c, 'kraken-usdt.c')
-	return num(c[0], 'kraken-usdt.last')
+// {"error":[],"result":{"XETHZUSD":{"c":["2713.25","0.004"],...},"USDTZUSD":{"c":["0.9997","49.9"],...}}}
+export function parseKrakenTicker(json: unknown): { ethUsd: number; usdtUsd: number } {
+	const o = obj(json, 'kraken')
+	const errors = arr(o.error ?? [], 'kraken.error')
+	if (errors.length > 0) throw new Error(`kraken: ${errors.join(',')}`)
+	const result = obj(o.result, 'kraken.result')
+	const last = (pair: string): number => positive(arr(obj(result[pair], `kraken.${pair}`).c, `kraken.${pair}.c`)[0], `kraken.${pair}`)
+	return { ethUsd: last('XETHZUSD'), usdtUsd: last('USDTZUSD') }
 }
 
-// ---------- replay (plan 04 replay server) ----------
-
-// The plan 04 replay server replays one historical Binance ETHUSDT series in Binance kline format,
-// timestamps shifted to the wall clock, under one path per venue name (so the per-venue logic and the
-// desk's quorum are exercised; the REPLAY flag of the replay desk discloses that it is one series).
-export function replayVenueRequest(replayUrl: string, venue: VenueName): HttpReq {
-	return { url: `${replayUrl}/venue/${venue}/api/v3/klines?symbol=ETHUSDT&interval=1m&limit=20`, method: 'GET' }
+// {"symbol":"ETHUSDT","price":"2713.86000000"}
+export function parseBinanceTicker(json: unknown): number {
+	return positive(obj(json, 'binance').price, 'binance.price')
 }
 
-export interface DeskInput {
-	nowSec: number
-	usdtUsd: number | null
-	dvol: number | null
-	series: VenueSeries[]
-	notes: string[] // per-source fetch/parse problems, for logs
+// POST /info {"type":"allMids"} -> {"ETH":"2712.75",...} (perp mid, USDC treated as USD)
+export function parseHyperliquidMids(json: unknown): number {
+	return positive(obj(json, 'hyperliquid').ETH, 'hyperliquid.ETH')
 }
 
 // ---------- node-mode fetch ----------
 
-type Fetched = { json: unknown } | { error: string }
+export type Fetched = { json: unknown } | { error: string }
+
+export interface DeskInput {
+	nowSec: number
+	usdtUsd: number | null // Kraken's USDT/USD; null: USDT-quoted prices cannot be converted and are dropped
+	series: VenueSeries[] // 1-minute candles per venue (a failed venue keeps an empty list, so the quorum counts it)
+	tickers: VenueTicker[] // real-time prices of the venues that answered
+	binance1s: Candle[] | null // only for the binance-1s estimator
+	notes: string[] // per-source fetch/parse problems, for logs
+}
 
 // Sends every request first, then waits for each response, so the calls run concurrently.
 export function sendAll(nodeRuntime: NodeRuntime<unknown>, reqs: HttpReq[]): Fetched[] {
@@ -207,7 +235,8 @@ export function sendAll(nodeRuntime: NodeRuntime<unknown>, reqs: HttpReq[]): Fet
 	})
 }
 
-function settle<T>(f: Fetched, parse: (json: unknown) => T): { value: T } | { error: string } {
+export function settle<T>(f: Fetched | undefined, parse: (json: unknown) => T): { value: T } | { error: string } {
+	if (f === undefined) return { error: 'no response' }
 	if ('error' in f) return { error: f.error }
 	try {
 		return { value: parse(f.json) }
@@ -216,56 +245,72 @@ function settle<T>(f: Fetched, parse: (json: unknown) => T): { value: T } | { er
 	}
 }
 
-export function fetchLive(
-	nodeRuntime: NodeRuntime<unknown>,
-	venues: VenueName[],
-	dvolUrl: string,
-	usdtUsdUrl: string,
-	nowSec: number,
-): DeskInput {
-	const reqs = [
-		...venues.map((v) => venueRequest(v, nowSec)),
-		dvolRequest(dvolUrl, nowSec),
-		{ url: usdtUsdUrl, method: 'GET' as const },
-	]
-	const res = sendAll(nodeRuntime, reqs)
-	const notes: string[] = []
-	const series: VenueSeries[] = []
-	venues.forEach((v, i) => {
-		const r = settle(res[i], (j) => parseVenue(v, j))
-		if ('error' in r) notes.push(`${v}: ${r.error}`)
-		// a failed venue stays in the list with no candles, so the quorum message counts it
-		series.push({ venue: v, quote: VENUE_QUOTE[v], candles: 'error' in r ? [] : r.value })
-	})
-	const dv = settle(res[venues.length], parseDvol)
-	if ('error' in dv) notes.push(`dvol: ${dv.error}`)
-	const ut = settle(res[venues.length + 1], parseUsdtUsd)
-	if ('error' in ut) notes.push(`usdtusd: ${ut.error}`)
-	return {
-		nowSec,
-		usdtUsd: 'error' in ut ? null : ut.value,
-		dvol: 'error' in dv ? null : dv.value,
-		series,
-		notes,
+function parseTicker(venue: Exclude<VenueName, 'kraken'>, json: unknown): number {
+	switch (venue) {
+		case 'coinbase':
+			return parseCoinbaseTicker(json)
+		case 'binance':
+			return parseBinanceTicker(json)
+		case 'hyperliquid':
+			return parseHyperliquidMids(json)
 	}
 }
 
-export function fetchReplay(
+/**
+ * One concurrent batch: each venue's 1-minute candles and ticker, Kraken's ticker for USDT/USD if Kraken is not a
+ * venue, Binance 1 s klines when asked, then `extra` requests (the pool read in shadow mode), returned as is.
+ * At most 4 + 4 + 1 + 1 = 10 HTTP calls, under the 15 per execution quota.
+ */
+export function fetchLive(
 	nodeRuntime: NodeRuntime<unknown>,
-	replayUrl: string,
 	venues: VenueName[],
 	nowSec: number,
-): DeskInput {
-	const res = sendAll(
-		nodeRuntime,
-		venues.map((v) => replayVenueRequest(replayUrl, v)),
-	)
+	withBinance1s: boolean,
+	extra: HttpReq[] = [],
+): { input: DeskInput; extra: Fetched[] } {
+	const needKrakenTicker = !venues.includes('kraken')
+	const reqs: HttpReq[] = [
+		...venues.map((v) => venueRequest(v, nowSec)),
+		...venues.map((v) => tickerRequest(v)),
+		...(needKrakenTicker ? [tickerRequest('kraken')] : []),
+		...(withBinance1s ? [BINANCE_1S_REQUEST] : []),
+		...extra,
+	]
+	const res = sendAll(nodeRuntime, reqs)
+	let i = 0
 	const notes: string[] = []
-	const series: VenueSeries[] = venues.map((v, i) => {
-		const r = settle(res[i], parseBinance)
-		if ('error' in r) notes.push(`replay ${v}: ${r.error}`)
-		// replay prices are the historical USDT closes, used as USD (no USDT/USD rate in the replay)
-		return { venue: v, quote: 'USD', candles: 'error' in r ? [] : r.value }
+	const series: VenueSeries[] = venues.map((v) => {
+		const r = settle(res[i++], (j) => parseVenue(v, j))
+		if ('error' in r) notes.push(`${v}: ${r.error}`)
+		return { venue: v, quote: VENUE_QUOTE[v], candles: 'error' in r ? [] : r.value }
 	})
-	return { nowSec, usdtUsd: null, dvol: null, series, notes }
+	const tickers: VenueTicker[] = []
+	let usdtUsd: number | null = null
+	const takeKraken = (f: Fetched | undefined, asVenue: boolean): void => {
+		const r = settle(f, parseKrakenTicker)
+		if ('error' in r) {
+			notes.push(`kraken ticker: ${r.error}`)
+			return
+		}
+		usdtUsd = r.value.usdtUsd
+		if (asVenue) tickers.push({ venue: 'kraken', quote: 'USD', price: r.value.ethUsd })
+	}
+	for (const v of venues) {
+		const f = res[i++]
+		if (v === 'kraken') {
+			takeKraken(f, true)
+			continue
+		}
+		const r = settle(f, (j) => parseTicker(v, j))
+		if ('error' in r) notes.push(`${v} ticker: ${r.error}`)
+		else tickers.push({ venue: v, quote: VENUE_QUOTE[v], price: r.value })
+	}
+	if (needKrakenTicker) takeKraken(res[i++], false)
+	let binance1s: Candle[] | null = null
+	if (withBinance1s) {
+		const r = settle(res[i++], parseBinance)
+		if ('error' in r) notes.push(`binance 1s: ${r.error}`)
+		else binance1s = r.value
+	}
+	return { input: { nowSec, usdtUsd, series, tickers, binance1s, notes }, extra: res.slice(i) }
 }

@@ -18,12 +18,20 @@ export type Quote = 'USD' | 'USDT'
 export interface Candle {
 	t: number // candle open time, unix seconds
 	close: number // close price in the venue's quote currency
+	high?: number // high of the candle, same currency (venue-range estimator)
+	low?: number // low of the candle, same currency
 }
 
 export interface VenueSeries {
 	venue: string
 	quote: Quote
 	candles: Candle[]
+}
+
+export interface VenueTicker {
+	venue: string
+	quote: Quote
+	price: number // last trade or mid in the venue's quote currency
 }
 
 export interface EstimatorInput {
