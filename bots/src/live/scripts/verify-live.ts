@@ -2,7 +2,8 @@
 // 30 minutes): the desk reports regularly and seq rises by one; pool D's fee is the policy's quote, poke by poke, and
 // what the hook recorded; the keeper pokes K about every 180 s with a 7,200 s TTL from its own key; F is never poked and
 // charges its flat 700 pips; arbitrage and retail swaps land on D, K and F. Writes docs/evidence/live-check-<date>.json;
-// exits 1 if a check fails. Usage: bun src/live/scripts/verify-live.ts
+// exits 1 if a check fails. The window ends 3 blocks behind the head and a failed read is retried up to 3 times, 1 s apart
+// (lib/retry.ts: some nodes of the public RPC lag the head); no check is relaxed. Usage: bun src/live/scripts/verify-live.ts
 import { climFeePolicyAbi, climPokerAbi, LIVE_POOLS, pokeFeeHookAbi, poolManagerSwapEventAbi, riskDeskV2Abi } from "@clim/shared";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,18 +11,19 @@ import { envNum } from "../../lib/env";
 import { liveClient, readLiveState } from "../lib/chain";
 import { loadLiveDeployments, REPO_ROOT } from "../lib/deployments";
 import { median } from "../../lib/market";
+import { laggedHead, withRetry } from "../lib/retry";
 import { chunkedRanges } from "../lib/tail";
 
 const d = loadLiveDeployments();
 const client = liveClient();
-const head = await client.getBlockNumber();
+const head = laggedHead(await withRetry(() => client.getBlockNumber()));
 const window = BigInt(envNum("WINDOW_BLOCKS", 18_000));
 const from = head > window ? head - window : 0n;
 const ranges = chunkedRanges(from, head);
 
 async function collect<T>(get: (a: bigint, b: bigint) => Promise<T[]>): Promise<T[]> {
   const out: T[] = [];
-  for (const [a, b] of ranges) out.push(...(await get(a, b)));
+  for (const [a, b] of ranges) out.push(...(await withRetry(() => get(a, b))));
   return out;
 }
 
@@ -50,7 +52,7 @@ const hookMatches = pokes.filter((p) => {
 let quoteMatches = 0;
 const lastTen = pokes.slice(-10);
 for (const p of lastTen) {
-  const [q01, q10] = await client.readContract({ address: d.policy, abi: climFeePolicyAbi, functionName: "quoteDirectional", blockNumber: p.blockNumber });
+  const [q01, q10] = await withRetry(() => client.readContract({ address: d.policy, abi: climFeePolicyAbi, functionName: "quoteDirectional", blockNumber: p.blockNumber }));
   if (p.args.eventApplied || (q01 === p.args.fee0For1 && q10 === p.args.fee1For0)) quoteMatches++;
 }
 checks.poolDFollowsPolicy = {
@@ -64,7 +66,10 @@ const kTimes: number[] = [];
 let kFromKeeper = 0;
 let kTtlOk = 0;
 for (const l of kPokes) {
-  const [tx, blk] = await Promise.all([client.getTransaction({ hash: l.transactionHash }), client.getBlock({ blockNumber: l.blockNumber })]);
+  const [tx, blk] = await Promise.all([
+    withRetry(() => client.getTransaction({ hash: l.transactionHash })),
+    withRetry(() => client.getBlock({ blockNumber: l.blockNumber })),
+  ]);
   const t = Number(blk.timestamp);
   kTimes.push(t);
   if (tx.from.toLowerCase() === d.roles.keeper.toLowerCase()) kFromKeeper++;
@@ -79,7 +84,7 @@ checks.poolKKeeperPattern = {
 // 4. F: never poked in the window, flat fee both ways now
 const fSym = await collect((a, b) => client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.F.poolId }, fromBlock: a, toBlock: b }));
 const fDir = await collect((a, b) => client.getLogs({ address: d.hook, event: pokeFeeHookAbi[4], args: { poolId: d.pools.F.poolId }, fromBlock: a, toBlock: b }));
-const state = await readLiveState(client, d, head);
+const state = await withRetry(() => readLiveState(client, d, head));
 checks.poolFFlat = {
   pass: fSym.length + fDir.length === 0 && state.pools.F.fee0For1 === d.hookConfig.flatPips && state.pools.F.fee1For0 === d.hookConfig.flatPips,
   detail: { pokes: fSym.length + fDir.length, fee0For1: state.pools.F.fee0For1, fee1For0: state.pools.F.fee1For0 },

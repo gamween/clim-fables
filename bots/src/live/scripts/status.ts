@@ -1,7 +1,8 @@
 // Health of the live stack on Robinhood Chain testnet: desk seq and age, the policy's quote and mode, each pool's fee
 // both ways and price against the venues, the last pokes on D (ClimPoker) and K (keeper), every key's balances, the
 // age of each bot's last log line, the launchd jobs (plan 03 Task 23) and the outage record. Exits 1 on a problem;
-// --watch prints a snapshot every 15 s instead.
+// --watch prints a snapshot every 15 s instead. The snapshot is read 3 blocks behind the head (balances at the latest
+// block) and a failed read is retried up to 3 times, 1 s apart (lib/retry.ts: some nodes of the public RPC lag the head).
 // Usage: bun src/live/scripts/status.ts [--watch]
 import { climPokerAbi, FeeMode, LIVE_POOLS, pipsToBp, pokeFeeHookAbi, sigmaE9ToAnnual, stateViewAbi } from "@clim/shared";
 import { existsSync, readFileSync } from "node:fs";
@@ -15,6 +16,7 @@ import { liveClient, readLiveBalances, readLiveState } from "../lib/chain";
 import { loadLiveDeployments } from "../lib/deployments";
 import { liveKey, type LiveRole } from "../lib/env";
 import { jobLabel, jobState, LIVE_JOB_NAMES } from "../lib/launchd";
+import { laggedHead, withRetry } from "../lib/retry";
 import { lastTs } from "../lib/tail";
 
 const d = loadLiveDeployments();
@@ -31,8 +33,12 @@ const LOGS: Array<[string, string, number]> = [
 
 async function snapshot(): Promise<string[]> {
   const problems: string[] = [];
-  const head = await client.getBlockNumber();
-  const [s, block, quotes] = await Promise.all([readLiveState(client, d, head), client.getBlock({ blockNumber: head }), fetchVenueQuotes().catch(() => [])]);
+  const head = laggedHead(await withRetry(() => client.getBlockNumber()));
+  const [s, block, quotes] = await Promise.all([
+    withRetry(() => readLiveState(client, d, head)),
+    withRetry(() => client.getBlock({ blockNumber: head })),
+    fetchVenueQuotes().catch(() => []),
+  ]);
   const now = Number(block.timestamp);
   const m = aggregate(quotes);
   const age = s.desk.seq === 0 ? Number.POSITIVE_INFINITY : now - s.desk.tObs;
@@ -44,14 +50,16 @@ async function snapshot(): Promise<string[]> {
 
   const from = head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
   const [poked, kPokes] = await Promise.all([
-    client.getLogs({ address: d.poker, event: climPokerAbi[1], fromBlock: from, toBlock: head }),
-    client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.K.poolId }, fromBlock: from, toBlock: head }),
+    withRetry(() => client.getLogs({ address: d.poker, event: climPokerAbi[1], fromBlock: from, toBlock: head })),
+    withRetry(() => client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.K.poolId }, fromBlock: from, toBlock: head })),
   ]);
   const lastPoke = poked[poked.length - 1]?.args;
   const lastK = kPokes[kPokes.length - 1];
   for (const name of LIVE_POOLS) {
     const ps = s.pools[name];
-    const liq = await client.readContract({ address: d.uniswap.stateView, abi: stateViewAbi, functionName: "getLiquidity", args: [d.pools[name].poolId] });
+    const liq = await withRetry(() =>
+      client.readContract({ address: d.uniswap.stateView, abi: stateViewAbi, functionName: "getLiquidity", args: [d.pools[name].poolId], blockNumber: head }),
+    );
     console.log(
       `  ${name}: fee ${ps.fee0For1}/${ps.fee1For0} pips (${pipsToBp(ps.fee0For1).toFixed(2)}/${pipsToBp(ps.fee1For0).toFixed(2)} bp) price ${ps.ethUsd.toFixed(2)}${m ? ` gap ${((ps.ethUsd / m.price - 1) * 1e4).toFixed(1)} bp` : ""} L ${Number(liq).toExponential(3)}`,
     );
@@ -83,7 +91,7 @@ async function snapshot(): Promise<string[]> {
     }
   }
   for (const [name, addr, router] of keys) {
-    const b = await readLiveBalances(client, d, addr, router ?? addr);
+    const b = await withRetry(() => readLiveBalances(client, d, addr, router ?? addr));
     const tokens = router ? `, ${formatUnits(b.tETH, 18)} tETH, ${formatUnits(b.tUSDG, 6)} tUSDG` : "";
     console.log(`  ${name} ${addr}: ${formatEther(b.native)} ETH${tokens}`);
     if (b.native < 10n ** 16n) problems.push(`${name} has under 0.01 ETH (bun run live:fund)`);
