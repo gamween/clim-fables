@@ -188,3 +188,9 @@ code {
     scale: none;
   }
 }
+
+/* Fables' 404 has no footer and no promo card (app/not-found.tsx). */
+body:has([data-page="not-found"]) footer,
+body:has([data-page="not-found"]) [data-promo] {
+  display: none;
+}

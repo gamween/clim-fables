@@ -53,6 +53,13 @@
   flex-direction: column;
   gap: 48px;
 }
+/* Fables' hairline between the stat row and each pool section. */
+.rule {
+  height: 1px;
+  margin: 4px 0;
+  border: 0;
+  background: var(--line-light);
+}
 .poolHead {
   display: flex;
   flex-direction: column;
@@ -278,13 +285,30 @@
   font-size: 13px;
   line-height: 20px;
 }
-.split {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
+/* Fables' asymmetric fee: the buy side over the sell side, each after a 6 x 5 px triangle (positive up, negative down). */
+.feeSides {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
-.splitLabel {
-  color: var(--ink-secondary);
-  font-size: 14px;
-  font-weight: 400;
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+.delta::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+}
+.delta[data-dir="up"]::before {
+  border-bottom: 5px solid var(--positive);
+}
+.delta[data-dir="down"]::before {
+  border-top: 5px solid var(--negative);
 }

@@ -83,6 +83,7 @@ export function EthUsdgPool() {
           tip={f ? feeTooltip(f.fee0For1, f.fee1For0, FABLES.config.flatPips) : "The fee this market charges on every swap right now"}
           value={f ? <FeeValue prefix="fables" chain="mainnet" block={f.blockNumber} fee0For1={f.fee0For1} fee1For0={f.fee1For0} /> : "-"}
           secondary={tier ? <TierBadge badge={tier} title="Fables' keeper has raised the fee above the flat 0.07%" /> : f ? "flat fee" : <Skeleton />}
+          secondaryAside={f !== null && f.fee0For1 !== f.fee1For0}
         />
         <Stat
           label="Price"
@@ -112,6 +113,7 @@ export function EthUsdgPool() {
       {fables.error ? <ReadError error={fables.error} /> : null}
       {clim.error ? <ReadError error={clim.error} /> : null}
 
+      <hr className={p.rule} />
       <Section
         id="dynamic-fee"
         title="Dynamic Fee"
@@ -189,6 +191,7 @@ export function EthUsdgPool() {
         </p>
       </Section>
 
+      <hr className={p.rule} />
       <Section id="fee-updates" title="Fee updates" description="The keeper's overrides on Fables' pool and clim's reports, newest first. Each links to its transaction.">
         {pokes.data && points.data ? (
           <FeeUpdates rows={feeUpdateRows(pokes.data.items, points.data.items, reports.data?.items ?? [], 12)} nowTs={nowTs} />
@@ -197,6 +200,7 @@ export function EthUsdgPool() {
         )}
       </Section>
 
+      <hr className={p.rule} />
       <Section id="verify" title="Pool and desk" description="Fables' pool on mainnet and clim's desk on testnet. Every contract is verified; follow the links.">
         <ParamsCard
           rows={[
@@ -216,6 +220,7 @@ export function EthUsdgPool() {
         />
       </Section>
 
+      <hr className={p.rule} />
       <Section id="transactions" title="Recent transactions" description="Swaps against this market in the last 10 minutes, newest first, read from the PoolManager's Swap logs.">
         <RecentSwaps history={swaps.data} client={mainnetClient} txUrl={fablesTx} />
       </Section>

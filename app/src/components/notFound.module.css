@@ -1,0 +1,115 @@
+/* Fables' 404 (NotFound stylesheet, inventory §2.5): centred column, 200 px fox-and-star mask, "?" marks bobbing and
+   tilting over 1.5 s, Inter 16/24 450 line, "Back to Home" fading in after 0.35 s. */
+.page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: calc(100svh - 2 * (var(--nav-h) + var(--banner-h)));
+}
+.inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+  min-width: 0;
+}
+.art {
+  position: relative;
+  display: flex;
+  line-height: 0;
+}
+.logo {
+  display: block;
+  width: 200px;
+  max-width: 100%;
+  aspect-ratio: 500 / 328;
+  background-color: var(--ink);
+  mask: url(/fables/fox_star_logo.svg) center / contain no-repeat;
+}
+.mark {
+  position: absolute;
+  font-family: var(--font-text);
+  font-size: 2rem;
+  font-weight: 850;
+  line-height: 1;
+  color: var(--ink-faint);
+  user-select: none;
+  pointer-events: none;
+  animation-name: bob, tilt;
+  animation-duration: 1.5s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-delay: var(--bob), var(--tilt);
+}
+@keyframes bob {
+  from {
+    translate: 0 4px;
+  }
+  to {
+    translate: 0 -4px;
+  }
+}
+@keyframes tilt {
+  from {
+    rotate: -4deg;
+  }
+  to {
+    rotate: 4deg;
+  }
+}
+.description {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 450;
+  line-height: 24px;
+  color: var(--ink-secondary);
+}
+.backSlot {
+  margin: 0;
+}
+.backSlot a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  animation: fadeIn 0.5s ease 0.35s forwards;
+  transition: color 0.2s ease;
+}
+@media (hover: hover) {
+  .backSlot a:hover {
+    color: var(--ink);
+  }
+}
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .backSlot a {
+    opacity: 1;
+    animation: none;
+  }
+  .mark {
+    animation: none;
+  }
+}
+@media (max-width: 768px) {
+  .logo {
+    width: min(200px, 56vw);
+  }
+  .mark {
+    font-size: 1.5rem;
+  }
+}
+@media (max-width: 575px) {
+  .backSlot a {
+    min-height: 44px;
+  }
+}

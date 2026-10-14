@@ -1,54 +1,95 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { BatchIcon, ChartIcon, ForkIcon, GaugeIcon, KeyIcon, LadderIcon, LoopIcon, PathIcon, PauseIcon, RunIcon, ShieldIcon, WarningIcon } from "@/components/ui/icons";
 import { inlineMd } from "@/lib/inlineMd";
+import { REPO_URL, repoFile } from "@/lib/site";
 import s from "./docs.module.css";
 
-export const SIDEBAR = [
+type Leaf = readonly [label: string, hash: string, icon: (p: { size?: number }) => ReactNode];
+
+export const SIDEBAR: ReadonlyArray<{ label: string; href: "/integrate" | "/evidence"; items: readonly Leaf[] }> = [
   {
     label: "Integrate",
     href: "/integrate",
     items: [
-      ["The ladder", "#ladder"],
-      ["Level 1: keeper input", "#level-1"],
-      ["Level 2: the batch", "#level-2"],
-      ["Verify the contracts", "#verify"],
-      ["Path to mainnet", "#mainnet"],
+      ["The ladder", "#ladder", LadderIcon],
+      ["Level 1: keeper input", "#level-1", KeyIcon],
+      ["Level 2: the batch", "#level-2", BatchIcon],
+      ["Verify the contracts", "#verify", ShieldIcon],
+      ["Path to mainnet", "#mainnet", PathIcon],
     ],
   },
   {
     label: "Evidence",
     href: "/evidence",
     items: [
-      ["Results, as measured", "#results"],
-      ["The fork run", "#fork-run"],
-      ["Gas and cadence", "#gas"],
-      ["The live loop", "#live-loop"],
-      ["Desk outages", "#outages"],
-      ["Failure modes", "#security"],
+      ["Results, as measured", "#results", ChartIcon],
+      ["The fork run", "#fork-run", ForkIcon],
+      ["Gas and cadence", "#gas", GaugeIcon],
+      ["The live loop", "#live-loop", LoopIcon],
+      ["Desk outages", "#outages", PauseIcon],
+      ["Failure modes", "#security", WarningIcon],
     ],
   },
-] as const;
+];
 
+/** Fables' docs layout (inventory §2.10): a 220 px rail of groups and indented leaves with icons, a footer row under a
+ *  hairline, and a 718 px main column, the grid (986 px) centred. */
 export function DocsLayout({ current, children }: { current: "/integrate" | "/evidence"; children: ReactNode }) {
   return (
     <div className={s.docs}>
       <aside className={s.sidebar} aria-label="On this page">
-        {SIDEBAR.map((g) => (
-          <div key={g.href} className={s.group}>
-            <Link href={g.href} className={s.groupLabel}>
-              {g.label}
-            </Link>
-            {g.items.map(([label, hash]) => (
-              <Link key={hash} href={`${g.href}${hash}`} className={g.href === current ? `${s.leaf} ${s.leafActive}` : s.leaf}>
-                {label}
+        <div className={s.railScroll}>
+          {SIDEBAR.map((g) => (
+            <div key={g.href} className={s.group}>
+              <Link href={g.href} className={g.href === current ? `${s.groupLabel} ${s.groupActive}` : s.groupLabel}>
+                {g.label}
               </Link>
-            ))}
+              <ul className={s.leaves}>
+                {g.items.map(([label, hash, Icon]) => (
+                  <li key={hash}>
+                    <Link href={`${g.href}${hash}`} className={s.leaf}>
+                      <Icon size={16} />
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <div className={s.group}>
+            <Link href="/run" className={s.groupLabel}>
+              Run
+            </Link>
+            <ul className={s.leaves}>
+              <li>
+                <Link href="/run" className={s.leaf}>
+                  <RunIcon size={16} />
+                  Replay the run
+                </Link>
+              </li>
+            </ul>
           </div>
-        ))}
-        <Link href="/run" className={s.leaf}>
-          Replay the run
-        </Link>
+        </div>
+        <div className={s.railFooter}>
+          <Link href="/credits" className={s.railFootLink}>
+            Credits
+          </Link>
+          <a href={REPO_URL} target="_blank" rel="noreferrer" className={s.railFootLink}>
+            Source
+          </a>
+          <a href={repoFile("docs/security.md")} target="_blank" rel="noreferrer" className={s.railFootLink}>
+            Security
+          </a>
+        </div>
       </aside>
+      <nav className={s.mobileNav} aria-label="Docs">
+        {[...SIDEBAR.map((g) => [g.href, g.label] as const), ["/run", "Run"] as const].map(([href, label]) => (
+          <Link key={href} href={href} className={s.mobileChip} aria-current={href === current ? "page" : undefined}>
+            {label}
+          </Link>
+        ))}
+      </nav>
       <article className={s.main}>{children}</article>
     </div>
   );

@@ -69,17 +69,32 @@ export function InfoTip({ text }: { text: string }) {
   );
 }
 
-export function Stat({ label, tip, value, secondary }: { label: string; tip?: string; value: ReactNode; secondary?: ReactNode }) {
+/** Fables' stat: label, value, then a secondary line; `secondaryAside` puts the secondary (a tier badge) beside the
+ *  value instead, as Fables does next to an asymmetric fee. */
+export function Stat({ label, tip, value, secondary, secondaryAside }: { label: string; tip?: string; value: ReactNode; secondary?: ReactNode; secondaryAside?: boolean }) {
+  const v = (
+    <span className={s.statValue} data-qa="stat-value">
+      {value}
+    </span>
+  );
+  const sec = secondary !== undefined ? <span className={s.statSecondary}>{secondary}</span> : null;
   return (
     <div className={s.stat}>
       <span className={s.statLabel}>
         {label}
         {tip ? <InfoTip text={tip} /> : null}
       </span>
-      <span className={s.statValue} data-qa="stat-value">
-        {value}
-      </span>
-      {secondary !== undefined ? <span className={s.statSecondary}>{secondary}</span> : null}
+      {secondaryAside ? (
+        <span className={s.statAside}>
+          {v}
+          {sec}
+        </span>
+      ) : (
+        <>
+          {v}
+          {sec}
+        </>
+      )}
     </div>
   );
 }

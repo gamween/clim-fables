@@ -64,6 +64,7 @@ export function TestnetPool({ name }: { name: LivePoolName }) {
           tip={now ? feeTooltip(now.fee0For1, now.fee1For0, LIVE.hookConfig.flatPips) : "The fee this market charges on every swap right now"}
           value={now ? <FeeValue prefix={`pool:${name}`} chain="testnet" block={block} fee0For1={now.fee0For1} fee1For0={now.fee1For0} /> : "-"}
           secondary={tier ? <TierBadge badge={tier} /> : now ? "flat fee" : <Skeleton />}
+          secondaryAside={now !== undefined && now.fee0For1 !== now.fee1For0}
         />
         <Stat label="Price" tip="tUSDG per tETH from slot0" value={now ? <LiveValue k={`pool:${name}:price`} chain="testnet" block={block} raw={now.sqrtPriceX96} text={formatPrice(now.price)} /> : "-"} secondary="tUSDG per tETH" />
         <Stat label="Fee source" tip={source.note} value={<TierBadge badge={source} />} secondary={name === "D" ? "ClimPoker" : name === "K" ? "keeper-style bot" : "no override"} />
@@ -82,6 +83,7 @@ export function TestnetPool({ name }: { name: LivePoolName }) {
       </div>
       {clim.error ? <ReadError error={clim.error} /> : null}
 
+      <hr className={p.rule} />
       <Section id="dynamic-fee" title="Dynamic Fee" description={`${source.label}: ${source.note}. The fee in force over the last 24 hours, rebuilt with the hook's own rule from ${name === "D" ? "ClimPoker's Poked logs, each at its report's observation time" : "the hook's FeePoked logs, each at its block's time"}.`}>
         <AsideGrid
           rail={
@@ -118,12 +120,14 @@ export function TestnetPool({ name }: { name: LivePoolName }) {
         </AsideGrid>
       </Section>
 
+      {name === "D" ? <hr className={p.rule} /> : null}
       {name === "D" ? (
         <Section id="outages" title="Desk outages" description="Windows in which clim's desk sent no report, measured on chain. The live stack runs on the maintainer's Mac; every silence is published as measured.">
           <OutagesTable />
         </Section>
       ) : null}
 
+      <hr className={p.rule} />
       <Section id="pool" title="Pool">
         <ParamsCard
           rows={[
@@ -137,6 +141,7 @@ export function TestnetPool({ name }: { name: LivePoolName }) {
         />
       </Section>
 
+      <hr className={p.rule} />
       <Section id="transactions" title="Recent transactions" description="Swaps against this pool in the last 24 hours, newest first.">
         <RecentSwaps history={swaps.data} client={testnetClient} txUrl={testnetTx} />
       </Section>

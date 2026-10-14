@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { RunPlayer } from "@/components/run/RunPlayer";
 import { ButtonLink, NetworkTag, Section, Stat } from "@/components/ui/kit";
 import forkReports from "@/generated/fork-reports-2026-10-07.json";
@@ -9,8 +8,6 @@ import { FABLES } from "@/lib/chain/fables";
 import { formatFeePct, formatInt, formatUtcDateTime } from "@/lib/format";
 import { repoFile } from "@/lib/site";
 import p from "@/components/pages.module.css";
-
-export const metadata: Metadata = { title: "The run" };
 
 // Server-side: a client module's exports are references, not values, in a server component.
 const RUN = buildRun(forkRun, forkReports, storm);
@@ -36,7 +33,7 @@ export default function RunPage() {
       </div>
       <div className={p.statRow}>
         <Stat label="Pokes" tip="ClimPoker.poke() calls on the fork, one per replayed desk report" value={formatInt(RUN_SUMMARY.pokes)} secondary="one every 30 s" />
-        <Stat label="Poked fee" tip="Lowest and highest fee clim sent to Fables' hook" value={`${formatFeePct(RUN_SUMMARY.minPokedPips)} to ${formatFeePct(RUN_SUMMARY.maxPokedPips)}`} secondary="inside the hook's band" />
+        <Stat label="Poked fee" tip="Lowest and highest fee clim sent to Fables' hook" value={`${formatFeePct(RUN_SUMMARY.minPokedPips).replace(/%$/, "")}\u2013${formatFeePct(RUN_SUMMARY.maxPokedPips)}`} secondary="inside the hook's band" />
         <Stat label="Swaps" tip="Swaps sent both ways on the fork; each paid the hook's currentFee" value={formatInt(RUN_SUMMARY.swaps)} secondary={`${RUN_SUMMARY.swapReverts} reverted`} />
         <Stat label="Keeper overrides" tip="Fables' keeper's FeePoked logs on mainnet in the same window" value={formatInt(RUN_SUMMARY.keeperPokes)} secondary="mainnet, same window" />
         <Stat label="Window" value={<span style={{ fontSize: 16 }}>{formatUtcDateTime(RUN_WINDOW.from).slice(11)}</span>} secondary={`to ${formatUtcDateTime(RUN_WINDOW.to).slice(11)}`} />

@@ -74,3 +74,86 @@ export const EthMark = ({ size = 16 }: { size?: number }) => (
     <path d="M16 21.4 9.5 17.6 16 26.5l6.5-8.9-6.5 3.8Z" fill="#8f8e8e" />
   </svg>
 );
+
+export const PulseIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M1.5 8.5h3l1.5-4 3 8 1.8-5.5 1 1.5h2.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+// Docs sidebar leaves (two-tone, 16 px).
+const F1 = "var(--icon-1, #636161)";
+const F2 = "var(--icon-2, #8f8e8e)";
+export const LadderIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="2" y="10" width="4" height="4" rx="1" fill={F1} />
+    <rect x="6" y="6" width="4" height="8" rx="1" fill={F2} />
+    <rect x="10" y="2" width="4" height="12" rx="1" fill={F1} />
+  </svg>
+);
+export const KeyIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="5.5" cy="8" r="3.5" fill={F2} />
+    <rect x="8" y="7" width="6.5" height="2" rx="1" fill={F1} />
+    <rect x="11.5" y="8" width="2" height="3.5" rx="1" fill={F1} />
+  </svg>
+);
+export const BatchIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="2" y="2" width="12" height="4" rx="1.5" fill={F2} />
+    <rect x="2" y="7" width="12" height="3" rx="1.5" fill={F1} />
+    <rect x="2" y="11" width="12" height="3" rx="1.5" fill={F1} />
+  </svg>
+);
+export const ShieldIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M8 1.5 13.5 3.5v4.2c0 3.2-2.3 5.6-5.5 6.8-3.2-1.2-5.5-3.6-5.5-6.8V3.5L8 1.5Z" fill={F1} />
+    <path d="m5.6 8 1.7 1.7L10.6 6.4" stroke={F2} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+export const PathIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="4" cy="12" r="2.5" fill={F1} />
+    <circle cx="12" cy="4" r="2.5" fill={F2} />
+    <path d="M4 9.5V7a2 2 0 0 1 2-2h3.5" stroke={F1} strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+export const ChartIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="2" y="2" width="12" height="12" rx="2" fill={F1} />
+    <path d="M4.5 11 7 7.5l2 2L11.5 5" stroke={F2} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+export const ForkIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="4.5" cy="3.5" r="2" fill={F2} />
+    <circle cx="11.5" cy="3.5" r="2" fill={F1} />
+    <circle cx="8" cy="12.5" r="2" fill={F2} />
+    <path d="M4.5 5.5c0 2.5 3.5 2.5 3.5 5M11.5 5.5c0 2.5-3.5 2.5-3.5 5" stroke={F1} strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+export const GaugeIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M2 11a6 6 0 0 1 12 0" stroke={F1} strokeWidth="2.5" strokeLinecap="round" />
+    <path d="M8 11 10.5 6.5" stroke={F2} strokeWidth="1.6" strokeLinecap="round" />
+  </svg>
+);
+export const LoopIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M13 8a5 5 0 1 1-1.5-3.6" stroke={F1} strokeWidth="2" strokeLinecap="round" />
+    <path d="M12.5 1.8v3.2H9.3" stroke={F2} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+export const PauseIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="8" cy="8" r="6.5" fill={F1} />
+    <rect x="5.5" y="5" width="1.8" height="6" rx=".9" fill={F2} />
+    <rect x="8.7" y="5" width="1.8" height="6" rx=".9" fill={F2} />
+  </svg>
+);
+export const WarningIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M8 1.8 14.5 13.5h-13L8 1.8Z" fill={F1} />
+    <path d="M8 6.3v3.2M8 11.4v.1" stroke={F2} strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);

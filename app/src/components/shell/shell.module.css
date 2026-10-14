@@ -206,6 +206,12 @@
   background: repeating-linear-gradient(135deg, var(--raised) 0 3px, var(--surface) 3px 6px);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+/* On a phone the banner wraps onto two lines; the separator dot would start the second one. */
+@media (max-width: 575px) {
+  .bannerDot {
+    display: none;
+  }
+}
 /* Phone width: brand, pill and menu must fit in 360 px minus the 16 px gutters, the menu being the only nav there. */
 @media (max-width: 575px) {
   .headerInner {
@@ -439,12 +445,42 @@
 .toast:hover .toastClose {
   opacity: 1;
 }
-@media (max-width: 575px) {
+.toast {
+  animation: toastIn 0.2s cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+@keyframes toastIn {
+  from {
+    opacity: 0;
+  }
+}
+/* It floats only where it clears the 1200 px content column (two 256 px gutters); narrower, the menu carries it. */
+@media (max-width: 1711px) {
   .toast {
-    left: 16px;
-    right: 16px;
-    width: auto;
-    aspect-ratio: auto;
-    min-height: 96px;
+    display: none;
+  }
+}
+.menuPromo {
+  position: relative;
+  margin-top: 4px;
+  min-height: 96px;
+  padding: 12px 12px 12px 64px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: var(--radius);
+  background-color: var(--card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.menuPromo .toastBadge {
+  top: calc(50% - 21px);
+  left: 12px;
+}
+.menuPromo .toastBody {
+  font-size: 12px;
+  line-height: 16px;
+}
+@media (min-width: 1712px) {
+  .menuPromo {
+    display: none;
   }
 }

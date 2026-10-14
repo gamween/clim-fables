@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { EvidenceIcon, ExternalIcon, IntegrateIcon, MarketsIcon, MenuIcon, RunIcon } from "@/components/ui/icons";
 import uiStyles from "@/components/ui/ui.module.css";
 import { FABLES_APP_URL, NAV, NO_WALLET_TEXT, REPO_URL, repoFile } from "@/lib/site";
+import { PromoMenuCard } from "./PromoToast";
 import s from "./shell.module.css";
 
 const ICONS = { markets: MarketsIcon, integrate: IntegrateIcon, evidence: EvidenceIcon, run: RunIcon } as const;
@@ -109,6 +110,7 @@ function Menu() {
               )}
             </div>
           ))}
+          <PromoMenuCard onNavigate={() => setOpen(false)} />
         </div>
       ) : null}
     </div>

@@ -12,7 +12,8 @@ import p from "../pages.module.css";
 
 type Chain = "mainnet" | "testnet";
 
-/** One fee when both directions pay the same, "Sell / Buy" otherwise (ETH is currency0: zero-for-one sells ETH). */
+/** One fee when both directions pay the same; otherwise Fables' two stacked sides, buy (green up mark) over sell (red
+ *  down mark). ETH is currency0: zero-for-one sells ETH. */
 export function FeeValue({ prefix, chain, block, fee0For1, fee1For0 }: { prefix: string; chain: Chain; block: bigint; fee0For1: number; fee1For0: number }) {
   if (fee0For1 === fee1For0) {
     return (
@@ -25,11 +26,13 @@ export function FeeValue({ prefix, chain, block, fee0For1, fee1For0 }: { prefix:
     );
   }
   return (
-    <span className={p.split}>
-      <span className={p.splitLabel}>Buy</span>
-      <LiveValue k={`${prefix}:fee1For0`} chain={chain} block={block} raw={fee1For0} text={formatFeePct(fee1For0)} />
-      <span className={p.splitLabel}>Sell</span>
-      <LiveValue k={`${prefix}:fee0For1`} chain={chain} block={block} raw={fee0For1} text={formatFeePct(fee0For1)} />
+    <span className={p.feeSides}>
+      <span className={p.delta} data-dir="up" title="Buy ETH" aria-label={`Buy ETH ${formatFeePct(fee1For0)}`}>
+        <LiveValue k={`${prefix}:fee1For0`} chain={chain} block={block} raw={fee1For0} text={formatFeePct(fee1For0)} />
+      </span>
+      <span className={p.delta} data-dir="down" title="Sell ETH" aria-label={`Sell ETH ${formatFeePct(fee0For1)}`}>
+        <LiveValue k={`${prefix}:fee0For1`} chain={chain} block={block} raw={fee0For1} text={formatFeePct(fee0For1)} />
+      </span>
     </span>
   );
 }

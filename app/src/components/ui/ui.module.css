@@ -104,6 +104,13 @@
   align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
+  white-space: nowrap;
+}
+.statAside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 .statSecondary {
   color: var(--ink-secondary);

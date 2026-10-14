@@ -1,41 +1,88 @@
 /* Fables' docs layout (inventory §2.10): a 220 px sidebar and a 718 px main column, Inter 16/24 body. */
 .docs {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 48px;
-  max-width: 1040px;
+  grid-template-columns: 220px minmax(0, 718px);
+  column-gap: 48px;
+  max-width: 986px;
   margin: 8px auto 0;
   width: 100%;
+  justify-content: start;
+  align-items: start;
 }
 .sidebar {
   position: sticky;
   top: calc(var(--nav-h) + var(--banner-h) + 24px);
-  align-self: start;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  max-height: calc(100dvh - var(--nav-h) - var(--banner-h) - 48px);
+}
+.railScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding-bottom: 24px;
+}
+.railScroll::-webkit-scrollbar {
+  display: none;
 }
 .group {
   display: flex;
   flex-direction: column;
 }
 .groupLabel {
+  display: flex;
+  align-items: center;
+  padding: 7px 0;
+  font-size: 14px;
+  line-height: 22px;
+  letter-spacing: -0.09px;
   color: var(--ink-muted);
-  margin-bottom: 4px;
+  transition: color 80ms ease-out;
+}
+.groupActive {
+  color: var(--ink);
+}
+.leaves {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 22px;
 }
 .leaf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 8px 0;
   font-size: 14px;
   line-height: 22px;
   letter-spacing: -0.09px;
   color: var(--ink-muted);
-  transition: color 0.18s;
+  transition: color 80ms ease-out;
 }
-.leaf:hover {
-  color: var(--ink-secondary);
+.leaf svg {
+  flex: none;
 }
-.leafActive {
-  color: var(--ink);
+.railFooter {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-light);
+}
+.railFootLink {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 16px;
+  transition: color 80ms ease-out;
+}
+@media (hover: hover) and (min-width: 576px) {
+  .leaf:hover,
+  .groupLabel:hover,
+  .railFootLink:hover {
+    color: var(--ink-secondary);
+    transition-duration: 0.18s;
+  }
 }
 .main {
   max-width: 718px;
@@ -178,11 +225,53 @@
   color: var(--negative);
   font-weight: 500;
 }
-@media (max-width: 900px) {
+/* Under 821 px Fables hides the rail and shows a row of section buttons above the column; under 576 px the column gets
+   16 px gutters, a 28/34 title and 26 px leading. */
+.mobileNav {
+  display: none;
+}
+.mobileChip {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+.mobileChip[aria-current="page"] {
+  background: var(--raised);
+  color: var(--ink);
+}
+@media (max-width: 821px) {
   .docs {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 24px;
   }
   .sidebar {
-    position: static;
+    display: none;
+  }
+  .mobileNav {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 575px) {
+  .main {
+    line-height: 26px;
+  }
+  .main h1 {
+    font-size: 28px;
+    line-height: 34px;
+  }
+  .ruleBig {
+    margin: 24px 0;
+  }
+  .table th,
+  .table td {
+    padding: 12px;
   }
 }

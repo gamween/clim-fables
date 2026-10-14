@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { promoDismissed, PROMO_DISMISS_KEY } from "@/lib/promo";
 import s from "./shell.module.css";
 
 const SLIDES = [
@@ -10,18 +12,60 @@ const SLIDES = [
 ] as const;
 const SLIDE_MS = 7_000;
 
-/** Fables' rotating promo card (bottom left), carrying clim's three entry points. */
-export function PromoToast() {
+/** Routes laid out like Fables' docs, where Fables shows no promo card. */
+const NO_PROMO = ["/integrate", "/evidence", "/credits"];
+
+const noSubscribe = () => () => {};
+
+function storedDismissal(): "dismissed" | "shown" {
+  try {
+    return promoDismissed(window.localStorage.getItem(PROMO_DISMISS_KEY), Date.now()) ? "dismissed" : "shown";
+  } catch {
+    return "shown";
+  }
+}
+
+function useSlides() {
   const [i, setI] = useState(0);
-  const [hidden, setHidden] = useState(false);
+  const [paused, setPaused] = useState(false);
   useEffect(() => {
-    const id = setInterval(() => setI((v) => (v + 1) % SLIDES.length), SLIDE_MS);
-    return () => clearInterval(id);
-  }, []);
-  if (hidden) return null;
-  const slide = SLIDES[i] ?? SLIDES[0];
+    if (paused) return;
+    const id = setTimeout(() => setI((v) => (v + 1) % SLIDES.length), SLIDE_MS);
+    return () => clearTimeout(id);
+  }, [i, paused]);
+  return { i, slide: SLIDES[i] ?? SLIDES[0], setPaused };
+}
+
+function Slide({ slide }: { slide: (typeof SLIDES)[number] }) {
   return (
-    <aside className={s.toast} aria-label="clim">
+    <Link key={slide.href} href={slide.href} className={s.toastSlide}>
+      <span className={s.toastTitle}>{slide.title}</span>
+      <span className={s.toastBody}>{slide.body}</span>
+    </Link>
+  );
+}
+
+/** Fables' rotating promo card (bottom left), carrying clim's three entry points. As on Fables, it fades in, pauses on
+ *  hover, and its dismiss cross hides it for 24 hours. It floats only where it clears the content column (a viewport of
+ *  at least 1712 px: a 1200 px column plus two 256 px gutters); narrower, it lives in the header menu
+ *  (PromoMenuCard), as Fables' card does on phones. */
+export function PromoToast() {
+  const pathname = usePathname();
+  const { i, slide, setPaused } = useSlides();
+  // "server" until hydrated, so the card fades in after the page as on Fables.
+  const stored = useSyncExternalStore(noSubscribe, storedDismissal, () => "server");
+  const [hidden, setHidden] = useState(false);
+  if (hidden || stored === "dismissed" || stored === "server" || NO_PROMO.some((r) => pathname === r || pathname.startsWith(`${r}/`))) return null;
+  const dismiss = () => {
+    try {
+      window.localStorage.setItem(PROMO_DISMISS_KEY, String(Date.now()));
+    } catch {
+      // Private window or blocked storage: hide it for this visit only.
+    }
+    setHidden(true);
+  };
+  return (
+    <aside className={s.toast} aria-label="clim" data-promo onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <span className={s.toastBadge} aria-hidden>
         c
       </span>
@@ -31,13 +75,23 @@ export function PromoToast() {
           <animate attributeName="stroke-dashoffset" from="31.4" to="0" dur={`${SLIDE_MS / 1000}s`} fill="freeze" />
         </circle>
       </svg>
-      <button type="button" className={s.toastClose} aria-label="Hide" onClick={() => setHidden(true)}>
+      <button type="button" className={s.toastClose} aria-label="Dismiss for 24 hours" onClick={dismiss}>
         ×
       </button>
-      <Link key={slide.href} href={slide.href} className={s.toastSlide}>
-        <span className={s.toastTitle}>{slide.title}</span>
-        <span className={s.toastBody}>{slide.body}</span>
-      </Link>
+      <Slide slide={slide} />
     </aside>
+  );
+}
+
+/** The same card, embedded in the header menu (Fables' "promotion" slot) where the floating one would cover content. */
+export function PromoMenuCard({ onNavigate }: { onNavigate: () => void }) {
+  const { slide } = useSlides();
+  return (
+    <div className={s.menuPromo} onClick={onNavigate} data-promo>
+      <span className={s.toastBadge} aria-hidden>
+        c
+      </span>
+      <Slide slide={slide} />
+    </div>
   );
 }

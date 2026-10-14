@@ -7,7 +7,10 @@ export function Banner() {
     <div className={s.banner} role="note" data-guard="banner" data-qa="banner">
       <span className={s.bannerMark} aria-hidden />
       <strong style={{ fontWeight: 500 }}>{BANNER_TEXT}</strong>
-      <span className={s.bannerMuted}>· {BANNER_DETAIL}</span>
+      <span className={s.bannerMuted}>
+        <span className={s.bannerDot}>· </span>
+        {BANNER_DETAIL}
+      </span>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 "use client";
-// Fables' landing (inventory §2.1) with clim's thesis in the hero and the live number under it: the keeper's fee on
-// Fables' pool now against clim's recommendation now.
+// Fables' landing (inventory §2.1) with clim's thesis in the hero (one line, as Fables' own) and the live numbers in the
+// feature plates under it: the keeper's fee on Fables' pool now against clim's recommendation now.
 import Link from "next/link";
 import { MarketsTable } from "@/components/markets/MarketsTable";
-import { ButtonLink, Card, LiveDot, LiveValue, NetworkTag, Skeleton, TierBadge } from "@/components/ui/kit";
-import { ArrowRightIcon, ExternalIcon } from "@/components/ui/icons";
+import { ButtonLink, Card, LiveDot, LiveValue, NetworkTag, PairLogo, Skeleton, TierBadge } from "@/components/ui/kit";
+import { ArrowRightIcon, ExternalIcon, PulseIcon } from "@/components/ui/icons";
 import { useClimNow, useFablesNow } from "@/hooks/live";
 import { FABLES } from "@/lib/chain/fables";
 import { formatFeePct, formatInt } from "@/lib/format";
@@ -35,24 +35,10 @@ export function Landing() {
             Live on Robinhood
           </span>
           <h1 className={s.headline} data-qa="headline">
-            Fables&apos; keeper sets the fee.
-            <br />
-            <span className={s.turn}>clim checks it in public.</span>
+            Fables&apos; keeper sets the fee. <span className={s.turn}>clim checks it in public.</span>
           </h1>
-          <div className={s.pills} aria-label="The fee now">
-            <span className={s.pill}>
-              <span className={`${s.pillFace} ${s.pillLit}`}>{f ? <LiveValue k="fables:fee0For1" chain="mainnet" block={f.blockNumber} raw={f.fee0For1} text={formatFeePct(f.fee0For1)} /> : <Skeleton />}</span>
-              <span className={s.pillLabel}>Fables keeper, now</span>
-              <NetworkTag network="mainnet" />
-            </span>
-            <span className={s.pill}>
-              <span className={`${s.pillFace} ${s.pillWhite}`}>{c ? <LiveValue k="clim:quote" chain="testnet" block={c.quote.blockNumber} raw={c.quote.fee} text={formatFeePct(c.quote.fee)} /> : <Skeleton />}</span>
-              <span className={s.pillLabel}>clim&apos;s recommendation, now</span>
-              <NetworkTag network="testnet" />
-            </span>
-          </div>
           <p className={s.subline}>
-            A Chainlink CRE desk reads ETH on four exchanges every 30 s and publishes a fee anyone can recompute, next to the fee Fables&apos; keeper sets on ETH/USDG. A showcase, read only.{" "}
+            A Chainlink CRE desk reads ETH on four exchanges every 30 s and publishes a fee anyone can recompute.{" "}
             <a href={repoFile("docs/integrate/README.md")} target="_blank" rel="noreferrer">
               Read the integration guide <ExternalIcon size={14} />
             </a>
@@ -63,11 +49,24 @@ export function Landing() {
       <div className={s.grid}>
         <div className={s.feature}>
           <div className={s.plate}>
-            <span className={s.tag}>Two fees</span>
-            <div className={s.pills}>
-              <span className={s.pillFace}>{formatFeePct(FABLES.config.flatPips)}</span>
-              <span className={`${s.pillFace} ${s.pillLit}`}>{f ? <LiveValue k="fables:fee0For1" chain="mainnet" block={f.blockNumber} raw={f.fee0For1} text={formatFeePct(f.fee0For1)} /> : <Skeleton />}</span>
-              <span className={`${s.pillFace} ${s.pillWhite}`}>{c ? <LiveValue k="clim:quote" chain="testnet" block={c.quote.blockNumber} raw={c.quote.fee} text={formatFeePct(c.quote.fee)} /> : <Skeleton />}</span>
+            <span className={s.iconChip} aria-hidden>
+              <PulseIcon size={18} />
+            </span>
+            <div className={`${s.pills} ${s.platePills}`}>
+              <span className={s.pill}>
+                <span className={s.pillFace}>{formatFeePct(FABLES.config.flatPips)}</span>
+                <span className={s.pillLabel}>Flat</span>
+              </span>
+              <span className={s.pill}>
+                <span className={`${s.pillFace} ${s.pillLit}`}>{f ? <LiveValue k="fables:fee0For1" chain="mainnet" block={f.blockNumber} raw={f.fee0For1} text={formatFeePct(f.fee0For1)} /> : <Skeleton />}</span>
+                <span className={s.pillLabel}>Fables, now</span>
+                <NetworkTag network="mainnet" />
+              </span>
+              <span className={s.pill}>
+                <span className={`${s.pillFace} ${s.pillWhite}`}>{c ? <LiveValue k="clim:quote" chain="testnet" block={c.quote.blockNumber} raw={c.quote.fee} text={formatFeePct(c.quote.fee)} /> : <Skeleton />}</span>
+                <span className={s.pillLabel}>clim, now</span>
+                <NetworkTag network="testnet" />
+              </span>
             </div>
           </div>
           <div className={s.featureText}>
@@ -77,7 +76,10 @@ export function Landing() {
         </div>
         <div className={s.feature}>
           <div className={s.plate}>
-            <span className={s.tag}>Desk</span>
+            <span className={s.tag}>
+              <PairLogo size={20} />
+              ETH/USDG
+            </span>
             <div className={s.deskTicker}>
               <span className={s.deskSeq}>{c ? <LiveValue k="clim:seq" chain="testnet" block={c.quote.blockNumber} raw={c.quote.seq} text={formatInt(c.quote.seq)} /> : <Skeleton />}</span>
               <span className={s.pillLabel}>reports so far</span>
@@ -91,7 +93,6 @@ export function Landing() {
         </div>
         <div className={s.feature}>
           <div className={s.plate} style={{ flexDirection: "column" }}>
-            <span className={s.tag}>Bounds</span>
             <div className={s.band}>
               {f ? <span className={s.bandMark} style={{ left: bandPos(f.fee0For1), background: "var(--brand)" }} title="Fables keeper" /> : null}
               {c ? <span className={s.bandMark} style={{ left: bandPos(c.quote.fee), background: "var(--ink)" }} title="clim" /> : null}
