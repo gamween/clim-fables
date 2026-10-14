@@ -1,0 +1,93 @@
+# CI for clim x Fables: contracts (Foundry), lab (Python, uv), TypeScript packages (Bun). No secret is needed: the
+# fork suites skip without RH_MAINNET_RPC_URL / SEPOLIA_RPC_URL, and nothing here reads a key or sends a transaction.
+# Actions are pinned to full commit SHAs (the tag is in the comment).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: contracts (forge)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: v1.4.2
+      - name: Format
+        run: forge fmt --check
+      - name: Build
+        run: forge build
+      - name: Unit tests (fork suites skip without an RPC)
+        run: forge test
+      - name: Exported ABIs match the contracts
+        run: bash script/export-abis.sh > /dev/null && git diff --exit-code -- ../shared/abis
+      - name: Coverage (reported in the job summary, not gated)
+        run: |
+          forge coverage --report summary --no-match-coverage "(test|script|lib)/" | tee "${RUNNER_TEMP:-/tmp}/coverage.txt"
+          { echo '### Contracts coverage'; echo '```'; grep -E '^[|]' "${RUNNER_TEMP:-/tmp}/coverage.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+  lab:
+    name: lab (pytest)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: lab
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          version: "0.11.19"
+      - name: Tests (raw-data tests skip, lab/data is not in git)
+        run: uv run --frozen pytest -q
+
+  typescript:
+    name: shared, bots, integrate, cre (bun)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.9
+      - name: Install (workspaces shared, bots, docs/integrate)
+        run: bun install --frozen-lockfile
+      - name: Tests
+        run: bun run test
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Published cost section matches the gas evidence
+        run: bun run live:cost-doc --check
+        working-directory: bots
+      - name: CRE workflow install
+        run: bun install --frozen-lockfile
+        working-directory: cre/risk-desk
+      - name: CRE workflow tests
+        run: bun test
+        working-directory: cre/risk-desk
+      - name: CRE workflow typecheck
+        run: bun run typecheck
+        working-directory: cre/risk-desk
