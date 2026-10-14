@@ -4,7 +4,8 @@
 // RunAtLoad and KeepAlive bring every job back after a reboot (the plists stay in ~/Library/LaunchAgents) and after a
 // crash (no sooner than ThrottleInterval after its last start). Nothing here keeps the Mac awake: sleep is the
 // maintainer's (his Pauline app), and outages are recorded (scripts/outages.ts), not prevented.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { constants } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 
 export const LABEL_PREFIX = "fi.clim-fables.";
@@ -139,4 +140,33 @@ export function guiDomain(): string {
 export function jobState(name: LiveJobName): JobState | null {
   const r = spawnSync("launchctl", ["print", `${guiDomain()}/${jobLabel(name)}`], { encoding: "utf8" });
   return r.status === 0 ? parseLaunchctlPrint(r.stdout) : null;
+}
+
+/** The signals that would end `live:logs` (Ctrl+C, kill, a closed terminal, the alarm of `perl -e 'alarm ...'`). */
+export const FORWARDED_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP", "SIGALRM"] as const;
+export type ForwardedSignal = (typeof FORWARDED_SIGNALS)[number];
+
+/** Sends each of `signals` received by `source` (this process) to `child` instead of letting it end this process. */
+export function forwardSignals(
+  child: { kill(signal: NodeJS.Signals): unknown },
+  source: { on(signal: ForwardedSignal, listener: () => void): unknown } = process,
+  signals: readonly ForwardedSignal[] = FORWARDED_SIGNALS,
+): void {
+  for (const s of signals) source.on(s, () => void child.kill(s));
+}
+
+/** The shell's exit status for a child that exited with `code` or was ended by `signal` (128 + its number). */
+export function exitCodeFor(code: number | null, signal: NodeJS.Signals | null): number {
+  if (code !== null) return code;
+  const n = signal === null ? undefined : constants.signals[signal];
+  return n === undefined ? 1 : 128 + n;
+}
+
+/** Runs `cmd` in the foreground as if this process exec'd into it: the signals that would end this process go to the
+ *  child, and this process exits with the child's status when it exits, so killing it never leaves the child behind. */
+export function execForwarding(cmd: string, args: readonly string[], stdio: "inherit" | "ignore" = "inherit"): ChildProcess {
+  const child = spawn(cmd, [...args], { stdio });
+  forwardSignals(child);
+  child.on("exit", (code, signal) => process.exit(exitCodeFor(code, signal)));
+  return child;
 }

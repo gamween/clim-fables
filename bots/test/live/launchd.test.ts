@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { jobLabel, jobPathVar, LIVE_JOB_NAMES, liveJobSpec, parseLaunchctlPrint, plistFor, type JobPaths } from "../../src/live/lib/launchd";
+import { exitCodeFor, FORWARDED_SIGNALS, forwardSignals, jobLabel, jobPathVar, LIVE_JOB_NAMES, liveJobSpec, parseLaunchctlPrint, plistFor, type JobPaths } from "../../src/live/lib/launchd";
 
 const P: JobPaths = { bun: "/opt/homebrew/bin/bun", cre: "/Users/me/.cre/bin/cre", botsDir: "/Users/me/clim-fables/bots", home: "/Users/me" };
 
@@ -66,5 +67,45 @@ describe("launchctl print", () => {
     expect(parseLaunchctlPrint(running)).toEqual({ state: "running", pid: 4242, lastExitCode: "(never exited)" });
     const waiting = "gui/501/fi.clim-fables.desk = {\n\tstate = not running\n\tlast exit code = 1\n\tjob state = exited\n}\n";
     expect(parseLaunchctlPrint(waiting)).toEqual({ state: "not running", pid: null, lastExitCode: "1" });
+  });
+});
+
+describe("live:logs follows the logs in the foreground", () => {
+  test("SIGINT, SIGTERM, SIGHUP and SIGALRM (perl's alarm) go to the child", () => {
+    expect([...FORWARDED_SIGNALS]).toEqual(["SIGINT", "SIGTERM", "SIGHUP", "SIGALRM"]);
+    const source = new EventEmitter();
+    const sent: string[] = [];
+    forwardSignals({ kill: (s: NodeJS.Signals) => sent.push(s) > 0 }, source);
+    for (const s of ["SIGTERM", "SIGALRM", "SIGINT", "SIGHUP", "SIGUSR1"]) source.emit(s);
+    expect(sent).toEqual(["SIGTERM", "SIGALRM", "SIGINT", "SIGHUP"]);
+  });
+  test("exits with the child's code, or 128 + the signal that ended it", () => {
+    expect(exitCodeFor(0, null)).toBe(0);
+    expect(exitCodeFor(1, null)).toBe(1);
+    expect(exitCodeFor(null, "SIGTERM")).toBe(143);
+    expect(exitCodeFor(null, "SIGALRM")).toBe(142);
+    expect(exitCodeFor(null, "SIGINT")).toBe(130);
+    expect(exitCodeFor(null, null)).toBe(1);
+  });
+  test.skipIf(process.platform === "win32")("killing the parent ends the child too (no orphan tail)", async () => {
+    const lib = join(import.meta.dir, "..", "..", "src", "live", "lib", "launchd.ts");
+    const code = `import { execForwarding } from ${JSON.stringify(lib)}; const c = execForwarding("sleep", ["30"], "ignore"); console.log(c.pid);`;
+    for (const [signal, status] of [["SIGTERM", 143], ["SIGALRM", 142]] as const) {
+      const parent = spawn(process.execPath, ["-e", code], { stdio: ["ignore", "pipe", "inherit"] });
+      const childPid = await new Promise<number>((resolve) => parent.stdout.once("data", (b: Buffer) => resolve(Number(b.toString().trim()))));
+      const alive = (pid: number) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      expect(alive(childPid)).toBe(true);
+      const exited = new Promise<number | null>((resolve) => parent.once("exit", (c) => resolve(c)));
+      parent.kill(signal);
+      expect(await exited).toBe(status);
+      expect(alive(childPid)).toBe(false);
+    }
   });
 });

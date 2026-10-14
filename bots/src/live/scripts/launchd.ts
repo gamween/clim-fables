@@ -2,7 +2,8 @@
 // install: resolves bun and cre on PATH, writes ~/Library/LaunchAgents/fi.clim-fables.<name>.plist (no secret in it) and
 //          bootstraps it into gui/<uid> (a job already loaded is booted out first, so install also reloads).
 // uninstall: boots the jobs out and removes their plists (they then stay stopped after a reboot).
-// logs: tails bots/out/logs/<name>.log and .err.log. print: prints the plists without writing or loading anything.
+// logs: tails bots/out/logs/<name>.log and .err.log (a signal that ends this process ends the tail too).
+// print: prints the plists without writing or loading anything.
 // Health: bun run live:status.
 // Usage: bun src/live/scripts/launchd.ts <install|uninstall|logs|print> [name ...]   (names: desk runner keeper arb noise outages)
 import { spawnSync } from "node:child_process";
@@ -10,7 +11,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { REPO_ROOT } from "../lib/deployments";
-import { guiDomain, isLiveJobName, jobLabel, jobState, LIVE_JOB_NAMES, liveJobSpec, logPaths, plistFor, type JobPaths, type LiveJobName } from "../lib/launchd";
+import { execForwarding, guiDomain, isLiveJobName, jobLabel, jobState, LIVE_JOB_NAMES, liveJobSpec, logPaths, plistFor, type JobPaths, type LiveJobName } from "../lib/launchd";
 
 const BOTS_DIR = join(REPO_ROOT, "bots");
 const AGENTS_DIR = join(homedir(), "Library", "LaunchAgents");
@@ -72,8 +73,8 @@ function logs(): void {
     const p = logPaths(n, BOTS_DIR);
     return [p.stdout, p.stderr];
   });
-  const r = spawnSync("tail", ["-n", "20", "-F", ...files], { stdio: "inherit" });
-  process.exit(r.status ?? 0);
+  // tail in the foreground: Ctrl+C, a kill or perl's alarm reach it through this process, never orphaning it
+  execForwarding("tail", ["-n", "20", "-F", ...files]);
 }
 
 function print(): void {
