@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { hashesFromJsonl, percentile, summarizeGas } from "../../src/live/lib/gas";
+import { cadence, hashesFromJsonl, percentile, summarizeGas } from "../../src/live/lib/gas";
 
 const H = (n: number) => `0x${n.toString(16).padStart(64, "0")}` as const;
 
@@ -26,5 +26,21 @@ describe("gas summary", () => {
       JSON.stringify({ action: "poke", txHash: H(3) }),
     ].join("\n");
     expect(hashesFromJsonl(text, (o) => o.action === "poke", 2)).toEqual([H(2), H(3)]);
+  });
+});
+
+describe("cadence", () => {
+  test("a report every 30 s: 2,880 a day", () => {
+    expect(cadence([0, 30, 60, 90, 120])).toEqual({ n: 5, spanSec: 120, medianGapSec: 30, p90GapSec: 30, perDay: 2_880 });
+  });
+  test("gaps alternating 30 and 60 s: the rate comes from the span, not the median gap", () => {
+    const c = cadence([0, 30, 90, 120, 180, 210, 270]);
+    expect(c.perDay).toBe(1_920); // 6 gaps over 270 s
+    expect(c.p90GapSec).toBe(60);
+  });
+  test("fewer than two times, a zero span or times out of order throw", () => {
+    expect(() => cadence([10])).toThrow("at least two times");
+    expect(() => cadence([10, 10])).toThrow("longer than 0 s");
+    expect(() => cadence([10, 5])).toThrow("ascending");
   });
 });

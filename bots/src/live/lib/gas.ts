@@ -48,3 +48,22 @@ export function hashesFromJsonl(text: string, pick: (o: Record<string, unknown>)
   }
   return out.slice(-last);
 }
+
+export type Cadence = { n: number; spanSec: number; medianGapSec: number; p90GapSec: number; perDay: number };
+
+/** Cadence of a series of times (unix seconds, ascending): the gaps' median and p90, and the measured daily rate
+ *  ((n - 1) events over the span, scaled to 86,400 s), which stays right when the gaps alternate. */
+export function cadence(times: readonly number[]): Cadence {
+  if (times.length < 2) throw new RangeError("cadence needs at least two times");
+  const gaps = times.slice(1).map((t, i) => t - (times[i] as number));
+  if (gaps.some((g) => g < 0)) throw new RangeError("times must be ascending");
+  const spanSec = (times[times.length - 1] as number) - (times[0] as number);
+  if (spanSec === 0) throw new RangeError("cadence needs a span longer than 0 s");
+  return {
+    n: times.length,
+    spanSec,
+    medianGapSec: percentile(gaps, 50),
+    p90GapSec: percentile(gaps, 90),
+    perDay: Math.round(((times.length - 1) * 86_400) / spanSec),
+  };
+}
