@@ -1,27 +1,42 @@
 import type { NextConfig } from "next";
+import { RPC_URLS } from "./src/lib/rpc";
+
+const isDev = process.env.NODE_ENV === "development";
+
+// The showcase only reads: the browser may talk to this site and to the public Robinhood Chain RPCs, nothing else.
+// No wallet provider, relay or analytics endpoint can be reached (connect-src), no form can post anywhere
+// (form-action 'none'), and no other site may frame the app (frame-ancestors 'none').
+const rpcOrigins = [...new Set([...RPC_URLS.mainnet, ...RPC_URLS.testnet].map((u) => new URL(u).origin))];
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' blob: data:",
+  "font-src 'self'",
+  `connect-src 'self' ${rpcOrigins.join(" ")}`,
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'none'",
+  "frame-ancestors 'none'",
+].join("; ");
 
 const nextConfig: NextConfig = {
-  // RainbowKit imports wagmi's baseAccount connector; on the server, @base-org/account loads its Node
-  // entry, which pulls @coinbase/cdp-sdk and its lazy imports of optional @x402/* peers (x402 payments,
-  // unused here). Loading these two packages from node_modules instead of bundling them keeps the lazy
-  // imports lazy; the browser bundle uses @base-org/account's browser entry and is unaffected.
-  serverExternalPackages: ["@base-org/account", "@coinbase/cdp-sdk"],
-  // /swap and /lp build wallet transactions, so no other site may frame the app (clickjacking): X-Frame-
-  // Options for older browsers, CSP frame-ancestors for the rest. The CSP carries that one directive and
-  // nothing else: no script-src or connect-src, so RainbowKit, WalletConnect and the RPC calls load as
-  // before. Referrer-Policy is the browsers' default, stated; RPC and WalletConnect allowlists read Origin.
   async headers() {
     return [
       {
         source: "/:path*",
         headers: [
+          { key: "Content-Security-Policy", value: csp },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         ],
       },
     ];
+  },
+  async redirects() {
+    // The spec named the pool page /pool/eth-usdg; the app mirrors Fables' route, /markets/eth.
+    return [{ source: "/pool/eth-usdg", destination: "/markets/eth", permanent: false }];
   },
 };
 

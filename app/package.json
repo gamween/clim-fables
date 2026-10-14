@@ -1,6 +1,6 @@
 {
-  "name": "clim-app",
-  "version": "0.1.0",
+  "name": "clim-fables-app",
+  "version": "0.2.0",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -11,41 +11,31 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "sync": "node scripts/sync-data.mjs",
-    "snapshot": "tsx scripts/snapshot.ts",
-    "e2e:onchain": "tsx scripts/e2e-onchain.ts",
-    "dither": "node scripts/make-dither.mjs",
-    "logos": "node scripts/make-logos.mjs",
-    "world-dots": "node scripts/make-world-dots.mjs",
-    "licenses": "npx -y generate-license-file --input package.json --output public/third-party-licenses.txt --overwrite"
+    "sync:check": "node scripts/sync-data.mjs --check",
+    "fables-assets": "node scripts/fables-assets.mjs",
+    "fables-assets:check": "node scripts/fables-assets.mjs --check",
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "e2e:guardrails": "playwright test e2e/guardrails.spec.ts",
+    "check:live": "playwright test e2e/live.spec.ts",
+    "qa:visual": "playwright test e2e/visual.spec.ts",
+    "licenses": "npx -y generate-license-file@4.2.5 --input package.json --output public/third-party-licenses.txt --overwrite"
   },
   "dependencies": {
-    "@rainbow-me/rainbowkit": "^2.2.11",
-    "@tanstack/react-query": "^5.104.1",
-    "motion": "^14.0.0",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-markdown": "^10.1.0",
-    "recharts": "^3.10.1",
-    "remark-gfm": "^4.0.1",
-    "viem": "^2.57.3",
-    "wagmi": "^2.19.5"
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
+    "viem": "2.57.3"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^22.20.5",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@web3icons/core": "^4.0.58",
-    "dotted-map": "^2.2.3",
-    "eslint": "^9",
+    "@playwright/test": "1.63.0",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
     "eslint-config-next": "16.3.8",
-    "tailwindcss": "^4",
-    "tsx": "^4.23.15",
-    "typescript": "^5",
-    "vitest": "^5.0.3"
-  },
-  "overrides": {
-    "ws@^8": "^8.21.0"
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
   }
 }
