@@ -1,0 +1,22 @@
+[
+  {
+    "title": "Effective arbitrage interval",
+    "file": "lab/out/fables-dt-eff.json",
+    "framing": "dt_eff is of order 1 to 3 s; the per-hour estimate is very sensitive to the band (a 1 bp shift in the reference price moves weeks 4-5 from ~13 s to ~3-4.5 s). clim's posted fee does not depend on dt: eta is calibrated at equal average fee, so only eta*sqrt(dt/2) matters."
+  },
+  {
+    "title": "Volatility window",
+    "file": "lab/out/fables-window.json",
+    "framing": "At equal time-average fee, clim's 5-minute rule and the keeper are comparable: -4.4 % arbitrage loss with arbitrage every second, +4.6 % every 15 s; clim charges 11.96 bp per dollar traded vs the keeper's 10.77 bp. Not a claim of better fees."
+  },
+  {
+    "title": "Volatility estimator",
+    "file": "lab/out/fables-estimator.json",
+    "framing": "binance-1s scored best in-sample by 1.09 points on a simulator driven by the same Binance path; it is excluded because the desk must not depend on one venue (spec §3); venue-range is the best multi-venue estimator."
+  },
+  {
+    "title": "Per-direction signal",
+    "file": "lab/out/fables-direction.json",
+    "framing": "Trades toward the venue capture the stale pool's gap (signal correlates 0.93 with the pre-trade gap and 0.04 with the later move); the premium rule clears its gate on the five weeks pooled but in only 3 of 5 weeks; measured, experimental, not deployed on ETH/USDG (its hook is symmetric)."
+  }
+]

@@ -1,0 +1,89 @@
+{
+  "file": "docs/evidence/live-check-2026-10-14.json",
+  "data": {
+    "generatedAt": "2026-10-14T09:04:32.085Z",
+    "chainId": 46630,
+    "fromBlock": "134913097",
+    "toBlock": "134931097",
+    "checks": {
+      "deskReports": {
+        "pass": true,
+        "detail": {
+          "reports": 64,
+          "firstSeq": 16,
+          "lastSeq": 79,
+          "seqStepsByOne": true,
+          "maxGapSec": 32,
+          "medianGapSec": 30
+        }
+      },
+      "poolDFollowsPolicy": {
+        "pass": true,
+        "detail": {
+          "pokes": 63,
+          "hookFeePokedMatches": 63,
+          "lastTenMatchingQuote": 10,
+          "lastPoke": {
+            "seq": 78,
+            "tObs": 1791968619,
+            "fee0For1": 700,
+            "fee1For0": 897,
+            "mode": 0,
+            "eventApplied": false,
+            "expiry": 1791969219,
+            "caller": "0xc3e13f95Ca546Df0ae1839c9533c8D6685609060"
+          }
+        }
+      },
+      "poolKKeeperPattern": {
+        "pass": true,
+        "detail": {
+          "pokes": 10,
+          "fromKeeper": 10,
+          "ttl7200": 10,
+          "medianGapSec": 180,
+          "fees": [
+            1466,
+            1016,
+            811,
+            1466,
+            1466,
+            1016,
+            811,
+            700,
+            700,
+            700
+          ]
+        }
+      },
+      "poolFFlat": {
+        "pass": true,
+        "detail": {
+          "pokes": 0,
+          "fee0For1": 700,
+          "fee1For0": 700
+        }
+      },
+      "swapsLand": {
+        "pass": true,
+        "detail": {
+          "D": {
+            "arb": 58,
+            "retail": 34,
+            "meanFeePips": 1208
+          },
+          "K": {
+            "arb": 74,
+            "retail": 34,
+            "meanFeePips": 939.1111111111111
+          },
+          "F": {
+            "arb": 102,
+            "retail": 34,
+            "meanFeePips": 700
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,356 @@
+{
+  "ladder": {
+    "header": [
+      "Level",
+      "Fables' work",
+      "Risk to Fables",
+      "Status"
+    ],
+    "rows": [
+      [
+        "0. Shadow",
+        "None: clim's desk reads Fables' live ETH/USDG pool and publishes its own recommendation next to the keeper's overrides",
+        "None",
+        "The CRE workflow's `rh-shadow-settings` target reads the mainnet pool (read only, never a write); see [`cre/README.md`](../../cre/README.md)"
+      ],
+      [
+        "1. Keeper input",
+        "A few lines in the off-chain keeper: read `ClimFeePolicy` over RPC and compose with the keeper's own fee",
+        "No contract touched",
+        "Works today against the testnet desk: [`keeper-read.ts`](keeper-read.ts)"
+      ],
+      [
+        "2. On-chain adapter",
+        "One AccessManager batch, revocable in one call",
+        "Bounded by the hook's own floor, cap and TTL; only roles Fables grants can call `ClimPoker`; clim holds no admin power; a silent desk means no poke",
+        "Batch encoded from the ABIs and executed against Fables' real AccessManager on a mainnet fork; live on clim's own testnet pools"
+      ]
+    ]
+  },
+  "keeperDiff": "import { createPublicClient, http } from \"viem\";\nimport { robinhoodTestnet } from \"viem/chains\";\nimport { composeFee, readClimQuote } from \"./keeper-read\";\n\nconst climClient = createPublicClient({ chain: robinhoodTestnet, transport: http() });\n\n// before: await pokeFee(poolId, myFeePips, ttl)\nconst clim = await readClimQuote(climClient);\nconst { fee } = composeFee(myFeePips, clim); // max(yours, clim's) while clim is fresh; yours alone otherwise\nawait pokeFee(poolId, fee, ttl);\n",
+  "keeperRead": "// Level 1 of the clim x Fables integration: your off-chain keeper reads clim's fee and composes it with its own.\n// Self-contained (viem only): copy this file into the keeper. Every call is an eth_call; nothing is ever sent.\n// Live read of the testnet desk: bun docs/integrate/keeper-read.ts\nimport { createPublicClient, http, type Address, type PublicClient } from \"viem\";\nimport { robinhoodTestnet } from \"viem/chains\";\n\n/** clim on Robinhood Chain testnet (chain 46630), from shared/deployments/robinhood-testnet.json. */\nexport const CLIM_TESTNET = {\n  policy: \"0x5f140A5e17826CFcEeeD7cD3FcAe4D56c9e0C519\",\n  riskDesk: \"0x63f543430982685387C83e4ec55E5a26fd1371Ef\",\n} as const satisfies Record<string, Address>;\n\n/** The four ClimFeePolicy views this file reads (a subset of shared/abis/ClimFeePolicy.json, checked by a test). */\nexport const climFeePolicyReadAbi = [\n  { type: \"function\", name: \"quote\", stateMutability: \"view\", inputs: [], outputs: [{ name: \"fee\", type: \"uint24\" }, { name: \"mode\", type: \"uint8\" }] },\n  {\n    type: \"function\",\n    name: \"quoteDirectional\",\n    stateMutability: \"view\",\n    inputs: [],\n    outputs: [{ name: \"fee0For1\", type: \"uint24\" }, { name: \"fee1For0\", type: \"uint24\" }, { name: \"mode\", type: \"uint8\" }],\n  },\n  { type: \"function\", name: \"lastObservation\", stateMutability: \"view\", inputs: [], outputs: [{ name: \"tObs\", type: \"uint40\" }, { name: \"seq\", type: \"uint32\" }] },\n  { type: \"function\", name: \"tauKillSec\", stateMutability: \"view\", inputs: [], outputs: [{ name: \"\", type: \"uint32\" }] },\n] as const;\n\n/** normal: fresh desk; degraded: venues disagree (the fee is at least the policy's safe fee); blind: no report for more\n *  than tauKillSec (ClimPoker refuses to poke, and a keeper should ignore clim). */\nexport type ClimMode = \"normal\" | \"degraded\" | \"blind\";\nconst MODES: Readonly<Record<number, ClimMode>> = { 0: \"normal\", 1: \"degraded\", 2: \"blind\" };\n\nexport type ClimQuote = {\n  /** quote(): one fee for both directions, in pips (1 pip = 0.0001 %, 100 pips = 1 bp). */\n  fee: number;\n  /** quoteDirectional(): zero-for-one pays currency0 for currency1. */\n  fee0For1: number;\n  fee1For0: number;\n  mode: ClimMode;\n  /** The desk's last observation (unix seconds) and report counter. */\n  tObs: number;\n  seq: number;\n  /** blockTimestamp - tObs; negative by up to 30 s when a report carries a future tObs (the desk's skew limit). */\n  ageSec: number;\n  tauKillSec: number;\n  /** Every value above was read at this block. */\n  blockNumber: bigint;\n  blockTimestamp: number;\n};\n\nexport type ReadOptions = {\n  policy?: Address;\n  /** Read this many blocks behind the head, so a load-balanced RPC whose nodes lag a little still serves the block. */\n  lagBlocks?: bigint;\n};\n\n/** Reads clim's quote, both directions, the observation and the kill delay, all at one block. */\nexport async function readClimQuote(client: PublicClient, o: ReadOptions = {}): Promise<ClimQuote> {\n  const address = o.policy ?? CLIM_TESTNET.policy;\n  const lag = o.lagBlocks ?? 3n;\n  const head = await client.getBlockNumber();\n  const blockNumber = head > lag ? head - lag : head;\n  const read = { address, abi: climFeePolicyReadAbi, blockNumber } as const;\n  const [block, [fee, mode], [fee0For1, fee1For0], [tObs, seq], tauKillSec] = await Promise.all([\n    client.getBlock({ blockNumber }),\n    client.readContract({ ...read, functionName: \"quote\" }),\n    client.readContract({ ...read, functionName: \"quoteDirectional\" }),\n    client.readContract({ ...read, functionName: \"lastObservation\" }),\n    client.readContract({ ...read, functionName: \"tauKillSec\" }),\n  ]);\n  const named = MODES[mode];\n  if (named === undefined) throw new Error(`unknown ClimFeePolicy mode ${mode}`);\n  const blockTimestamp = Number(block.timestamp);\n  return { fee, fee0For1, fee1For0, mode: named, tObs, seq, ageSec: blockTimestamp - tObs, tauKillSec, blockNumber, blockTimestamp };\n}\n\n/** clim counts while its desk is not blind and its observation is at most maxAgeSec old (default: the policy's\n *  tauKillSec, the same rule ClimPoker applies on-chain). */\nexport function climUsable(clim: ClimQuote, maxAgeSec: number = clim.tauKillSec): boolean {\n  return clim.mode !== \"blind\" && clim.ageSec <= maxAgeSec;\n}\n\nexport type Composed = { fee: number; source: \"keeper\" | \"clim\"; climUsed: boolean };\n\n/** A one-fee hook (ETH/USDG today): max(your fee, clim's quote()) while clim is usable, your fee alone otherwise.\n *  Your event overrides stay on top: clim can raise the fee, never lower yours. */\nexport function composeFee(keeperFeePips: number, clim: ClimQuote, maxAgeSec?: number): Composed {\n  if (!climUsable(clim, maxAgeSec)) return { fee: keeperFeePips, source: \"keeper\", climUsed: false };\n  return clim.fee > keeperFeePips ? { fee: clim.fee, source: \"clim\", climUsed: true } : { fee: keeperFeePips, source: \"keeper\", climUsed: true };\n}\n\nexport type ComposedDirectional = { fee0For1: Composed; fee1For0: Composed };\n\n/** A per-direction hook: the same rule on each side, with quoteDirectional()'s per-side fees. */\nexport function composeDirectional(keeper0For1: number, keeper1For0: number, clim: ClimQuote, maxAgeSec?: number): ComposedDirectional {\n  return {\n    fee0For1: composeFee(keeper0For1, { ...clim, fee: clim.fee0For1 }, maxAgeSec),\n    fee1For0: composeFee(keeper1For0, { ...clim, fee: clim.fee1For0 }, maxAgeSec),\n  };\n}\n\nif (import.meta.main) {\n  const client = createPublicClient({ chain: robinhoodTestnet, transport: http(process.env.RH_TESTNET_RPC_URL) });\n  const q = await readClimQuote(client);\n  console.log(JSON.stringify({ ...q, blockNumber: q.blockNumber.toString() }, null, 2));\n  console.log(\"composed with a 700-pip keeper fee:\", JSON.stringify(composeFee(700, q)));\n}\n",
+  "batchCalls": {
+    "header": [
+      "#",
+      "Call",
+      "Effect",
+      "Needs"
+    ],
+    "rows": [
+      [
+        "1",
+        "`grantRole(1, ClimPoker, 0)`",
+        "ClimPoker may call the hook's `pokeFee` (FEE_POKER)",
+        "POKER_ADMIN (role 5), the admin of FEE_POKER"
+      ],
+      [
+        "2",
+        "`setTargetFunctionRole(ClimPoker, [postEvent, postEventAndPoke], 1)`",
+        "the keeper (FEE_POKER) posts its event overrides through ClimPoker",
+        "ADMIN (role 0)"
+      ],
+      [
+        "3",
+        "`labelRole(7, \"CLIM_RUNNER\")`",
+        "names the new role",
+        "ADMIN"
+      ],
+      [
+        "4",
+        "`setTargetFunctionRole(ClimPoker, [poke], 7)`",
+        "CLIM_RUNNER may trigger a poke (the fee still comes from the policy)",
+        "ADMIN"
+      ],
+      [
+        "5",
+        "`grantRole(7, clim's runner, 0)`",
+        "clim's runner bot pokes after each desk report",
+        "ADMIN (the default admin of a new role)"
+      ],
+      [
+        "6",
+        "`grantRole(7, Fables' keeper, 0)`",
+        "the keeper can poke too",
+        "ADMIN"
+      ]
+    ]
+  },
+  "batchFork": {
+    "generatedBy": "docs/integrate/level2-batch.ts",
+    "params": {
+      "chainId": 4663,
+      "accessManager": "0xA362D98B33A7bb5B5E2180a05f995A70FB404f30",
+      "poker": "0x5c4a3C2CD1ffE6aAfDF62b64bb3E620C696c832E",
+      "runners": [
+        "0x9071328d72b35420DcF7938d1F64Ab44Deb9D607",
+        "0x1B6a8808E1D26dba66bA11E52997803C43CAd429"
+      ],
+      "note": "Fables' AccessManager on Robinhood Chain mainnet. The poker address is the ClimPoker of the recorded fork run (docs/evidence/fork-run-2026-10-07.json), deployed only on a fork; the runner is the fork suite's runner (makeAddr(\"climRunner\")); the second CLIM_RUNNER account is Fables' keeper 0x1B6a...d429 (FEE_POKER at fork block 87,780,000). A mainnet batch uses the address ClimPoker gets when deployed and clim's runner key.",
+      "feePokerRole": 1,
+      "climRunnerRole": 7,
+      "climRunnerLabel": "CLIM_RUNNER"
+    },
+    "requiredCaller": "an account holding ADMIN (role 0) and POKER_ADMIN (role 5) with no execution delay, or send the grantRole(FEE_POKER) call from a POKER_ADMIN holder and the rest from an ADMIN holder",
+    "calls": [
+      {
+        "description": "FEE_POKER to ClimPoker: it may call the hook's pokeFee (needs POKER_ADMIN, role 5)",
+        "function": "grantRole(uint64,address,uint32)",
+        "args": [
+          1,
+          "0x5c4a3C2CD1ffE6aAfDF62b64bb3E620C696c832E",
+          0
+        ],
+        "data": "0x25c471a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000005c4a3c2cd1ffe6aafdf62b64bb3e620c696c832e0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "postEvent and postEventAndPoke on ClimPoker for FEE_POKER: the keeper posts its event overrides there (needs ADMIN, role 0)",
+        "function": "setTargetFunctionRole(address,bytes4[],uint64)",
+        "args": [
+          "0x5c4a3C2CD1ffE6aAfDF62b64bb3E620C696c832E",
+          [
+            "0xad0ce2ef",
+            "0x928313c5"
+          ],
+          1
+        ],
+        "data": "0x08d6122d0000000000000000000000005c4a3c2cd1ffe6aafdf62b64bb3e620c696c832e000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002ad0ce2ef00000000000000000000000000000000000000000000000000000000928313c500000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "label role 7 (needs ADMIN)",
+        "function": "labelRole(uint64,string)",
+        "args": [
+          7,
+          "CLIM_RUNNER"
+        ],
+        "data": "0x853551b800000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000b434c494d5f52554e4e4552000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "poke on ClimPoker for CLIM_RUNNER (needs ADMIN)",
+        "function": "setTargetFunctionRole(address,bytes4[],uint64)",
+        "args": [
+          "0x5c4a3C2CD1ffE6aAfDF62b64bb3E620C696c832E",
+          [
+            "0x18178358"
+          ],
+          7
+        ],
+        "data": "0x08d6122d0000000000000000000000005c4a3c2cd1ffe6aafdf62b64bb3e620c696c832e0000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000011817835800000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "CLIM_RUNNER to clim's runner 0x9071328d72b35420DcF7938d1F64Ab44Deb9D607 (needs ADMIN, the default admin of a new role)",
+        "function": "grantRole(uint64,address,uint32)",
+        "args": [
+          7,
+          "0x9071328d72b35420DcF7938d1F64Ab44Deb9D607",
+          0
+        ],
+        "data": "0x25c471a000000000000000000000000000000000000000000000000000000000000000070000000000000000000000009071328d72b35420dcf7938d1f64ab44deb9d6070000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "CLIM_RUNNER to account 1 0x1B6a8808E1D26dba66bA11E52997803C43CAd429 (needs ADMIN, the default admin of a new role)",
+        "function": "grantRole(uint64,address,uint32)",
+        "args": [
+          7,
+          "0x1B6a8808E1D26dba66bA11E52997803C43CAd429",
+          0
+        ],
+        "data": "0x25c471a000000000000000000000000000000000000000000000000000000000000000070000000000000000000000001b6a8808e1d26dba66ba11e52997803c43cad4290000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ],
+    "multicall": {
+      "to": "0xA362D98B33A7bb5B5E2180a05f995A70FB404f30",
+      "data": "0xac9650d80000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000000000000000000000000016000000000000000000000000000000000000000000000000000000000000002600000000000000000000000000000000000000000000000000000000000000320000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000004a0000000000000000000000000000000000000000000000000000000000000006425c471a000000000000000000000000000000000000000000000000000000000000000010000000000000000000000005c4a3c2cd1ffe6aafdf62b64bb3e620c696c832e00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c408d6122d0000000000000000000000005c4a3c2cd1ffe6aafdf62b64bb3e620c696c832e000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002ad0ce2ef00000000000000000000000000000000000000000000000000000000928313c500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000084853551b800000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000b434c494d5f52554e4e45520000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a408d6122d0000000000000000000000005c4a3c2cd1ffe6aafdf62b64bb3e620c696c832e000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000001181783580000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006425c471a000000000000000000000000000000000000000000000000000000000000000070000000000000000000000009071328d72b35420dcf7938d1f64ab44deb9d607000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006425c471a000000000000000000000000000000000000000000000000000000000000000070000000000000000000000001b6a8808e1d26dba66ba11e52997803c43cad429000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "revoke": {
+      "stop": {
+        "description": "revoke FEE_POKER from ClimPoker: every poke reverts in the hook from the next block (needs POKER_ADMIN)",
+        "function": "revokeRole(uint64,address)",
+        "args": [
+          1,
+          "0x5c4a3C2CD1ffE6aAfDF62b64bb3E620C696c832E"
+        ],
+        "data": "0xb7d2b16200000000000000000000000000000000000000000000000000000000000000010000000000000000000000005c4a3c2cd1ffe6aafdf62b64bb3e620c696c832e"
+      },
+      "cleanup": [
+        {
+          "description": "revoke CLIM_RUNNER from 0x9071328d72b35420DcF7938d1F64Ab44Deb9D607 (needs ADMIN)",
+          "function": "revokeRole(uint64,address)",
+          "args": [
+            7,
+            "0x9071328d72b35420DcF7938d1F64Ab44Deb9D607"
+          ],
+          "data": "0xb7d2b16200000000000000000000000000000000000000000000000000000000000000070000000000000000000000009071328d72b35420dcf7938d1f64ab44deb9d607"
+        },
+        {
+          "description": "revoke CLIM_RUNNER from 0x1B6a8808E1D26dba66bA11E52997803C43CAd429 (needs ADMIN)",
+          "function": "revokeRole(uint64,address)",
+          "args": [
+            7,
+            "0x1B6a8808E1D26dba66bA11E52997803C43CAd429"
+          ],
+          "data": "0xb7d2b16200000000000000000000000000000000000000000000000000000000000000070000000000000000000000001b6a8808e1d26dba66ba11e52997803c43cad429"
+        }
+      ]
+    },
+    "expect": {
+      "functionRoles": [
+        {
+          "function": "postEvent(uint24,uint24,uint40)",
+          "selector": "0xad0ce2ef",
+          "role": 1
+        },
+        {
+          "function": "postEventAndPoke(uint24,uint24,uint40)",
+          "selector": "0x928313c5",
+          "role": 1
+        },
+        {
+          "function": "poke()",
+          "selector": "0x18178358",
+          "role": 7
+        }
+      ],
+      "members": [
+        {
+          "role": 1,
+          "account": "0x5c4a3C2CD1ffE6aAfDF62b64bb3E620C696c832E"
+        },
+        {
+          "role": 7,
+          "account": "0x9071328d72b35420DcF7938d1F64Ab44Deb9D607"
+        },
+        {
+          "role": 7,
+          "account": "0x1B6a8808E1D26dba66bA11E52997803C43CAd429"
+        }
+      ]
+    }
+  },
+  "batchTestnet": {
+    "generatedBy": "docs/integrate/level2-batch.ts",
+    "params": {
+      "chainId": 46630,
+      "accessManager": "0x61859758b20441995FCDb8b8BC144B1eBEeC2e3E",
+      "poker": "0x99d6c4F74A2ad09471b1B4fd1F0aC68B099cbE07",
+      "runners": [
+        "0xc3e13f95Ca546Df0ae1839c9533c8D6685609060"
+      ],
+      "note": "clim's own AccessManager on Robinhood Chain testnet (shared/deployments/robinhood-testnet.json), where contracts/script/v2/13_LiveDesk.s.sol sent the same calls at deployment; --check reads that state.",
+      "feePokerRole": 1,
+      "climRunnerRole": 7,
+      "climRunnerLabel": "CLIM_RUNNER"
+    },
+    "requiredCaller": "an account holding ADMIN (role 0) and POKER_ADMIN (role 5) with no execution delay, or send the grantRole(FEE_POKER) call from a POKER_ADMIN holder and the rest from an ADMIN holder",
+    "calls": [
+      {
+        "description": "FEE_POKER to ClimPoker: it may call the hook's pokeFee (needs POKER_ADMIN, role 5)",
+        "function": "grantRole(uint64,address,uint32)",
+        "args": [
+          1,
+          "0x99d6c4F74A2ad09471b1B4fd1F0aC68B099cbE07",
+          0
+        ],
+        "data": "0x25c471a0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000099d6c4f74a2ad09471b1b4fd1f0ac68b099cbe070000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "postEvent and postEventAndPoke on ClimPoker for FEE_POKER: the keeper posts its event overrides there (needs ADMIN, role 0)",
+        "function": "setTargetFunctionRole(address,bytes4[],uint64)",
+        "args": [
+          "0x99d6c4F74A2ad09471b1B4fd1F0aC68B099cbE07",
+          [
+            "0xad0ce2ef",
+            "0x928313c5"
+          ],
+          1
+        ],
+        "data": "0x08d6122d00000000000000000000000099d6c4f74a2ad09471b1b4fd1f0ac68b099cbe07000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002ad0ce2ef00000000000000000000000000000000000000000000000000000000928313c500000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "label role 7 (needs ADMIN)",
+        "function": "labelRole(uint64,string)",
+        "args": [
+          7,
+          "CLIM_RUNNER"
+        ],
+        "data": "0x853551b800000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000b434c494d5f52554e4e4552000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "poke on ClimPoker for CLIM_RUNNER (needs ADMIN)",
+        "function": "setTargetFunctionRole(address,bytes4[],uint64)",
+        "args": [
+          "0x99d6c4F74A2ad09471b1B4fd1F0aC68B099cbE07",
+          [
+            "0x18178358"
+          ],
+          7
+        ],
+        "data": "0x08d6122d00000000000000000000000099d6c4f74a2ad09471b1b4fd1f0ac68b099cbe070000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000000700000000000000000000000000000000000000000000000000000000000000011817835800000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "description": "CLIM_RUNNER to clim's runner 0xc3e13f95Ca546Df0ae1839c9533c8D6685609060 (needs ADMIN, the default admin of a new role)",
+        "function": "grantRole(uint64,address,uint32)",
+        "args": [
+          7,
+          "0xc3e13f95Ca546Df0ae1839c9533c8D6685609060",
+          0
+        ],
+        "data": "0x25c471a00000000000000000000000000000000000000000000000000000000000000007000000000000000000000000c3e13f95ca546df0ae1839c9533c8d66856090600000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ],
+    "multicall": {
+      "to": "0x61859758b20441995FCDb8b8BC144B1eBEeC2e3E",
+      "data": "0xac9650d80000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001400000000000000000000000000000000000000000000000000000000000000240000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000003e0000000000000000000000000000000000000000000000000000000000000006425c471a0000000000000000000000000000000000000000000000000000000000000000100000000000000000000000099d6c4f74a2ad09471b1b4fd1f0ac68b099cbe0700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c408d6122d00000000000000000000000099d6c4f74a2ad09471b1b4fd1f0ac68b099cbe07000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000002ad0ce2ef00000000000000000000000000000000000000000000000000000000928313c500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000084853551b800000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000b434c494d5f52554e4e45520000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a408d6122d00000000000000000000000099d6c4f74a2ad09471b1b4fd1f0ac68b099cbe07000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000070000000000000000000000000000000000000000000000000000000000000001181783580000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006425c471a00000000000000000000000000000000000000000000000000000000000000007000000000000000000000000c3e13f95ca546df0ae1839c9533c8d6685609060000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "revoke": {
+      "stop": {
+        "description": "revoke FEE_POKER from ClimPoker: every poke reverts in the hook from the next block (needs POKER_ADMIN)",
+        "function": "revokeRole(uint64,address)",
+        "args": [
+          1,
+          "0x99d6c4F74A2ad09471b1B4fd1F0aC68B099cbE07"
+        ],
+        "data": "0xb7d2b162000000000000000000000000000000000000000000000000000000000000000100000000000000000000000099d6c4f74a2ad09471b1b4fd1f0ac68b099cbe07"
+      },
+      "cleanup": [
+        {
+          "description": "revoke CLIM_RUNNER from 0xc3e13f95Ca546Df0ae1839c9533c8D6685609060 (needs ADMIN)",
+          "function": "revokeRole(uint64,address)",
+          "args": [
+            7,
+            "0xc3e13f95Ca546Df0ae1839c9533c8D6685609060"
+          ],
+          "data": "0xb7d2b1620000000000000000000000000000000000000000000000000000000000000007000000000000000000000000c3e13f95ca546df0ae1839c9533c8d6685609060"
+        }
+      ]
+    },
+    "expect": {
+      "functionRoles": [
+        {
+          "function": "postEvent(uint24,uint24,uint40)",
+          "selector": "0xad0ce2ef",
+          "role": 1
+        },
+        {
+          "function": "postEventAndPoke(uint24,uint24,uint40)",
+          "selector": "0x928313c5",
+          "role": 1
+        },
+        {
+          "function": "poke()",
+          "selector": "0x18178358",
+          "role": 7
+        }
+      ],
+      "members": [
+        {
+          "role": 1,
+          "account": "0x99d6c4F74A2ad09471b1B4fd1F0aC68B099cbE07"
+        },
+        {
+          "role": 7,
+          "account": "0xc3e13f95Ca546Df0ae1839c9533c8D6685609060"
+        }
+      ]
+    }
+  }
+}

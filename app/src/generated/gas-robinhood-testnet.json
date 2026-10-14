@@ -1,0 +1,63 @@
+{
+  "generatedAt": "2026-10-14T11:05:19.313Z",
+  "chainId": 46630,
+  "note": "Robinhood Chain testnet receipts of the live stack (plan 03); gasUsed includes the L1 component (gasUsedForL1)",
+  "deskReport": {
+    "n": 200,
+    "gasUsedMedian": 86285,
+    "gasUsedP90": 86633,
+    "gasUsedForL1Median": 0,
+    "effectiveGasPriceMedianWei": 10000000,
+    "costMedianEth": 8.6285e-7
+  },
+  "poke": {
+    "n": 200,
+    "gasUsedMedian": 79749,
+    "gasUsedP90": 79817,
+    "gasUsedForL1Median": 0,
+    "effectiveGasPriceMedianWei": 10000000,
+    "costMedianEth": 7.9749e-7
+  },
+  "keeperPoke": {
+    "n": 48,
+    "gasUsedMedian": 46047,
+    "gasUsedP90": 46047,
+    "gasUsedForL1Median": 0,
+    "effectiveGasPriceMedianWei": 10000000,
+    "costMedianEth": 4.6047e-7
+  },
+  "arbSwap": {
+    "n": 197,
+    "gasUsedMedian": 132312,
+    "gasUsedP90": 132449,
+    "gasUsedForL1Median": 0,
+    "effectiveGasPriceMedianWei": 10000000,
+    "costMedianEth": 0.00000132312
+  },
+  "retailSwap": {
+    "n": 199,
+    "gasUsedMedian": 132397,
+    "gasUsedP90": 132530,
+    "gasUsedForL1Median": 0,
+    "effectiveGasPriceMedianWei": 10000000,
+    "costMedianEth": 0.00000132397
+  },
+  "cadence": {
+    "fromBlock": 134962855,
+    "toBlock": 134998855,
+    "deskReport": {
+      "n": 117,
+      "spanSec": 3786,
+      "medianGapSec": 30,
+      "p90GapSec": 31,
+      "perDay": 2647
+    },
+    "poke": {
+      "n": 117,
+      "spanSec": 3786,
+      "medianGapSec": 30,
+      "p90GapSec": 31,
+      "perDay": 2647
+    }
+  }
+}

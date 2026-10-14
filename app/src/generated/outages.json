@@ -1,0 +1,80 @@
+{
+  "source": "bots/out/outages.json",
+  "generatedAt": "2026-10-14T14:18:58.293Z",
+  "chainId": 46630,
+  "riskDesk": "0x63f543430982685387C83e4ec55E5a26fd1371Ef",
+  "gapSec": 90,
+  "deployBlock": 134885665,
+  "scannedToBlock": 135103814,
+  "chainTimeSec": 1791987534,
+  "reportCount": 636,
+  "lastReport": {
+    "seq": 636,
+    "tObs": 1791987529
+  },
+  "windows": [
+    {
+      "from": 1791965028,
+      "to": 1791965378,
+      "durationSec": 350,
+      "seqBefore": 5,
+      "seqAfter": 6,
+      "ongoing": false,
+      "reason": "processes stopped and restarted: desk"
+    },
+    {
+      "from": 1791965429,
+      "to": 1791966514,
+      "durationSec": 1085,
+      "seqBefore": 7,
+      "seqAfter": 8,
+      "ongoing": false,
+      "reason": "processes stopped and restarted: desk, outages, runner"
+    },
+    {
+      "from": 1791968679,
+      "to": 1791969493,
+      "durationSec": 814,
+      "seqBefore": 80,
+      "seqAfter": 81,
+      "ongoing": false,
+      "reason": "processes stopped and restarted: arb, desk, keeper, noise, outages, runner"
+    },
+    {
+      "from": 1791973986,
+      "to": 1791974195,
+      "durationSec": 209,
+      "seqBefore": 218,
+      "seqAfter": 219,
+      "ongoing": false,
+      "reason": "RPC or network errors in keeper"
+    },
+    {
+      "from": 1791975837,
+      "to": 1791975928,
+      "durationSec": 91,
+      "seqBefore": 271,
+      "seqAfter": 272,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1791976324,
+      "to": 1791976536,
+      "durationSec": 212,
+      "seqBefore": 281,
+      "seqAfter": 282,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1791976536,
+      "to": 1791976627,
+      "durationSec": 91,
+      "seqBefore": 282,
+      "seqAfter": 283,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    }
+  ]
+}

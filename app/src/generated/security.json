@@ -1,0 +1,103 @@
+{
+  "intro": "\"Flat\" is the hook's flat fee: 7 bp on Fables' ETH/USDG pool, 700 pips on clim's testnet pools.",
+  "failureModes": {
+    "header": [
+      "Failure",
+      "What happens",
+      "Fee on a pool driven by `ClimPoker`",
+      "Proof"
+    ],
+    "rows": [
+      [
+        "One venue stale or down, 3 still fresh",
+        "the desk reports from the 3",
+        "normal",
+        "`estimate` \"median-close: 3 fresh venues out of 4\" (`estimator.test.ts`)"
+      ],
+      [
+        "Fewer than 3 fresh venues",
+        "no report; the desk ages",
+        "as \"desk silent\" below",
+        "\"no report when fewer than 3 venues answer\" (`workflow.test.ts`); `test_RevertWhen_TooFewSources`"
+      ],
+      [
+        "Venues disagree by more than 25 bp",
+        "`FLAG_DEGRADED`; the policy is degraded",
+        "at least the safe fee (30 bp), still poked",
+        "`test_DegradedWhenVenuesDisagree`, `test_DegradedChargesAtLeastSafe`, `test_DegradedDeskPokesAtLeastTheSafeFee`"
+      ],
+      [
+        "Desk silent (CRE outage, Mac asleep or offline, operator out of gas)",
+        "blind after `tauKillSec` (180 s); `poke()` reverts `DeskBlind`",
+        "the last poke's fee until `tObs + 600 s`, then flat",
+        "`contracts/test/v2/Outage.t.sol` (6 tests); on the fork `test_BlindDeskDoesNotPoke`, `test_OverrideExpiresBackToFablesFlatFee`; the live drill of 2026-10-14 (814 s outage, pool D at 700/700 pips during it), [`docs/sessions/2026-10-14.md`](sessions/2026-10-14.md)"
+      ],
+      [
+        "Desk back after more than 180 s",
+        "the first report is taken as is, no ramp",
+        "normal from the next poke",
+        "`test_ReportAfterAnOutageIsTakenAsIs`, `test_FirstReportAfterTheOutageIsTakenAsIsAndPokesAgain`"
+      ],
+      [
+        "Runner bot down, desk running",
+        "no poke",
+        "the last poke's fee until `tObs + 600 s`, then flat",
+        "`test_PoolDKeepsItsLastOverrideUntilItsTtlThenFallsBackToFlat`"
+      ],
+      [
+        "A lagging RPC node makes the runner's poke simulation revert `DeskBlind`",
+        "the runner retries 3 times, 2 s apart, then skips that report",
+        "the next report is poked",
+        "\"waits 2 s and simulates again until the node catches up\", \"still DeskBlind after 3 retries\" (`bots/test/live/runner.test.ts`)"
+      ],
+      [
+        "Report delivered late but accepted",
+        "the override is anchored to `tObs`",
+        "ends at `tObs + 600 s`",
+        "`test_TtlIsAnchoredToTheObservation`"
+      ],
+      [
+        "Report with a future `tObs` (up to 30 s)",
+        "accepted; fresh until `tObs + 180 s`",
+        "the override never lasts more than 600 s",
+        "`test_AcceptsAReportExactlyMaxSkewAhead`, `test_TtlFromAFutureObservationNeverExceedsTheConfiguredTtl`"
+      ],
+      [
+        "Report more than 30 s ahead, or under 20 s after the last",
+        "rejected",
+        "unchanged",
+        "`test_RevertWhen_FromTheFuture`, `test_RevertWhen_TooSoon`"
+      ],
+      [
+        "Forged report (another forwarder or origin)",
+        "rejected",
+        "unchanged",
+        "`test_RevertWhen_NotTheForwarder`, `test_RevertWhen_SimOriginIsNotTheOperator`"
+      ],
+      [
+        "Fables lowers the hook's cap below the policy's (or raises its floor above)",
+        "a poke outside the new band reverts in the hook",
+        "the last override until it expires, then flat",
+        "`test_PokeAboveALoweredHookCapReverts` (fork, cap lowered to 3,000 pips)"
+      ],
+      [
+        "Fables revokes FEE_POKER from `ClimPoker`",
+        "every poke reverts",
+        "the last override until it expires, then flat",
+        "`test_RevokedRoleStopsPokes`, `test_RevocationStopsEveryPoke`"
+      ],
+      [
+        "Desk blind while Fables' keeper wants to post an event",
+        "`postEventAndPoke` reverts `DeskBlind`; `postEvent` alone records the event",
+        "the keeper pokes the hook directly meanwhile; the first poke after the desk is back sends `max(clim, event)`",
+        "`test_WhileBlindTheKeeperCanStillPostAnEvent`"
+      ],
+      [
+        "Chain reorganization",
+        "not covered by a test",
+        "`ClimPoker` reads the desk in the same transaction as it pokes (`_poke` calls `policy.quoteDirectional()`), so a poke never applies a report from another branch; a reorganized report or poke disappears with its block, the hook keeps what the canonical chain wrote, and the next report and poke rewrite it",
+        "code: `ClimPoker._poke`"
+      ]
+    ]
+  }
+}

@@ -1,0 +1,233 @@
+{
+  "generatedAt": "2026-10-07T13:47:44Z",
+  "source": "lab/scripts/fables_storm.py",
+  "chain": "Robinhood Chain",
+  "chainId": 4663,
+  "explorer": "https://robin.etherscan.io",
+  "hook": "0x06a889870c8f83640d6816319f72e2aa579b6080",
+  "poolId": "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551",
+  "pair": "ETH/USDG",
+  "window": {
+    "start": 1791337200,
+    "end": 1791342600
+  },
+  "config": {
+    "floorPips": 100,
+    "flatPips": 700,
+    "capPips": 6000
+  },
+  "pokeTtlSec": 7200,
+  "keepers": [
+    "0x1b6a8808e1d26dba66ba11e52997803c43cad429"
+  ],
+  "pokes": [
+    {
+      "t": 1791338220,
+      "feePips": 1468,
+      "expiry": 1791345420,
+      "tx": "0x7c734b394a46d3d08d0a1e3fb70e52d940a55f63534bd0a1f1bb64ecf50fdb80"
+    },
+    {
+      "t": 1791338280,
+      "feePips": 2657,
+      "expiry": 1791345480,
+      "tx": "0x1c87d97cf8dcba9e35d1a4db6315f8444e32afa0b8d591f02c5be6abd2333652"
+    },
+    {
+      "t": 1791338340,
+      "feePips": 3638,
+      "expiry": 1791345540,
+      "tx": "0xe8650326203c9750e469b3258d70e7196c03ff6aa7b93a45955f08947307bb83"
+    },
+    {
+      "t": 1791338400,
+      "feePips": 6000,
+      "expiry": 1791345600,
+      "tx": "0xb2ea0b70b9ae1b68a4380dda510699e6e401c970717cf1db7bdc9be75fa69c77"
+    },
+    {
+      "t": 1791339360,
+      "feePips": 5327,
+      "expiry": 1791346560,
+      "tx": "0x8bf42fb9c95be5b7874e56e4937891f92799c0366b6c417f6291cf89db531f1f"
+    },
+    {
+      "t": 1791339420,
+      "feePips": 4671,
+      "expiry": 1791346620,
+      "tx": "0xe8864ed6b1d9ce80bfafb0a40dba7b100cedd150a9a04e0c9e9cacce4d33ba7c"
+    },
+    {
+      "t": 1791339540,
+      "feePips": 3773,
+      "expiry": 1791346740,
+      "tx": "0x1289d14b9cc51dc38513feed0d5105db4f0a85b0ccf8f28cf25b1824befc9fe4"
+    },
+    {
+      "t": 1791339600,
+      "feePips": 3104,
+      "expiry": 1791346800,
+      "tx": "0xc34262642bcfd1d2ebd8f7519a8fa92d9df40fa6c8f13821f7922071ad39287b"
+    },
+    {
+      "t": 1791339720,
+      "feePips": 2150,
+      "expiry": 1791346920,
+      "tx": "0x7997ebb0f545bf2227425a192d8cc4561499f7c13e03a50bffdb78f87cfe5c70"
+    },
+    {
+      "t": 1791339840,
+      "feePips": 3543,
+      "expiry": 1791347040,
+      "tx": "0x1fe58f5f72d472daadcf9c09142cb5c0f587e5b9b02458348f755d358dda1332"
+    },
+    {
+      "t": 1791339900,
+      "feePips": 2841,
+      "expiry": 1791347100,
+      "tx": "0x4055bcf6bcea2304a61cb628c8fdb0f68d184af9dfae3f125a27ea0a4c8fdba0"
+    },
+    {
+      "t": 1791339960,
+      "feePips": 2273,
+      "expiry": 1791347160,
+      "tx": "0xbbf759795cc6518fc84ec55c9a244d99754d27f50c2c85f5686667e5438c490c"
+    },
+    {
+      "t": 1791340080,
+      "feePips": 1468,
+      "expiry": 1791347280,
+      "tx": "0xb18310b4eb1bb3a09ad2cc01903563eaf3de40c8d336927a201eaee7c2fadc1b"
+    },
+    {
+      "t": 1791340500,
+      "feePips": 818,
+      "expiry": 1791347700,
+      "tx": "0xd231b09e5ce2a653f87d16fb95d3e6d75ef742aaead174c44bd6db6e77958098"
+    },
+    {
+      "t": 1791340560,
+      "feePips": 1468,
+      "expiry": 1791347760,
+      "tx": "0xeace9e4956aa93830c3e1dcf4b64b3b6dab24d1c82d7dc6338da5857f2c17b5f"
+    },
+    {
+      "t": 1791340981,
+      "feePips": 828,
+      "expiry": 1791348181,
+      "tx": "0x4f34e3c7e2ec8ebbce3ad64d41807c3325245c5e0fba7c70105e50bee422e7fd"
+    },
+    {
+      "t": 1791341040,
+      "feePips": 700,
+      "expiry": 1791348240,
+      "tx": "0xd6a91fedbea5c9781dbbbdde1faf514f1dfb91f89a489301e2942f52d84436c9"
+    },
+    {
+      "t": 1791342300,
+      "feePips": 814,
+      "expiry": 1791349500,
+      "tx": "0x9c5a72308ba55498140480fd8836703afe517ef11214e930a26df7d9fdb3440a"
+    },
+    {
+      "t": 1791342360,
+      "feePips": 700,
+      "expiry": 1791349560,
+      "tx": "0x0dfe3093353499a483c67796461f0f5a8a60958c493ecbfe0e59f62088be58cf"
+    }
+  ],
+  "steps": [
+    {
+      "t": 1791337200,
+      "feePips": 700
+    },
+    {
+      "t": 1791338220,
+      "feePips": 1468
+    },
+    {
+      "t": 1791338280,
+      "feePips": 2657
+    },
+    {
+      "t": 1791338340,
+      "feePips": 3638
+    },
+    {
+      "t": 1791338400,
+      "feePips": 6000
+    },
+    {
+      "t": 1791339360,
+      "feePips": 5327
+    },
+    {
+      "t": 1791339420,
+      "feePips": 4671
+    },
+    {
+      "t": 1791339540,
+      "feePips": 3773
+    },
+    {
+      "t": 1791339600,
+      "feePips": 3104
+    },
+    {
+      "t": 1791339720,
+      "feePips": 2150
+    },
+    {
+      "t": 1791339840,
+      "feePips": 3543
+    },
+    {
+      "t": 1791339900,
+      "feePips": 2841
+    },
+    {
+      "t": 1791339960,
+      "feePips": 2273
+    },
+    {
+      "t": 1791340080,
+      "feePips": 1468
+    },
+    {
+      "t": 1791340500,
+      "feePips": 818
+    },
+    {
+      "t": 1791340560,
+      "feePips": 1468
+    },
+    {
+      "t": 1791340981,
+      "feePips": 828
+    },
+    {
+      "t": 1791341040,
+      "feePips": 700
+    },
+    {
+      "t": 1791342300,
+      "feePips": 814
+    },
+    {
+      "t": 1791342360,
+      "feePips": 700
+    }
+  ],
+  "swaps": {
+    "n": 1699,
+    "minPips": 700,
+    "maxPips": 6000,
+    "aboveFlat": 1135,
+    "matchKeeperRule": 1699,
+    "top": {
+      "t": 1791338431,
+      "feePips": 6000,
+      "tx": "0x69a3dae618365dc82eb52943dd6e40d9604fba19cbb4d2d12bee0b0e4e029c65"
+    }
+  }
+}
