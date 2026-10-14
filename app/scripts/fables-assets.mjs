@@ -1,5 +1,5 @@
-// Fables' brand files the showcase uses (logo mark, fox-and-star logo, landing art, the USDG token mark, Louize and
-// Inter). They belong to Fables and are not committed: public/fables/ is gitignored. This script copies them from the
+// Fables' brand files the showcase uses (logo mark, fox-and-star logo, landing art, the USDG token mark, favicon and
+// apple-touch-icon, Louize and Inter). They belong to Fables and are not committed: public/fables/ is gitignored. This script copies them from the
 // brand kit downloaded to .local/ (fables.fi/brand, 2026-10-13) before a local run or a deploy from the maintainer's
 // machine; `--check` only verifies they are in place (run before `vercel deploy`).
 import { copyFileSync, existsSync, mkdirSync } from "node:fs";
@@ -15,6 +15,9 @@ export const FABLES_ASSETS = [
   ["assets/hero-bg.webp", "hero-bg.webp"],
   ["assets/illustrations_landing_unicorn-ledge.webp", "unicorn-ledge.webp"],
   ["assets/tokens_USDG.svg", "tokens_USDG.svg"],
+  // Fables' favicon (16, 32 and 48 px in one .ico) and its 180 px apple-touch-icon, served as fables.fi serves them.
+  ["assets/favicon.ico", "favicon.ico"],
+  ["assets/apple-touch-icon.png", "apple-touch-icon.png"],
   ["fonts/louize-display-medium.woff2", "fonts/louize-display-medium.woff2"],
   ["fonts/inter.woff2", "fonts/inter.woff2"],
 ];

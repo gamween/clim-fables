@@ -22,6 +22,11 @@ describe("fables-assets", () => {
     expect(copyAssets({ repoRoot, appRoot })).toBe(FABLES_ASSETS.length);
     expect(missingAssets(appRoot)).toEqual([]);
   });
+  it("includes Fables' favicon files, as fables.fi serves them", () => {
+    const dests = FABLES_ASSETS.map(([, d]) => d);
+    expect(dests).toContain("favicon.ico");
+    expect(dests).toContain("apple-touch-icon.png");
+  });
   it("refuses to run without the brand kit", () => {
     expect(() => copyAssets({ repoRoot: mkdtempSync(join(tmpdir(), "empty-")), appRoot: mkdtempSync(join(tmpdir(), "app-")) })).toThrow("missing in");
   });

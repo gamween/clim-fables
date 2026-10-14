@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { Callout, Caption, Code, DocsLayout, docsStyles, MdTable, Rule, Table } from "@/components/docs/Docs";
 import { LiveCompose, LiveRoles } from "@/components/integrate/LiveCompose";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -7,8 +6,6 @@ import { LIVE, sourcifyTestnet, testnetCode } from "@/lib/chain/deployments";
 import { FABLES } from "@/lib/chain/fables";
 import { shortAddress } from "@/lib/format";
 import { repoFile } from "@/lib/site";
-
-export const metadata: Metadata = { title: "Integrate" };
 
 const CONTRACTS = [
   ["RiskDeskV2", LIVE.riskDesk],

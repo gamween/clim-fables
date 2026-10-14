@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Callout, Caption, DocsLayout, docsStyles as s, MdTable, Rule, Table } from "@/components/docs/Docs";
 import { ForkRunChart } from "@/components/evidence/ForkRunChart";
@@ -11,8 +10,6 @@ import security from "@/generated/security.json";
 import { formatFeePct, formatInt } from "@/lib/format";
 import { inlineMd } from "@/lib/inlineMd";
 import { repoFile } from "@/lib/site";
-
-export const metadata: Metadata = { title: "Evidence" };
 
 const GAS_ROWS = [
   ["Desk report (CRE simulator, through the mock forwarder)", gas.deskReport],

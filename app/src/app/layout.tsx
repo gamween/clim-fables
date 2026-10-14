@@ -4,14 +4,20 @@ import { Footer } from "@/components/shell/Footer";
 import { Header } from "@/components/shell/Header";
 import { PromoToast } from "@/components/shell/PromoToast";
 import s from "@/components/shell/shell.module.css";
-import { BANNER_TEXT, SITE_NAME, SITE_URL } from "@/lib/site";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site";
 import "./globals.css";
 
+// Fables' head (fables.fi, index.html): one title on every route, its description, theme colour #100f0f, favicon.ico
+// (16, 32, 48 px) and a 180 px apple-touch-icon. The showcase's title and description name clim × Fables and say it is
+// not affiliated; no route sets a title of its own; nothing is indexed (public/robots.txt disallows every path too).
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
-  description: `${BANNER_TEXT}. Fables' live dynamic fee on Robinhood Chain next to clim's verifiable volatility desk, read only.`,
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
   robots: { index: false, follow: false },
+  icons: { icon: [{ url: "/favicon.ico", sizes: "16x16 32x32 48x48" }], apple: [{ url: "/apple-touch-icon.png" }] },
+  openGraph: { type: "website", siteName: SITE_NAME, title: SITE_TITLE, description: SITE_DESCRIPTION, url: SITE_URL },
+  twitter: { card: "summary", title: SITE_TITLE, description: SITE_DESCRIPTION },
 };
 
 export const viewport: Viewport = { themeColor: "#100f0f", colorScheme: "dark" };

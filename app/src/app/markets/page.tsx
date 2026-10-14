@@ -1,10 +1,7 @@
-import type { Metadata } from "next";
 import { MarketsHeadStats } from "@/components/markets/MarketsHeadStats";
 import { MarketsTable } from "@/components/markets/MarketsTable";
 import { Card } from "@/components/ui/kit";
 import p from "@/components/pages.module.css";
-
-export const metadata: Metadata = { title: "Markets" };
 
 export default function MarketsPage() {
   return (

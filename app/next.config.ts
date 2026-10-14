@@ -34,6 +34,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    // Fables' favicon files at the paths fables.fi serves them; the files are Fables' (public/fables, gitignored).
+    return [
+      { source: "/favicon.ico", destination: "/fables/favicon.ico" },
+      { source: "/apple-touch-icon.png", destination: "/fables/apple-touch-icon.png" },
+    ];
+  },
   async redirects() {
     // The spec named the pool page /pool/eth-usdg; the app mirrors Fables' route, /markets/eth.
     return [{ source: "/pool/eth-usdg", destination: "/markets/eth", permanent: false }];

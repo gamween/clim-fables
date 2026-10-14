@@ -6,7 +6,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Banner } from "@/components/shell/Banner";
 import { Brand, NoWalletPill } from "@/components/shell/Header";
-import { BANNER_TEXT, NO_WALLET_TEXT, ROUTES } from "@/lib/site";
+import { metadata } from "@/app/layout";
+import { BANNER_TEXT, FABLES_TITLE, NO_WALLET_TEXT, ROUTES, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/site";
 import { RPC_URLS } from "@/lib/rpc";
 
 const APP = join(__dirname, "..");
@@ -84,5 +85,30 @@ describe("identity", () => {
   });
   it("lists every route the guardrail checks visit", () => {
     expect(ROUTES).toEqual(["/", "/markets", "/markets/eth", "/markets/d", "/markets/k", "/markets/f", "/integrate", "/evidence", "/run", "/credits"]);
+  });
+});
+
+describe("titles, indexing and icons", () => {
+  it("mirrors Fables' title with clim × Fables in place of Fables, everywhere a title is published", () => {
+    expect(FABLES_TITLE).toBe("Fables - Dynamic fee ve(3,3) exchange on Uniswap v4");
+    expect(SITE_TITLE).toBe(`${SITE_NAME} - Dynamic fee ve(3,3) exchange on Uniswap v4`);
+    expect(metadata.title).toBe(SITE_TITLE);
+    const og = metadata.openGraph as { title?: string; siteName?: string; description?: string };
+    const tw = metadata.twitter as { title?: string; description?: string };
+    for (const t of [og.title, og.siteName, tw.title]) expect(String(t).startsWith(SITE_NAME)).toBe(true);
+    expect(SITE_DESCRIPTION.endsWith(" Showcase by clim, not affiliated with Fables.")).toBe(true);
+    for (const d of [metadata.description, og.description, tw.description]) expect(d).toBe(SITE_DESCRIPTION);
+  });
+  it("sets no page title of its own, so every route carries the site title as on Fables", () => {
+    const pages = sourceFiles(join(APP, "src/app")).filter((f) => /page\.tsx$/.test(f) && readFileSync(f, "utf8").match(/\btitle\s*:/));
+    expect(pages).toEqual([]);
+  });
+  it("asks every crawler to stay out", () => {
+    expect(metadata.robots).toEqual({ index: false, follow: false });
+    expect(readFileSync(join(APP, "public/robots.txt"), "utf8")).toBe("User-agent: *\nDisallow: /\n");
+  });
+  it("uses Fables' favicon files, at Fables' paths", () => {
+    expect(metadata.icons).toEqual({ icon: [{ url: "/favicon.ico", sizes: "16x16 32x32 48x48" }], apple: [{ url: "/apple-touch-icon.png" }] });
+    expect(readdirSync(join(APP, "src/app")).filter((f) => /^(icon|apple-icon|favicon)\./.test(f))).toEqual([]);
   });
 });

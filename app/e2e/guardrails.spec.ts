@@ -1,7 +1,9 @@
 // Every route keeps the showcase guardrails (CLAUDE.md, spec §5.5): the permanent banner, "clim × Fables" in the nav,
 // the inert wallet pill and no "Connect", and pages that only ever read the chain.
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { BANNER_TEXT, NO_WALLET_TEXT, ROUTES } from "../src/lib/site";
+import { BANNER_TEXT, NO_WALLET_TEXT, ROUTES, SITE_NAME, SITE_TITLE } from "../src/lib/site";
 
 /** JSON-RPC methods the app may send: reads only. */
 const READ_METHODS = new Set(["eth_call", "eth_getLogs", "eth_blockNumber", "eth_getBlockByNumber", "eth_chainId"]);
@@ -20,7 +22,15 @@ for (const route of [...ROUTES, "/no-such-page"]) {
       for (const call of Array.isArray(body) ? body : [body]) methods.add(call.method);
     });
     await page.goto(route);
-    await expect(page).toHaveTitle(/clim × Fables/);
+    await expect(page).toHaveTitle(SITE_TITLE);
+    expect((await page.title()).startsWith(SITE_NAME)).toBe(true);
+    // Every robots meta says noindex (Next adds its own on the 404 next to the site's).
+    const robots = await page.locator('meta[name="robots"]').evaluateAll((els) => els.map((e) => e.getAttribute("content") ?? ""));
+    expect(robots.length).toBeGreaterThan(0);
+    for (const r of robots) expect(r).toMatch(/noindex/);
+    for (const sel of ['meta[property="og:title"]', 'meta[name="twitter:title"]', 'meta[property="og:site_name"]']) {
+      expect((await page.locator(sel).getAttribute("content"))?.startsWith(SITE_NAME), sel).toBe(true);
+    }
 
     const banner = page.locator('[data-guard="banner"]');
     await expect(banner).toBeVisible();
@@ -50,5 +60,18 @@ test("pool pages label their network", async ({ page }) => {
   for (const [route, network] of [["/markets/eth", "mainnet"], ["/markets/d", "testnet"], ["/markets/k", "testnet"], ["/markets/f", "testnet"]] as const) {
     await page.goto(route);
     await expect(page.locator(`[data-qa="pool-head"] [data-network="${network}"]`)).toBeVisible();
+  }
+});
+
+test("robots.txt and Fables' favicon files are served", async ({ request }) => {
+  // Fables' brand files are not in git (CI builds without them); a local build after `npm run fables-assets` and the
+  // deployment have them.
+  test.skip(!process.env.BASE_URL && !existsSync(join(__dirname, "../public/fables/favicon.ico")), "Fables' brand files are not in git");
+  const robots = await request.get("/robots.txt");
+  expect(await robots.text()).toBe("User-agent: *\nDisallow: /\n");
+  for (const path of ["/favicon.ico", "/apple-touch-icon.png"]) {
+    const res = await request.get(path);
+    expect(res.status(), path).toBe(200);
+    expect(res.headers()["content-type"], path).toMatch(/image\//);
   }
 });
