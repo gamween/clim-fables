@@ -228,7 +228,8 @@ Nothing in this stack keeps the Mac awake: sleep is the maintainer's (his Paulin
 
 ```bash
 cd bots && bun run live:status          # exit 0: healthy; exit 1 lists each PROBLEM (a job not running included)
-cd bots && bun run live:gas             # docs/evidence/gas-robinhood-testnet.json
+cd bots && bun run live:gas             # docs/evidence/gas-robinhood-testnet.json (gas per transaction and the desk's cadence)
+cd bots && bun run live:cost-doc        # docs/integrate/README.md "Gas and cost", from that file (--check: compare only)
 cd bots && bun run live:verify          # docs/evidence/live-check-<date>.json, PASS/FAIL per check
 cd bots && bun run live:outages         # one pass of the outage record now (the outages job runs one every 5 minutes)
 launchctl kickstart -k gui/$(id -u)/fi.clim-fables.runner   # restart one job now
