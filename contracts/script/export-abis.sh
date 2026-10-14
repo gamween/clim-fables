@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copies the ABIs that cre/, bots/ and app/ consume from Foundry artifacts to shared/abis/.
+# Copies the ABIs that cre/, bots/, app/ and docs/integrate/ consume from Foundry artifacts to shared/abis/.
 # Run from anywhere: contracts/script/export-abis.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -22,7 +22,8 @@ for artifact in \
   IPoolManager.sol/IPoolManager \
   IStateView.sol/IStateView \
   PoolSwapTest.sol/PoolSwapTest \
-  PoolModifyLiquidityTest.sol/PoolModifyLiquidityTest; do
+  PoolModifyLiquidityTest.sol/PoolModifyLiquidityTest \
+  AccessManager.sol/AccessManager; do
   name="${artifact##*/}"
   jq '.abi' "out/${artifact}.json" > "${OUT}/${name}.json"
   echo "${OUT}/${name}.json"
