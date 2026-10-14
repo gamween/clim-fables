@@ -2860,6 +2860,16 @@ describe("mergeOutages", () => {
     const w = mergeOutages(SNAP, [], 2000);
     expect(w[1]).toMatchObject({ from: 990, to: null, ongoing: true, source: "chain" });
   });
+  it("rebuilds a window recorded while ongoing from the chain, once, with the operator's reason", () => {
+    const open = { from: 990, to: null, durationSec: 60, seqBefore: 3, seqAfter: null, ongoing: true, reason: "processes stopped and restarted: desk" };
+    const snap: OutageSnapshot = { ...SNAP, chainTimeSec: 1050, windows: [...SNAP.windows, open] };
+    const closed = mergeOutages(snap, [{ seq: 4, tObs: 1500 }, { seq: 5, tObs: 1530 }], 1540);
+    expect(closed).toHaveLength(2);
+    expect(closed[1]).toEqual({ from: 990, to: 1500, durationSec: 510, seqBefore: 3, seqAfter: 4, ongoing: false, source: "chain", reason: open.reason });
+    const silent = mergeOutages(snap, [], 2000);
+    expect(silent).toHaveLength(2);
+    expect(silent[1]).toMatchObject({ from: 990, to: null, ongoing: true, source: "chain", reason: open.reason });
+  });
   it("reads the committed snapshot", () => {
     expect(snapshot.gapSec).toBe(90);
     expect(snapshot.windows.length).toBeGreaterThan(0);
@@ -2919,11 +2929,19 @@ export type OutageSnapshot = {
 
 export type ShownOutage = OutageWindow & { reason: string; source: "record" | "chain" };
 
+/** The recorder also writes the window still open when it ran (its `from` is snapshot.lastReport's tObs). That window is
+ *  not copied: the recomputation from lastReport rebuilds it from the chain (closed by the first new report, or still
+ *  ongoing), and it keeps the operator's reason. */
 export function mergeOutages(snapshot: OutageSnapshot, newReports: readonly ReportPoint[], nowSec: number): ShownOutage[] {
-  const recorded: ShownOutage[] = snapshot.windows.map((w) => ({ ...w, source: "record" }));
+  const recorded: ShownOutage[] = snapshot.windows.filter((w) => !w.ongoing).map((w) => ({ ...w, source: "record" }));
+  const openReason = new Map(snapshot.windows.filter((w) => w.ongoing).map((w) => [w.from, w.reason]));
   const series = [...(snapshot.lastReport ? [snapshot.lastReport] : []), ...[...newReports].sort((a, b) => a.seq - b.seq)];
   const live = outageWindows(series, { gapSec: snapshot.gapSec, nowSec }).map(
-    (w): ShownOutage => ({ ...w, source: "chain", reason: w.ongoing ? "ongoing: the desk has not reported since" : "measured on chain after the last recorded snapshot; no operator record" }),
+    (w): ShownOutage => ({
+      ...w,
+      source: "chain",
+      reason: openReason.get(w.from) ?? (w.ongoing ? "ongoing: the desk has not reported since" : "measured on chain after the last recorded snapshot; no operator record"),
+    }),
   );
   return [...recorded, ...live];
 }
@@ -2932,7 +2950,7 @@ export function mergeOutages(snapshot: OutageSnapshot, newReports: readonly Repo
 - [ ] **Step 5: Run them**
 
 Run: `cd app && npx vitest run src/lib/windowStats.test.ts src/lib/outages.test.ts`
-Expected: `Tests  7 passed (7)`.
+Expected: `Tests  8 passed (8)`.
 
 - [ ] **Step 6: Commit**
 

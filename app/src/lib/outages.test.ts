@@ -27,6 +27,16 @@ describe("mergeOutages", () => {
     const w = mergeOutages(SNAP, [], 2000);
     expect(w[1]).toMatchObject({ from: 990, to: null, ongoing: true, source: "chain" });
   });
+  it("rebuilds a window recorded while ongoing from the chain, once, with the operator's reason", () => {
+    const open = { from: 990, to: null, durationSec: 60, seqBefore: 3, seqAfter: null, ongoing: true, reason: "processes stopped and restarted: desk" };
+    const snap: OutageSnapshot = { ...SNAP, chainTimeSec: 1050, windows: [...SNAP.windows, open] };
+    const closed = mergeOutages(snap, [{ seq: 4, tObs: 1500 }, { seq: 5, tObs: 1530 }], 1540);
+    expect(closed).toHaveLength(2);
+    expect(closed[1]).toEqual({ from: 990, to: 1500, durationSec: 510, seqBefore: 3, seqAfter: 4, ongoing: false, source: "chain", reason: open.reason });
+    const silent = mergeOutages(snap, [], 2000);
+    expect(silent).toHaveLength(2);
+    expect(silent[1]).toMatchObject({ from: 990, to: null, ongoing: true, source: "chain", reason: open.reason });
+  });
   it("reads the committed snapshot", () => {
     expect(snapshot.gapSec).toBe(90);
     expect(snapshot.windows.length).toBeGreaterThan(0);

@@ -16,11 +16,19 @@ export type OutageSnapshot = {
 
 export type ShownOutage = OutageWindow & { reason: string; source: "record" | "chain" };
 
+/** The recorder also writes the window still open when it ran (its `from` is snapshot.lastReport's tObs). That window is
+ *  not copied: the recomputation from lastReport rebuilds it from the chain (closed by the first new report, or still
+ *  ongoing), and it keeps the operator's reason. */
 export function mergeOutages(snapshot: OutageSnapshot, newReports: readonly ReportPoint[], nowSec: number): ShownOutage[] {
-  const recorded: ShownOutage[] = snapshot.windows.map((w) => ({ ...w, source: "record" }));
+  const recorded: ShownOutage[] = snapshot.windows.filter((w) => !w.ongoing).map((w) => ({ ...w, source: "record" }));
+  const openReason = new Map(snapshot.windows.filter((w) => w.ongoing).map((w) => [w.from, w.reason]));
   const series = [...(snapshot.lastReport ? [snapshot.lastReport] : []), ...[...newReports].sort((a, b) => a.seq - b.seq)];
   const live = outageWindows(series, { gapSec: snapshot.gapSec, nowSec }).map(
-    (w): ShownOutage => ({ ...w, source: "chain", reason: w.ongoing ? "ongoing: the desk has not reported since" : "measured on chain after the last recorded snapshot; no operator record" }),
+    (w): ShownOutage => ({
+      ...w,
+      source: "chain",
+      reason: openReason.get(w.from) ?? (w.ongoing ? "ongoing: the desk has not reported since" : "measured on chain after the last recorded snapshot; no operator record"),
+    }),
   );
   return [...recorded, ...live];
 }
