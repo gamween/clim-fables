@@ -207,8 +207,8 @@ The six long-running processes run on the maintainer's Mac as launchd LaunchAgen
 
 | Job | What it runs (from `bots/`, absolute paths in the plist) | Log in `bots/out/logs/` | Expected output |
 |---|---|---|---|
-| `fi.clim-fables.desk` | `bun src/live/desk-loop.ts --target rh-testnet-settings --cre-bin <cre>` (CRE loop + recorder) | `desk.log` | the loop's `=== <time>` and `[USER LOG]` lines, then `[desk] run <time>: applied tx 0x... seq <n> sigma5 <x> dev <y> gas <g>` every 30 s |
-| `fi.clim-fables.runner` | `bun src/live/runner.ts` | `runner.log` | `[runner] seq <n> poked <f01>/<f10> pips, tx 0x..., gas <g>` after each report |
+| `fi.clim-fables.desk` | `bun src/live/desk-loop.ts --target rh-testnet-settings --cre-bin <cre>` (CRE loop + recorder) | `desk.log` | the loop's `=== <time>` and `[USER LOG]` lines, `pace: tObs <t>, start-up <s> s (median <m> s), next run <time>`, then `[desk] run <time>: applied tx 0x... seq <n> sigma5 <x> dev <y> gas <g>` every 30 s |
+| `fi.clim-fables.runner` | `bun src/live/runner.ts` | `runner.log` | at start `[runner] last poked seq on chain: <n> (...)`, then `[runner] seq <n> poked <f01>/<f10> pips, tx 0x..., gas <g>` after each report |
 | `fi.clim-fables.keeper` | `bun src/live/keeper.ts` | `keeper.log` | `[keeper] sigma5 <x>%/yr -> K fee <f> pips (TTL 7200 s), tx 0x...` about every 180 s |
 | `fi.clim-fables.arb` | `bun src/live/arb.ts` | `arb.log` | `[arb] <pool> pool <p> vs <m> (fee <f>) -> buyEth tx 0x...` when a pool leaves its band |
 | `fi.clim-fables.noise` | `bun src/live/noise.ts` | `noise.log` | `[noise] buyEth $<usd> on D (fee <f> pips) tx 0x...`, the same order on K and F |
@@ -240,7 +240,8 @@ cd bots && bun run live:uninstall       # stop every job and remove the plists (
 ### 8.5 Troubleshooting
 
 - `desk report age > 90 s`: the CRE loop is down or failing; `bun run live:logs desk` and `bots/out/desk-sim/*.log` show why. Credential checks against the CRE API fail now and then (friction log row 24); the loop recovers by itself. After `tauKillSec` (180 s) without a report the policy is blind: the runner stops poking and pool D returns to its flat 7 bp when its last 600 s override ends (8.6).
-- `D fee != last poke`: another FEE_POKER key poked D, or a poke reverted; `bots/out/runner-rh.jsonl` has the error.
+- `desk report age` around 60 s, or `clim: no report (<n> s since the last report < 20 s)` in `desk.log`: two reports less than 20 s apart (the desk's `MIN_GAP`). The loop paces each run on the last report's `tObs` (the `pace:` line after each run), so this happens only on the first run after the desk job starts, which has no `tObs` to pace on yet (it reads the last one and the next run starts about 30 s after it). A slow CLI start-up (the `start-up <s> s` of the `pace:` line; 1 s on an idle Mac, up to 39 s measured under load) delays that run's report and never makes the next one fail.
+- `D fee != last poke`: another FEE_POKER key poked D, or a poke reverted; `bots/out/runner-rh.jsonl` has the error (and, since 2026-10-14, each poke's `gasLimit`: its estimate plus 20 %). A restarted runner reads its last poked seq from ClimPoker's `Poked` events (the last 6,000 blocks) and never pokes that report again.
 - `job <name> not running` or `bot <name> silent`: `bun run live:logs <name>` shows the last error; launchd restarts an exited job 30 s after its last start; `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>` restarts it now. `job <name> not loaded`: `bun run live:install <name>`.
 - A job exits again at once (`last exit 1` in `live:status`): a key missing from `bots/.env`, the CRE CLI logged out (`cre login`), or a moved repository or tool (`bun run live:install`).
 - RPC endpoint: every process and script of `bots/` (the runner, keeper, arbitrage and retail bots, the desk job's receipt reads, `live:status`, `live:verify`, `live:gas`, `live:outages`, `live:fund`) uses `RH_TESTNET_RPC_URL` from `bots/.env` when it is set, else the public `https://rpc.testnet.chain.robinhood.com`. The CRE workflow itself reads and writes through the URL in `cre/project.yaml`, which this variable does not change.

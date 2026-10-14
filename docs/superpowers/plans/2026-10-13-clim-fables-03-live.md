@@ -114,7 +114,7 @@ The running Sepolia v1 stack lives in another checkout, `/Users/fianso/Developme
 | `shared/src/outages.ts` (create) | Outage windows from consecutive `RiskReportedV2` reports, for the bots and plan 04's app |
 | `bots/src/live/lib/{supervise,supervisor,outages,launchd}.ts` (create) | Wake detection and backoff (pure), the supervised loop and local outage records, the outage scan state, the launchd plist generator |
 | `bots/src/live/scripts/{outages,launchd}.ts` (create) | `bots/out/outages.json` from the chain; install, uninstall, logs and print of the LaunchAgents |
-| `cre/scripts/sim-loop.sh` (modify) | `CRE_BIN`, the CRE CLI's absolute path for the launchd desk job |
+| `cre/scripts/sim-loop.sh` (modify), `cre/risk-desk/sim-loop.test.ts` (create) | `CRE_BIN`, the CRE CLI's absolute path for the launchd desk job; each run paced on the last report's `tObs` (the desk's 20 s `MIN_GAP`), and the test of that pacing |
 | `contracts/test/v2/Outage.t.sol` (create) | Pools D, K, F during an outage and after it |
 | `docs/runbook.md`, `cre/README.md`, `docs/feedback/cre-friction-log.md`, `docs/sessions/*.md` (modify) | Operations and records |
 
@@ -6921,6 +6921,7 @@ What the pools do when the whole Mac stops (asleep, offline, rebooting), asserte
 **Files:**
 - Create: `shared/src/outages.ts`, `bots/src/live/lib/supervise.ts`, `bots/src/live/lib/outages.ts`, `bots/src/live/lib/launchd.ts`, `bots/src/live/lib/supervisor.ts`, `bots/src/live/scripts/outages.ts`, `bots/src/live/scripts/launchd.ts`
 - Modify: `shared/src/index.ts`, `shared/package.json`, `bots/src/live/lib/runner.ts`, `bots/src/live/runner.ts`, `bots/src/live/keeper.ts`, `bots/src/live/arb.ts`, `bots/src/live/noise.ts`, `bots/src/live/desk-loop.ts`, `bots/src/live/scripts/status.ts`, `bots/package.json`, `cre/scripts/sim-loop.sh`
+- Create (added after go-live, 2026-10-14): `cre/risk-desk/sim-loop.test.ts`
 - Test: `shared/test/outages.test.ts`, `bots/test/live/supervise.test.ts`, `bots/test/live/outages.test.ts`, `bots/test/live/launchd.test.ts`, `bots/test/live/runner.test.ts`, `contracts/test/v2/Outage.t.sol`
 
 - [ ] **Step 1: Write the failing test of the outage windows**
@@ -7278,13 +7279,23 @@ describe("live:logs follows the logs in the foreground", () => {
 });
 ```
 
-Replace `bots/test/live/runner.test.ts` with (Task 19's two tests, then the runner's answer to a node of the load-balanced public RPC that simulates `poke()` before it has seen the report the runner just read):
+Replace `bots/test/live/runner.test.ts` with (Task 19's two tests, then the runner's answer to a node of the load-balanced public RPC that simulates `poke()` before it has seen the report the runner just read, then, added after go-live on 2026-10-14, the last poked seq a restarted runner reads from the chain and the gas margin of a poke):
 
 ```ts
 import { describe, expect, test } from "bun:test";
 import { climPokerAbi, FeeMode } from "@clim/shared";
 import { ContractFunctionExecutionError, ContractFunctionRevertedError } from "viem";
-import { POKE_LAG_DELAY_MS, POKE_LAG_RETRIES, pokeDecision, simulatePoke } from "../../src/live/lib/runner";
+import {
+  lastPokedSeqFrom,
+  POKE_GAS_MARGIN_PCT,
+  POKE_LAG_DELAY_MS,
+  POKE_LAG_RETRIES,
+  POKED_LOOKBACK_BLOCKS,
+  pokeDecision,
+  readLastPokedSeq,
+  simulatePoke,
+  withGasMargin,
+} from "../../src/live/lib/runner";
 
 describe("when the runner pokes", () => {
   test("once per new desk report", () => {
@@ -7349,6 +7360,49 @@ describe("a fresh report the simulating RPC node has not seen yet", () => {
     await expect(simulatePoke(() => client.simulateContract(), r)).rejects.toThrow("nonce too low");
     expect(client.calls()).toBe(1);
     expect(r.sleeps).toEqual([]);
+  });
+});
+
+describe("a restarted runner", () => {
+  const poked = (seq: number) => ({ args: { seq } });
+  test("takes the highest seq of ClimPoker's Poked events as its last poked seq", () => {
+    expect(lastPokedSeqFrom([poked(99), poked(100), poked(98)])).toBe(100);
+    expect(lastPokedSeqFrom([])).toBe(0);
+    expect(lastPokedSeqFrom([{ args: {} }])).toBe(0);
+  });
+  test("does not poke again the seq it poked before the restart (2026-10-14 09:33 UTC: seq 100 poked twice)", () => {
+    const last = lastPokedSeqFrom([poked(99), poked(100)]);
+    expect(pokeDecision(100, last, FeeMode.Normal)).toBe("wait");
+    expect(pokeDecision(101, last, FeeMode.Normal)).toBe("poke");
+  });
+  test("reads the Poked events of the last POKED_LOOKBACK_BLOCKS blocks, in getLogs ranges of at most 2,000 blocks", async () => {
+    const ranges: Array<[bigint, bigint]> = [];
+    const client = {
+      getBlockNumber: async () => 10_000n,
+      getLogs: async (a: { fromBlock: bigint; toBlock: bigint }) => {
+        ranges.push([a.fromBlock, a.toBlock]);
+        return a.toBlock === 10_000n ? [poked(140), poked(141)] : [poked(139)];
+      },
+    };
+    expect(await readLastPokedSeq(client, "0x99d6c4F74A2ad09471b1B4fd1F0aC68B099cbE07")).toBe(141);
+    expect(ranges[0]?.[0]).toBe(10_000n - POKED_LOOKBACK_BLOCKS + 1n);
+    expect(ranges.at(-1)?.[1]).toBe(10_000n);
+    expect(ranges.every(([a, b]) => b - a < 2_000n)).toBe(true);
+    // ten minutes at about 10 blocks a second: more than tauKill (180 s), after which the desk is blind and nothing is poked
+    expect(POKED_LOOKBACK_BLOCKS).toBe(6_000n);
+  });
+});
+
+describe("the gas limit of a poke", () => {
+  test("is the estimate plus 20 %, rounded up", () => {
+    expect(POKE_GAS_MARGIN_PCT).toBe(20);
+    expect(withGasMargin(100_000n)).toBe(120_000n);
+    expect(withGasMargin(77_837n)).toBe(93_405n);
+  });
+  test("covers a poke that rewrites changed fees after an estimate made on unchanged ones", () => {
+    // 2026-10-14 09:33 UTC: estimated (and limited) at 77,837 gas against seq 100's unchanged fees, mined after seq 101
+    // changed the quote: out of gas. Pokes with changed fees used 79,749 (median) to 79,817 (p90) gas that day.
+    expect(withGasMargin(77_837n) > 79_817n).toBe(true);
   });
 });
 ```
@@ -7714,13 +7768,15 @@ export function execForwarding(cmd: string, args: readonly string[], stdio: "inh
 }
 ```
 
-Replace `bots/src/live/lib/runner.ts` with (the poke simulation retried after a fresh read, `simulatePoke`):
+Replace `bots/src/live/lib/runner.ts` with (the poke simulation retried after a fresh read, `simulatePoke`; the last poked seq read from ClimPoker's `Poked` events, `readLastPokedSeq`, and the 20 % gas margin, `withGasMargin`, both added after go-live):
 
 ```ts
-import { FeeMode } from "@clim/shared";
+import { climPokerAbi, FeeMode } from "@clim/shared";
+import type { Address } from "viem";
 import { shortError } from "../../lib/jsonl";
 import { withRetry, type RetryOptions } from "./retry";
 import { isDeskBlindError } from "./supervise";
+import { chunkedRanges } from "./tail";
 
 export type PokeDecision = "wait" | "poke" | "blind";
 
@@ -7740,12 +7796,47 @@ export const POKE_LAG_DELAY_MS = 2_000;
 export function simulatePoke<T>(simulate: () => Promise<T>, o: Pick<RetryOptions, "onRetry" | "sleep"> = {}): Promise<T> {
   return withRetry(simulate, { ...o, retries: POKE_LAG_RETRIES, delayMs: POKE_LAG_DELAY_MS, shouldRetry: (e) => isDeskBlindError(shortError(e)) });
 }
+
+/** How far back a restarted runner looks for its last poke: ten minutes at about 10 blocks a second. A report is poked
+ *  only while the desk is fresh (tauKill 180 s after its tObs), so a poke of the current seq is always this recent. */
+export const POKED_LOOKBACK_BLOCKS = 6_000n;
+
+/** The highest seq among ClimPoker's Poked events (0 for none). */
+export function lastPokedSeqFrom(logs: ReadonlyArray<{ args: { seq?: number } }>): number {
+  return logs.reduce((m, l) => Math.max(m, l.args.seq ?? 0), 0);
+}
+
+type PokedLogsClient = {
+  getBlockNumber(): Promise<bigint>;
+  getLogs(a: { address: Address; event: (typeof climPokerAbi)[1]; fromBlock: bigint; toBlock: bigint }): Promise<ReadonlyArray<{ args: { seq?: number } }>>;
+};
+
+/** The last seq poked through `poker`, read from its Poked events (indexed seq) over the last POKED_LOOKBACK_BLOCKS
+ *  blocks: a restarted runner keeps no memory, and without this it pokes the current report a second time. */
+export async function readLastPokedSeq(client: PokedLogsClient, poker: Address): Promise<number> {
+  const head = await client.getBlockNumber();
+  const from = head >= POKED_LOOKBACK_BLOCKS ? head - POKED_LOOKBACK_BLOCKS + 1n : 0n;
+  let last = 0;
+  for (const [fromBlock, toBlock] of chunkedRanges(from, head)) {
+    last = Math.max(last, lastPokedSeqFrom(await client.getLogs({ address: poker, event: climPokerAbi[1], fromBlock, toBlock })));
+  }
+  return last;
+}
+
+/** Headroom on a poke's gas estimate. The estimate is made against the policy's quote at that moment; if the next
+ *  report changes the quote before the poke is mined, writing the new fees costs more gas than rewriting the same ones. */
+export const POKE_GAS_MARGIN_PCT = 20;
+
+/** `estimate` plus `pct` %, rounded up. */
+export function withGasMargin(estimate: bigint, pct: number = POKE_GAS_MARGIN_PCT): bigint {
+  return (estimate * BigInt(100 + pct) + 99n) / 100n;
+}
 ```
 
 - [ ] **Step 8: Run the tests**
 
 Run: `cd bots && bun test test/live/supervise.test.ts test/live/outages.test.ts test/live/launchd.test.ts test/live/runner.test.ts`
-Expected: `28 pass` (supervise 7, outages 5, launchd 11, runner 5; the `plutil -lint` test runs on macOS only and prints `OK`; the orphan test starts `sleep 30` under a child bun and checks that SIGTERM and SIGALRM to that bun end it).
+Expected: `33 pass` (supervise 7, outages 5, launchd 11, runner 10; the `plutil -lint` test runs on macOS only and prints `OK`; the orphan test starts `sleep 30` under a child bun and checks that SIGTERM and SIGALRM to that bun end it).
 
 - [ ] **Step 9: Write the supervised loop**
 
@@ -7883,6 +7974,8 @@ Replace `bots/src/live/runner.ts` with:
 // the desk re-read; failed ticks back off (2 s doubling to 60 s). A poke never carries a stale fee: ClimPoker reads the
 // policy when the transaction runs. A DeskBlind revert right after a fresh read is first taken as a lagging node of the
 // load-balanced public RPC: the simulation is retried 3 times, 2 s apart, before the skip is logged.
+// A restarted runner first reads the last poked seq from ClimPoker's Poked events, so it never pokes that report again;
+// each poke's gas limit is its estimate plus 20 %, so a poke mined after the next report changed the fees still has gas.
 // Usage: bun src/live/runner.ts     Log: bots/out/runner-rh.jsonl     Env: RUNNER_POLL_MS (default 2000)
 import { climFeePolicyAbi, climPokerAbi, FeeMode, riskDeskV2Abi } from "@clim/shared";
 import { join } from "node:path";
@@ -7892,7 +7985,7 @@ import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
 import { liveClient, liveWallet } from "./lib/chain";
 import { loadLiveDeployments } from "./lib/deployments";
 import { liveKey } from "./lib/env";
-import { POKE_LAG_DELAY_MS, POKE_LAG_RETRIES, pokeDecision, simulatePoke } from "./lib/runner";
+import { POKE_LAG_DELAY_MS, POKE_LAG_RETRIES, POKED_LOOKBACK_BLOCKS, pokeDecision, readLastPokedSeq, simulatePoke, withGasMargin } from "./lib/runner";
 import { isDeskBlindError } from "./lib/supervise";
 import { runSupervised } from "./lib/supervisor";
 
@@ -7901,6 +7994,7 @@ const client = liveClient();
 const wallet = liveWallet(liveKey("runner"));
 const logFile = join(OUT_DIR, "runner-rh.jsonl");
 let lastSeq = 0;
+let lastSeqRead = false;
 let blindLogged = false;
 
 async function readDesk() {
@@ -7914,6 +8008,12 @@ async function readDesk() {
 }
 
 async function tick(): Promise<void> {
+  if (!lastSeqRead) {
+    // once per process, before any poke: the seq this runner (or a previous instance) last poked
+    lastSeq = Math.max(lastSeq, await readLastPokedSeq(client, d.poker));
+    lastSeqRead = true;
+    console.log(`[runner] last poked seq on chain: ${lastSeq} (Poked events of the last ${POKED_LOOKBACK_BLOCKS} blocks)`);
+  }
   const [st, q] = await readDesk();
   const seq = st[6];
   const base = { ts: new Date().toISOString(), seq, tObs: st[0], quote0For1: q[0], quote1For0: q[1], mode: q[2] };
@@ -7930,10 +8030,14 @@ async function tick(): Promise<void> {
   blindLogged = false;
   if (pokeDecision(seq, lastSeq, q[2]) !== "poke") return;
   try {
-    const { request } = await simulatePoke(() => client.simulateContract({ account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" }), {
-      onRetry: (_e, n) => console.log(`[runner] seq ${seq}: DeskBlind after a fresh read (a lagging RPC node), retry ${n}/${POKE_LAG_RETRIES} in ${POKE_LAG_DELAY_MS / 1_000} s`),
-    });
-    const hash = await wallet.writeContract(request);
+    const call = { account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" } as const;
+    const { request, gas } = await simulatePoke(
+      async () => ({ request: (await client.simulateContract(call)).request, gas: withGasMargin(await client.estimateContractGas(call)) }),
+      {
+        onRetry: (_e, n) => console.log(`[runner] seq ${seq}: DeskBlind after a fresh read (a lagging RPC node), retry ${n}/${POKE_LAG_RETRIES} in ${POKE_LAG_DELAY_MS / 1_000} s`),
+      },
+    );
+    const hash = await wallet.writeContract({ ...request, gas });
     const r = await client.waitForTransactionReceipt({ hash, timeout: 60_000 });
     const ev = parseEventLogs({ abi: climPokerAbi, eventName: "Poked", logs: r.logs })[0]?.args;
     appendJsonl(logFile, {
@@ -7943,6 +8047,7 @@ async function tick(): Promise<void> {
       status: r.status,
       block: r.blockNumber,
       gasUsed: r.gasUsed,
+      gasLimit: gas,
       effectiveGasPrice: r.effectiveGasPrice,
       fee0For1: ev?.fee0For1 ?? null,
       fee1For0: ev?.fee1For0 ?? null,
@@ -8283,41 +8388,196 @@ runSupervised({
 
 Under launchd the desk job gets the CRE CLI's absolute path as `--cre-bin`, which the recorder passes to the loop script as `CRE_BIN`.
 
+The loop paces each run on the last report's `tObs`, not on the previous run's start (added after go-live, 2026-10-14): a report's `tObs` is the clock when the simulator fires the trigger, after the CLI's start-up, and that start-up varied from 1 to 39 s per run between 09:22 and 09:32 UTC under load. Paced on run starts, a fast start after a slow one observed less than `MIN_GAP` (20 s) after the last report, the workflow skipped it, and the desk reported every 60 s. The next run now starts 30 s after the last `tObs` minus the median start-up of the last five runs, never less than `MIN_GAP` + 2 s after it.
+
 Replace `cre/scripts/sim-loop.sh` with:
 
 ```bash
 #!/usr/bin/env bash
-# Runs the clim risk desk in local CRE simulation every INTERVAL seconds (default 30).
+# Runs the clim risk desk in local CRE simulation, one report every INTERVAL seconds (default 30).
 # Builds the WASM once, then reuses it with --wasm, so runs do not recompile.
 # Usage (from cre/): [ENV_FILE=.env.replay] [CRE_BIN=/absolute/path/to/cre] scripts/sim-loop.sh <target> [--broadcast]
 # ENV_FILE: the .env file holding CRE_ETH_PRIVATE_KEY, passed to the CLI as -e (unset: the CLI's own cre/.env).
 # CRE_BIN: the CRE CLI to run (unset: `cre` from PATH); the launchd desk job passes the absolute path (plan 03 Task 23).
 # The replay desk has its own operator key in cre/.env.replay (plan 01 Task 18).
 # Output: full log in cre/logs/, USER LOG lines echoed to the terminal. Stop with Ctrl+C.
-set -euo pipefail
-cd "$(dirname "$0")/.."
-# The CLI prints local time labeled "Z" (friction row 19): run it in UTC so transcripts match block times.
-export TZ=UTC
-TARGET="${1:?usage: scripts/sim-loop.sh <target> [--broadcast]}"
-BROADCAST="${2:-}"
-INTERVAL="${INTERVAL:-30}"
-ENV_FILE="${ENV_FILE:-}"
-CRE="${CRE_BIN:-cre}"
-# Absolute path: simulate resolves a relative --wasm from the workflow folder (risk-desk/), build -o from here.
-WASM="$PWD/risk-desk/binary.wasm"
-mkdir -p logs
-LOG="logs/sim-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET}${BROADCAST:+-broadcast}.log"
-"$CRE" workflow build ./risk-desk -o "$WASM"
-echo "target=${TARGET} broadcast=${BROADCAST:-no} env=${ENV_FILE:-.env} interval=${INTERVAL}s cre=${CRE} log=${LOG}"
-while true; do
-  START=$(date +%s)
-  echo "=== $(date -u +%FT%TZ)" | tee -a "$LOG"
-  "$CRE" workflow simulate risk-desk --wasm "$WASM" --non-interactive --trigger-index 0 \
-    --target "$TARGET" ${BROADCAST} ${ENV_FILE:+-e "$ENV_FILE"} 2>&1 | tee -a "$LOG" | grep -E "USER LOG|rror|✗" || true
-  ELAPSED=$(( $(date +%s) - START ))
-  if (( ELAPSED < INTERVAL )); then sleep $(( INTERVAL - ELAPSED )); fi
-done
+# Pacing: a report's tObs is the clock when the simulator fires the trigger, after the CLI's start-up (1 s on an idle
+# Mac; 1 to 39 s measured on 2026-10-14 under load), and the desk rejects a tObs less than MIN_GAP (20 s) after the
+# last one. So the next run starts INTERVAL after the last report's tObs minus the median start-up of the last five
+# runs, never less than MIN_GAP + 2 s after that tObs: a fast start after a slow one can no longer fall inside MIN_GAP.
+
+# RiskDeskV2.MIN_GAP (contracts/src/v2/RiskDeskV2.sol; the workflow skips such a report before sending it).
+MIN_GAP=20
+
+# anchor_tobs <file of the run's USER LOG lines>: the tObs the next report must clear. The run's own tObs if it sent a
+# report, else the desk's last tObs as the run read it; nothing if the run printed neither.
+anchor_tobs() {
+  if grep -q "Write report transaction succeeded" "$1"; then
+    sed -nE 's/.*consensus: .* tObs=([0-9]+).*/\1/p' "$1" | tail -n 1
+  else
+    sed -nE 's/.*desk before: seq=[0-9]+ tObs=([0-9]+).*/\1/p' "$1" | tail -n 1
+  fi
+}
+
+# startup_sec <run start, epoch s> <file>: the run's tObs minus its start (nothing without a consensus line).
+startup_sec() {
+  local t
+  t=$(sed -nE 's/.*consensus: .* tObs=([0-9]+).*/\1/p' "$2" | tail -n 1)
+  if [[ -n "$t" ]]; then echo $(( t - $1 )); fi
+}
+
+# median_of <n>...: the median (the lower one of an even count); nothing for no argument.
+median_of() {
+  if (( $# > 0 )); then printf '%s\n' "$@" | sort -n | awk '{ v[NR] = $1 } END { print v[int((NR + 1) / 2)] }'; fi
+}
+
+# next_start <run start> <anchor tObs or ""> <lead> <interval> <min gap>: when the next run starts (epoch s).
+# anchor + interval - lead, the lead capped to [0, interval - min gap - 2], so the next tObs (never before its run's start)
+# is at least min gap + 2 s after the anchor. Without an anchor: interval after this run's start.
+next_start() {
+  local start=$1 anchor=$2 lead=$3 interval=$4 min_gap=$5 max_lead
+  if [[ -z "$anchor" ]]; then echo $(( start + interval )); return; fi
+  max_lead=$(( interval - min_gap - 2 ))
+  if (( max_lead < 0 )); then max_lead=0; fi
+  if (( lead > max_lead )); then lead=$max_lead; fi
+  if (( lead < 0 )); then lead=0; fi
+  echo $(( anchor + interval - lead ))
+}
+
+main() {
+  set -euo pipefail
+  cd "$(dirname "$0")/.."
+  # The CLI prints local time labeled "Z" (friction row 19): run it in UTC so transcripts match block times.
+  export TZ=UTC
+  local TARGET="${1:?usage: scripts/sim-loop.sh <target> [--broadcast]}"
+  local BROADCAST="${2:-}"
+  local INTERVAL="${INTERVAL:-30}"
+  local ENV_FILE="${ENV_FILE:-}"
+  local CRE="${CRE_BIN:-cre}"
+  # Absolute path: simulate resolves a relative --wasm from the workflow folder (risk-desk/), build -o from here.
+  local WASM="$PWD/risk-desk/binary.wasm"
+  mkdir -p logs
+  local LOG="logs/sim-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET}${BROADCAST:+-broadcast}.log"
+  local RUN
+  RUN=$(mktemp -t sim-loop)
+  trap 'rm -f "$RUN"' EXIT
+  "$CRE" workflow build ./risk-desk -o "$WASM"
+  echo "target=${TARGET} broadcast=${BROADCAST:-no} env=${ENV_FILE:-.env} interval=${INTERVAL}s cre=${CRE} log=${LOG}"
+  local START ANCHOR UP LEAD NEXT WAIT STARTUPS=""
+  while true; do
+    START=$(date +%s)
+    echo "=== $(date -u +%FT%TZ)" | tee -a "$LOG"
+    "$CRE" workflow simulate risk-desk --wasm "$WASM" --non-interactive --trigger-index 0 \
+      --target "$TARGET" ${BROADCAST} ${ENV_FILE:+-e "$ENV_FILE"} 2>&1 | tee -a "$LOG" | grep -E "USER LOG|rror|✗" | tee "$RUN" || true
+    ANCHOR=$(anchor_tobs "$RUN")
+    UP=$(startup_sec "$START" "$RUN")
+    if [[ -n "$UP" ]]; then STARTUPS=$(echo $STARTUPS "$UP" | awk '{ for (i = (NF > 5 ? NF - 4 : 1); i <= NF; i++) printf "%s ", $i }'); fi
+    LEAD=$(median_of $STARTUPS)
+    NEXT=$(next_start "$START" "$ANCHOR" "${LEAD:-0}" "$INTERVAL" "$MIN_GAP")
+    echo "pace: tObs ${ANCHOR:-unknown}, start-up ${UP:-unknown} s (median ${LEAD:-0} s), next run $(date -u -r "$NEXT" +%FT%TZ)" | tee -a "$LOG"
+    WAIT=$(( NEXT - $(date +%s) ))
+    if (( WAIT > 0 )); then sleep "$WAIT"; fi
+  done
+}
+
+# Run the loop when executed; sourcing only defines the functions above (cre/risk-desk/sim-loop.test.ts).
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi
 ```
+
+Create `cre/risk-desk/sim-loop.test.ts`:
+
+```ts
+import { describe, expect, test } from 'bun:test'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+// The pacing functions of cre/scripts/sim-loop.sh, called through bash (the script runs its loop only when executed,
+// not when sourced). macOS runs it with /bin/bash 3.2.
+const SCRIPT = join(import.meta.dir, '..', 'scripts', 'sim-loop.sh')
+const sh = (call: string): string => {
+	const r = Bun.spawnSync(['bash', '-c', `source "${SCRIPT}" && ${call}`])
+	if (r.exitCode !== 0) throw new Error(`bash exited ${r.exitCode}: ${r.stderr.toString()}`)
+	return r.stdout.toString().trim()
+}
+const transcript = (lines: string[]): string => {
+	const f = join(mkdtempSync(join(tmpdir(), 'sim-loop-')), 'run.log')
+	writeFileSync(f, lines.length > 0 ? `${lines.join('\n')}\n` : '')
+	return f
+}
+
+// The workflow's lines as the loop's filter keeps them (2026-10-14 runs on Robinhood Chain testnet).
+const APPLIED = [
+	'2026-10-14T09:34:16Z [USER LOG] node: estimator=venue-range sources=coinbase,kraken,binance,hyperliquid n=4 tEnd=1791970380 sigma5=27.7% sigma15=27.3% disp=6bp mid=2497.37 (tickers)',
+	'2026-10-14T09:34:17Z [USER LOG] consensus: sigma5=27.7%/yr sigma15=27.3%/yr sigma5E9=49415 sigma15E9=48604 n=4 disp=6bp venue=2497.37 pool=2497.72 dev=-138pips tObs=1791970456',
+	'2026-10-14T09:34:17Z [USER LOG] desk before: seq=102 tObs=1791970429 sigma5=28.5%/yr dev=390 flags=0',
+	'2026-10-14T09:34:19Z [USER LOG] Write report transaction succeeded: 0x85e94b619908bd8e0cc9efa764a8ab1e6232c12bd8a6d2d78a7dd98df331bb00',
+	'2026-10-14T09:34:19Z [USER LOG] REPORT applied seq=103 sigma5Reported=27.7% sigma5Applied=27.7% dev=-138 flags=0 tx=0x85e94b619908bd8e0cc9efa764a8ab1e6232c12bd8a6d2d78a7dd98df331bb00',
+]
+const SKIPPED = [
+	'2026-10-14T09:35:18Z [USER LOG] consensus: sigma5=26.8%/yr sigma15=27.9%/yr sigma5E9=47704 sigma15E9=49749 n=4 disp=6bp venue=2495.55 pool=2497.72 dev=-867pips tObs=1791970517',
+	'2026-10-14T09:35:18Z [USER LOG] desk before: seq=104 tObs=1791970500 sigma5=26.8%/yr dev=-239 flags=0',
+	'2026-10-14T09:35:18Z [USER LOG] clim: no report (17 s since the last report < 20 s)',
+]
+
+describe('the tObs the next report must clear', () => {
+	test("a run that sent a report: that report's tObs", () => {
+		expect(sh(`anchor_tobs "${transcript(APPLIED)}"`)).toBe('1791970456')
+	})
+	test("a run that sent nothing: the desk's last tObs as the run read it", () => {
+		expect(sh(`anchor_tobs "${transcript(SKIPPED)}"`)).toBe('1791970500')
+	})
+	test('a run that printed neither (CLI or network failure): none', () => {
+		expect(sh(`anchor_tobs "${transcript(['✗ Credential validation failed'])}"`)).toBe('')
+		expect(sh(`anchor_tobs "${transcript([])}"`)).toBe('')
+	})
+})
+
+describe("a run's start-up (its tObs minus the loop's start time)", () => {
+	test('from the consensus line', () => {
+		expect(sh(`startup_sec 1791970454 "${transcript(APPLIED)}"`)).toBe('2')
+		expect(sh(`startup_sec 1791970515 "${transcript(SKIPPED)}"`)).toBe('2')
+	})
+	test('none without a consensus line', () => {
+		expect(sh(`startup_sec 1791970454 "${transcript([])}"`)).toBe('')
+	})
+	test('the median of the last runs ignores one slow start', () => {
+		expect(sh('median_of 2 1 39 3 2')).toBe('2')
+		expect(sh('median_of 15')).toBe('15')
+		expect(sh('median_of')).toBe('')
+	})
+})
+
+describe('when the next run starts (interval 30 s, RiskDeskV2.MIN_GAP 20 s)', () => {
+	test('30 s after the last tObs, minus the expected start-up: one report every 30 s', () => {
+		expect(sh('next_start 1000 1002 2 30 20')).toBe('1030') // start-up 2 s: the next tObs lands at 1032
+	})
+	test('a fast start after a slow one still clears MIN_GAP (the 09:22 to 09:32 UTC skips)', () => {
+		// 2026-10-14 09:30:59: start-up 39 s (tObs = start + 39); the next run started on finishing, 4 s later, and its
+		// tObs came 9 s after: "no report (9 s since the last report < 20 s)". Now it waits for anchor + 30 - lead.
+		const start = 1_000
+		const anchor = start + 39
+		for (const lead of [0, 2, 8, 39]) {
+			const next = Number(sh(`next_start ${start} ${anchor} ${lead} 30 20`))
+			expect(next - anchor).toBeGreaterThanOrEqual(22) // any start-up >= 0 then gives a gap >= 22 s > MIN_GAP
+		}
+	})
+	test('the lead is capped at interval - MIN_GAP - 2 s', () => {
+		expect(sh('next_start 1000 1039 39 30 20')).toBe('1061')
+		expect(sh('next_start 1000 1039 -3 30 20')).toBe('1069')
+		expect(sh('next_start 1000 1039 5 21 20')).toBe('1060') // no room for a lead
+	})
+	test('no tObs read (the run failed): INTERVAL after this start, as before', () => {
+		expect(sh('next_start 1000 "" 2 30 20')).toBe('1030')
+	})
+	test('an old tObs (after a silence) gives a start in the past: the loop starts at once', () => {
+		expect(Number(sh('next_start 5000 1000 2 30 20'))).toBeLessThan(5000)
+	})
+})
+```
+
+Run: `cd cre/risk-desk && bun test sim-loop.test.ts`
+Expected: `11 pass`, `0 fail` (before the pacing functions exist, every test fails on `usage: scripts/sim-loop.sh <target> [--broadcast]`).
 
 Replace `bots/src/live/desk-loop.ts` with:
 
@@ -8826,8 +9086,8 @@ In `bots/package.json`, add after `"live:verify"` (`live:status` stays Task 22's
 
 - [ ] **Step 13: Run the whole suites, the typecheck and the plists**
 
-Run: `cd bots && bun test && bun run typecheck && cd ../shared && bun test && cd ../cre && bash -n scripts/sim-loop.sh && echo "sim-loop ok"`
-Expected: bots `0 fail` with 26 more tests than after Task 22 (122 in all), `tsc` exits 0, shared `0 fail` (77), then `sim-loop ok`.
+Run: `cd bots && bun test && bun run typecheck && cd ../shared && bun test && cd ../cre && bash -n scripts/sim-loop.sh && echo "sim-loop ok" && cd risk-desk && bun test`
+Expected: bots `0 fail` with 31 more tests than after Task 22 (127 in all), `tsc` exits 0, shared `0 fail` (77), then `sim-loop ok`, then the CRE suite `0 fail` (59, of which 11 in `sim-loop.test.ts`).
 
 Then print the six plists without installing anything, and lint them:
 
