@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-10-14T07:11:59Z",
+  "source": "lab/scripts/export_keeper_map.py",
+  "what": "Fee of the keeper-style twin (pool K) by 5-minute volatility: the median fee Fables' keeper posted on its ETH/USDG pool in each volatility bin, 2026-09-07 to 2026-10-12. An imitation of the observed pattern, not Fables' code.",
+  "sigma": "RV over 300 s from 5 s returns of Binance ETHUSDT 1 s, as each poke was posted (lab estimator)",
+  "pokes": 5088,
+  "edgesPctYr": [
+    0,
+    20,
+    30,
+    40,
+    50,
+    60,
+    80,
+    100,
+    150,
+    200
+  ],
+  "medianFeePips": [
+    700,
+    700,
+    811,
+    1016,
+    1466,
+    2272,
+    3357,
+    4237,
+    5004,
+    4893
+  ],
+  "samples": [
+    5,
+    210,
+    807,
+    1021,
+    889,
+    1127,
+    608,
+    364,
+    45,
+    12
+  ],
+  "feePips": [
+    700,
+    700,
+    811,
+    1016,
+    1466,
+    2272,
+    3357,
+    4237,
+    5004,
+    5004
+  ],
+  "clampPips": [
+    700,
+    6000
+  ],
+  "postEverySec": 179,
+  "ttlSec": 7200
+}

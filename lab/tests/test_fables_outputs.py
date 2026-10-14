@@ -126,3 +126,19 @@ def test_estimator_output():
     assert d["estimators"]["binance-1s"]["corrWithBinance1s"] == pytest.approx(1.0)
     assert any("favours binance-1s" in c for c in d["caveats"])
     assert d["chosenEtaE4"] == d["estimators"][d["chosen"]]["etaE4"]
+
+
+def test_keeper_map():
+    p = SHARED_DIR / "keeper-map-fables.json"
+    if not p.exists():
+        pytest.skip("keeper-map-fables.json not generated yet")
+    d = json.loads(p.read_text())
+    n = len(d["edgesPctYr"])
+    assert n == len(d["feePips"]) == len(d["samples"]) == len(d["medianFeePips"])
+    assert d["edgesPctYr"][0] == 0 and d["edgesPctYr"] == sorted(d["edgesPctYr"])
+    assert all(700 <= f <= 6_000 for f in d["feePips"])
+    assert d["feePips"] == sorted(d["feePips"])  # monotone in volatility
+    assert sum(d["samples"]) == d["pokes"] > 1_000
+    assert 60 <= d["postEverySec"] <= 600
+    assert d["ttlSec"] == 7_200
+    assert "not Fables' code" in d["what"]
