@@ -1,4 +1,4 @@
-# CI for clim x Fables: contracts (Foundry), lab (Python, uv), TypeScript packages (Bun). No secret is needed: the
+# CI for clim x Fables: contracts (Foundry), lab (Python, uv), TypeScript packages (Bun), the showcase app (Node). No secret is needed:
 # fork suites skip without RH_MAINNET_RPC_URL / SEPOLIA_RPC_URL, and nothing here reads a key or sends a transaction.
 # Actions are pinned to full commit SHAs (the tag is in the comment).
 name: ci
@@ -91,3 +91,38 @@ jobs:
       - name: CRE workflow typecheck
         run: bun run typecheck
         working-directory: cre/risk-desk
+
+  app:
+    name: app (vitest, typecheck, lint, build, guardrails)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Synced copies match the repository
+        run: npm run sync:check
+      - name: Unit and guardrail tests
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Build (without Fables' brand files, which are not in git)
+        run: npm run build
+      - name: No wallet code in the bundle
+        run: npm run check:bundle
+      - name: Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Guardrails on every route (the pages read the public RPCs; nothing is sent)
+        run: npm run e2e:guardrails
