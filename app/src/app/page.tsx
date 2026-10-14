@@ -1,3 +1,5 @@
+import { Landing } from "@/components/landing/Landing";
+
 export default function Home() {
-  return <h1>clim × Fables</h1>;
+  return <Landing />;
 }
