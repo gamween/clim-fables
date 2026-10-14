@@ -4756,7 +4756,7 @@ Guardrail tests: no wallet dependency, no signing or sending code, public RPCs o
 ### Task 15: The step chart and the data hooks
 
 **Files:**
-- Create: `app/src/components/charts/scale.ts`, `scale.test.ts`, `chart.module.css`, `StepChart.tsx` (under `app/src/components/charts/`), `app/src/hooks/usePoll.ts`, `app/src/hooks/useLogHistory.ts`, `app/src/hooks/live.ts`
+- Create: `app/src/components/charts/scale.ts`, `scale.test.ts`, `chart.module.css`, `StepChart.tsx` (under `app/src/components/charts/`), `app/src/lib/chain/history.ts`, `history.test.ts` (under `app/src/lib/chain/`), `app/src/hooks/usePoll.ts`, `app/src/hooks/useLogHistory.ts`, `app/src/hooks/live.ts`
 
 - [ ] **Step 1: Write the failing test `app/src/components/charts/scale.test.ts`**
 
@@ -5149,15 +5149,98 @@ export function usePoll<T>(fn: () => Promise<T>, intervalMs: number, key = ""): 
 }
 ```
 
-- [ ] **Step 8: Write `app/src/hooks/useLogHistory.ts`**
+- [ ] **Step 8: Write the failing test `app/src/lib/chain/history.test.ts`**
 
 ```ts
-"use client";
-import { useRef } from "react";
-import type { PublicClient } from "viem";
-import { blockTime, firstBlockAtOrAfter } from "@/lib/chain/blockTimes";
-import { laggedHead, withRetry } from "@/lib/chain/retry";
-import { usePoll } from "./usePoll";
+import { describe, expect, it } from "vitest";
+import { type History, mergeHistory } from "./history";
+
+type Log = { block: bigint };
+
+/** One log per block; records every range read. */
+function fakeRead() {
+  const calls: [bigint, bigint][] = [];
+  const read = async (from: bigint, to: bigint): Promise<Log[]> => {
+    calls.push([from, to]);
+    const out: Log[] = [];
+    for (let b = from; b <= to; b++) out.push({ block: b });
+    return out;
+  };
+  return { calls, read };
+}
+
+/** A window that starts `span` blocks before the head, one second per block. */
+const bounds = (span: bigint) => async (toBlock: bigint) => ({ fromBlock: toBlock - span, toTs: Number(toBlock) });
+
+const blocks = (h: History<Log>) => h.items.map((x) => Number(x.block));
+const range = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
+
+describe("mergeHistory", () => {
+  it("reads the whole window on the first poll", async () => {
+    const r = fakeRead();
+    const h = await mergeHistory({ prev: null, toBlock: 100n, windowSec: 60, bounds: bounds(10n), read: r.read });
+    expect(r.calls).toEqual([[90n, 100n]]);
+    expect(h).toMatchObject({ fromBlock: 90n, toBlock: 100n, toTs: 100, windowSec: 60 });
+    expect(blocks(h)).toEqual(range(90, 100));
+  });
+
+  it("reads only the new blocks and drops the ones that left the window", async () => {
+    const r = fakeRead();
+    const first = await mergeHistory({ prev: null, toBlock: 100n, windowSec: 60, bounds: bounds(10n), read: r.read });
+    const h = await mergeHistory({ prev: first, toBlock: 105n, windowSec: 60, bounds: bounds(10n), read: r.read });
+    expect(r.calls).toEqual([[90n, 100n], [101n, 105n]]);
+    expect(blocks(h)).toEqual(range(95, 105));
+  });
+
+  it("keeps the last history when the head goes backwards, so no block is read twice", async () => {
+    // fallback() can answer from a node behind the previous poll's: 100, then 95, then 110.
+    const r = fakeRead();
+    const first = await mergeHistory({ prev: null, toBlock: 100n, windowSec: 60, bounds: bounds(10n), read: r.read });
+    let boundsCalls = 0;
+    const lagging = await mergeHistory({
+      prev: first,
+      toBlock: 95n,
+      windowSec: 60,
+      bounds: async (b) => {
+        boundsCalls++;
+        return bounds(10n)(b);
+      },
+      read: r.read,
+    });
+    expect(lagging).toBe(first);
+    expect(boundsCalls).toBe(0);
+    const h = await mergeHistory({ prev: lagging, toBlock: 110n, windowSec: 60, bounds: bounds(10n), read: r.read });
+    expect(r.calls).toEqual([[90n, 100n], [101n, 110n]]);
+    expect(blocks(h)).toEqual(range(100, 110));
+    expect(new Set(blocks(h)).size).toBe(h.items.length);
+  });
+
+  it("keeps the last history when the head has not moved", async () => {
+    const r = fakeRead();
+    const first = await mergeHistory({ prev: null, toBlock: 100n, windowSec: 60, bounds: bounds(10n), read: r.read });
+    expect(await mergeHistory({ prev: first, toBlock: 100n, windowSec: 60, bounds: bounds(10n), read: r.read })).toBe(first);
+    expect(r.calls).toEqual([[90n, 100n]]);
+  });
+
+  it("reads the whole window again when it starts before the last one", async () => {
+    const r = fakeRead();
+    const first = await mergeHistory({ prev: null, toBlock: 100n, windowSec: 60, bounds: bounds(10n), read: r.read });
+    const h = await mergeHistory({ prev: first, toBlock: 102n, windowSec: 60, bounds: bounds(20n), read: r.read });
+    expect(r.calls).toEqual([[90n, 100n], [82n, 102n]]);
+    expect(blocks(h)).toEqual(range(82, 102));
+  });
+});
+```
+
+- [ ] **Step 9: Run it**
+
+Run: `cd app && npx vitest run src/lib/chain/history.test.ts`
+Expected: FAIL, `./history` does not exist.
+
+- [ ] **Step 10: Write `app/src/lib/chain/history.ts`**
+
+```ts
+// One poll of a sliding log window (useLogHistory), kept pure so a head that goes backwards can be tested.
 
 export type History<T> = {
   items: T[];
@@ -5167,6 +5250,48 @@ export type History<T> = {
   toTs: number;
   windowSec: number;
 };
+
+type Merge<T> = {
+  prev: History<T> | null;
+  toBlock: bigint;
+  windowSec: number;
+  /** The window's first block and the head's timestamp, read only when the head moved forward. */
+  bounds: (toBlock: bigint) => Promise<{ fromBlock: bigint; toTs: number }>;
+  read: (fromBlock: bigint, toBlock: bigint) => Promise<T[]>;
+};
+
+/** The first poll reads the whole window, each next one only the blocks after the last head, and drops the items that
+ *  fell out of the window. The head comes from a fallback() over several RPCs, so a lagging node can return one below
+ *  the last poll's: the history then stays as it was, since moving it back would read those blocks a second time. */
+export async function mergeHistory<T extends { block: bigint }>(o: Merge<T>): Promise<History<T>> {
+  const { prev, toBlock } = o;
+  if (prev !== null && toBlock <= prev.toBlock) return prev;
+  const { fromBlock, toTs } = await o.bounds(toBlock);
+  const items =
+    prev === null || fromBlock < prev.fromBlock
+      ? await o.read(fromBlock, toBlock)
+      : [...prev.items, ...(await o.read(prev.toBlock + 1n, toBlock))];
+  return { items: items.filter((x) => x.block >= fromBlock), fromBlock, toBlock, toTs, windowSec: o.windowSec };
+}
+```
+
+- [ ] **Step 11: Run it**
+
+Run: `cd app && npx vitest run src/lib/chain/history.test.ts`
+Expected: PASS, 5 tests.
+
+- [ ] **Step 12: Write `app/src/hooks/useLogHistory.ts`**
+
+```ts
+"use client";
+import { useRef } from "react";
+import type { PublicClient } from "viem";
+import { blockTime, firstBlockAtOrAfter } from "@/lib/chain/blockTimes";
+import { type History, mergeHistory } from "@/lib/chain/history";
+import { laggedHead, withRetry } from "@/lib/chain/retry";
+import { usePoll } from "./usePoll";
+
+export type { History };
 
 type Options<T> = {
   key: string;
@@ -5180,25 +5305,23 @@ type Options<T> = {
 };
 
 /** Logs over a sliding time window whose first block is found exactly from block timestamps: the first call reads the
- *  whole window (in ranges the RPC accepts), each next one only the blocks since the last call, and drops the items
- *  that fell out of the window. */
+ *  whole window (in ranges the RPC accepts), each next one only the blocks since the last call (mergeHistory). */
 export function useLogHistory<T extends { block: bigint }>(o: Options<T>) {
   const state = useRef<{ key: string; history: History<T> | null }>({ key: o.key, history: null });
   return usePoll<History<T>>(
     async () => {
       if (state.current.key !== o.key) state.current = { key: o.key, history: null };
       const client = o.client();
-      const toBlock = laggedHead(await withRetry(() => client.getBlockNumber({ cacheTime: 0 })));
-      const toTs = await blockTime(client, toBlock);
-      const fromBlock = await firstBlockAtOrAfter(client, toTs - o.windowSec - o.lookbackSec, toBlock, toTs, o.minBlockSec);
-      const prev = state.current.history;
-      let items: T[];
-      if (prev === null || fromBlock < prev.fromBlock) {
-        items = await o.read(client, fromBlock, toBlock);
-      } else {
-        items = toBlock > prev.toBlock ? [...prev.items, ...(await o.read(client, prev.toBlock + 1n, toBlock))] : prev.items;
-      }
-      const next = { items: items.filter((x) => x.block >= fromBlock), fromBlock, toBlock, toTs, windowSec: o.windowSec };
+      const next = await mergeHistory({
+        prev: state.current.history,
+        toBlock: laggedHead(await withRetry(() => client.getBlockNumber({ cacheTime: 0 }))),
+        windowSec: o.windowSec,
+        bounds: async (toBlock) => {
+          const toTs = await blockTime(client, toBlock);
+          return { fromBlock: await firstBlockAtOrAfter(client, toTs - o.windowSec - o.lookbackSec, toBlock, toTs, o.minBlockSec), toTs };
+        },
+        read: (fromBlock, toBlock) => o.read(client, fromBlock, toBlock),
+      });
       state.current = { key: o.key, history: next };
       return next;
     },
@@ -5208,7 +5331,7 @@ export function useLogHistory<T extends { block: bigint }>(o: Options<T>) {
 }
 ```
 
-- [ ] **Step 9: Write `app/src/hooks/live.ts`**
+- [ ] **Step 13: Write `app/src/hooks/live.ts`**
 
 ```ts
 "use client";
@@ -5276,15 +5399,15 @@ export const usePoolSwaps = (pool: LivePoolName, windowSec: number) =>
   });
 ```
 
-- [ ] **Step 10: Typecheck and lint**
+- [ ] **Step 14: Typecheck and lint**
 
 Run: `cd app && npm run typecheck && npm run lint`
 Expected: exit 0, no ESLint output.
 
-- [ ] **Step 11: Commit**
+- [ ] **Step 15: Commit**
 
 ```bash
-git add app/src/components/charts app/src/hooks/usePoll.ts app/src/hooks/useLogHistory.ts app/src/hooks/live.ts
+git add app/src/components/charts app/src/lib/chain/history.ts app/src/lib/chain/history.test.ts app/src/hooks/usePoll.ts app/src/hooks/useLogHistory.ts app/src/hooks/live.ts
 git commit -m "feat(app): Fables-style step chart, polling and sliding log windows read incrementally"
 ```
 
