@@ -3,7 +3,8 @@
 // Outages (plan 03 Task 23): a blind desk is a normal skip, logged once per blind spell (ClimPoker would revert
 // DeskBlind, and a DeskBlind revert met anyway is logged the same way); after a wall-clock jump the nonce is re-synced and
 // the desk re-read; failed ticks back off (2 s doubling to 60 s). A poke never carries a stale fee: ClimPoker reads the
-// policy when the transaction runs.
+// policy when the transaction runs. A DeskBlind revert right after a fresh read is first taken as a lagging node of the
+// load-balanced public RPC: the simulation is retried 3 times, 2 s apart, before the skip is logged.
 // Usage: bun src/live/runner.ts     Log: bots/out/runner-rh.jsonl     Env: RUNNER_POLL_MS (default 2000)
 import { climFeePolicyAbi, climPokerAbi, FeeMode, riskDeskV2Abi } from "@clim/shared";
 import { join } from "node:path";
@@ -13,7 +14,7 @@ import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
 import { liveClient, liveWallet } from "./lib/chain";
 import { loadLiveDeployments } from "./lib/deployments";
 import { liveKey } from "./lib/env";
-import { pokeDecision } from "./lib/runner";
+import { POKE_LAG_DELAY_MS, POKE_LAG_RETRIES, pokeDecision, simulatePoke } from "./lib/runner";
 import { isDeskBlindError } from "./lib/supervise";
 import { runSupervised } from "./lib/supervisor";
 
@@ -51,7 +52,9 @@ async function tick(): Promise<void> {
   blindLogged = false;
   if (pokeDecision(seq, lastSeq, q[2]) !== "poke") return;
   try {
-    const { request } = await client.simulateContract({ account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" });
+    const { request } = await simulatePoke(() => client.simulateContract({ account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" }), {
+      onRetry: (_e, n) => console.log(`[runner] seq ${seq}: DeskBlind after a fresh read (a lagging RPC node), retry ${n}/${POKE_LAG_RETRIES} in ${POKE_LAG_DELAY_MS / 1_000} s`),
+    });
     const hash = await wallet.writeContract(request);
     const r = await client.waitForTransactionReceipt({ hash, timeout: 60_000 });
     const ev = parseEventLogs({ abi: climPokerAbi, eventName: "Poked", logs: r.logs })[0]?.args;
@@ -73,7 +76,7 @@ async function tick(): Promise<void> {
   } catch (e) {
     const error = shortError(e);
     if (isDeskBlindError(error)) {
-      // the desk went blind between the read and the poke: the same skip as above
+      // still DeskBlind after simulatePoke's retries: the desk went blind between the read and the poke, the same skip
       appendJsonl(logFile, { ...base, action: "skip", reason: "desk blind (DeskBlind revert)" });
       console.log(`[runner] seq ${seq}: DeskBlind, no poke`);
       blindLogged = true;
