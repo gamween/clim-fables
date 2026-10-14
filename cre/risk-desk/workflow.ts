@@ -1,5 +1,6 @@
-// clim risk desk: every 30 s, measure multi-venue ETH realized volatility, reach DON consensus
-// field by field (median), and write the signed report to RiskDesk.onReport on Sepolia.
+// clim × Fables risk desk: every 30 s, measure ETH volatility over 5 and 15 minutes on four venues and the venue mid
+// against the target pool's mid, reach DON consensus field by field (median), and write the signed report to
+// RiskDeskV2.onReport on Robinhood Chain testnet.
 import {
 	bytesToHex,
 	ConsensusAggregationByFields,
@@ -19,29 +20,33 @@ import {
 	TxStatus,
 } from '@chainlink/cre-sdk'
 import { EVM_PB } from '@chainlink/cre-sdk/pb'
-import { type Address, decodeFunctionResult, encodeFunctionData, zeroAddress } from 'viem'
+import { type Address, decodeFunctionResult, encodeFunctionData, type Hex, zeroAddress } from 'viem'
 import { z } from 'zod'
-import { annualPctFromE9, estimate } from './estimator'
-import {
-	buildReport,
-	encodeRiskReport,
-	MIN_GAP_SEC,
-	type Observation,
-	RISK_DESK_ABI,
-} from './report'
-import { fetchLive, fetchReplay, VENUES } from './venues'
+import { annualPctFromE9, estimate, SIGMA_ESTIMATORS } from './estimator'
+import { decodeSlot0, devPipsOf, parseRpcSlot0, poolMidFromSqrtPriceX96, rpcSlot0Request, slot0CallData } from './pool'
+import { buildReport, encodeRiskReport, MIN_GAP_SEC, type Observation, RISK_DESK_ABI } from './report'
+import { fetchLive, type HttpReq, VENUES } from './venues'
+
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/
+const BYTES32 = /^0x[0-9a-fA-F]{64}$/
 
 export const configSchema = z.object({
 	schedule: z.string(),
-	deskAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+	deskAddress: z.string().regex(ADDRESS),
 	chainSelectorName: z.string(),
 	gasLimit: z.string(),
 	venues: z.array(z.enum(VENUES)).min(3),
-	dvolUrl: z.string(),
-	usdtUsdUrl: z.string(),
-	mode: z.enum(['live', 'replay']),
-	replayUrl: z.string(),
-	token0IsEth: z.boolean(),
+	sigmaEstimator: z.enum(SIGMA_ESTIMATORS),
+	kE4: z.number().int().min(10_000).max(20_000),
+	pool: z.object({
+		source: z.enum(['evm', 'http']), // evm: StateView on the desk's chain; http: eth_call to rpcUrl (shadow)
+		rpcUrl: z.string(),
+		stateView: z.string().regex(ADDRESS),
+		poolId: z.string().regex(BYTES32),
+		token0IsEth: z.boolean(),
+		decimals0: z.number().int().min(0).max(36),
+		decimals1: z.number().int().min(0).max(36),
+	}),
 	httpAuthorizedKeys: z.array(z.string()),
 })
 
@@ -49,51 +54,57 @@ export type Config = z.infer<typeof configSchema>
 
 export interface DeskState {
 	tObs: number
-	sigmaE9: number
+	sigma15E9: number
+	sigma5E9: number
+	devPips: number
 	kE4: number
 	flags: number
 	seq: number
 }
 
 const pct = (sigmaE9: number): string => annualPctFromE9(sigmaE9).toFixed(1)
+const msg = (e: unknown): string => (e instanceof Error ? e.message.split('\n')[0] : String(e))
 
-// Runs on every node: fetch the sources, estimate, return one observation for consensus.
+// Runs on every node: fetch the sources (and, in shadow mode, the pool over JSON-RPC), estimate, return one
+// observation for consensus.
 export const observe = (nodeRuntime: NodeRuntime<Config>, nowSec: number): Observation => {
 	const cfg = nodeRuntime.config
-	const input =
-		cfg.mode === 'replay'
-			? fetchReplay(nodeRuntime, cfg.replayUrl, cfg.venues, nowSec)
-			: fetchLive(nodeRuntime, cfg.venues, cfg.dvolUrl, cfg.usdtUsdUrl, nowSec)
+	const extra: HttpReq[] =
+		cfg.pool.source === 'http' ? [rpcSlot0Request(cfg.pool.rpcUrl, cfg.pool.stateView as Hex, cfg.pool.poolId as Hex)] : []
+	const { input, extra: fetched } = fetchLive(nodeRuntime, cfg.venues, nowSec, cfg.sigmaEstimator === 'binance-1s', extra)
 	for (const note of input.notes) nodeRuntime.log(`source dropped: ${note}`)
-	const est = estimate({
-		nowSec: input.nowSec,
-		usdtUsd: input.usdtUsd,
-		token0IsEth: cfg.token0IsEth,
-		series: input.series,
-	})
-	const dvolE2 = input.dvol === null ? 0 : Math.round(input.dvol * 100)
+	const est = estimate({ ...input, estimator: cfg.sigmaEstimator })
+	let poolMidE6 = 0
+	if (cfg.pool.source === 'http') {
+		const f = fetched[0]
+		try {
+			if (f === undefined) throw new Error('no response')
+			if ('error' in f) throw new Error(f.error)
+			poolMidE6 = Math.round(poolMidFromSqrtPriceX96(parseRpcSlot0(f.json), cfg.pool) * 1e6)
+		} catch (e) {
+			nodeRuntime.log(`pool read dropped: ${msg(e)}`)
+		}
+	}
 	nodeRuntime.log(
-		`node: sources=${est.sources.join(',')} n=${est.nSources} tEnd=${est.tEnd} price=${(est.priceE6 / 1e6).toFixed(2)} rv15=${pct(est.rv15E9)}% disp=${est.dispBp}bp tick=${est.refTick} dvol=${(dvolE2 / 100).toFixed(2)}`,
+		`node: estimator=${cfg.sigmaEstimator} sources=${est.sources.join(',')} n=${est.nSources} tEnd=${est.tEnd} sigma5=${pct(est.sigma5E9)}% sigma15=${pct(est.sigma15E9)}% disp=${est.dispBp}bp mid=${(est.venueMidE6 / 1e6).toFixed(2)} (${est.midFrom})${poolMidE6 > 0 ? ` pool=${(poolMidE6 / 1e6).toFixed(2)}` : ''}`,
 	)
 	return {
-		sigmaE9: est.sigmaE9,
-		rv15E9: est.rv15E9,
-		dvolE2,
-		refTick: est.refTick,
+		sigma15E9: est.sigma15E9,
+		sigma5E9: est.sigma5E9,
 		dispBp: est.dispBp,
 		nSources: est.nSources,
-		priceE6: est.priceE6,
+		venueMidE6: est.venueMidE6,
+		poolMidE6,
 	}
 }
 
 export const observationAggregation = ConsensusAggregationByFields<Observation>({
-	sigmaE9: median,
-	rv15E9: median,
-	dvolE2: median,
-	refTick: median,
+	sigma15E9: median,
+	sigma5E9: median,
 	dispBp: median,
 	nSources: median,
-	priceE6: median,
+	venueMidE6: median,
+	poolMidE6: median,
 })
 
 function evmClientFor(cfg: Config): EVMClient {
@@ -114,14 +125,35 @@ export function readDeskState(runtime: Runtime<Config>, evm: EVMClient): DeskSta
 				blockNumber: LATEST_BLOCK_NUMBER,
 			})
 			.result()
-		const [tObs, sigmaE9, kE4, flags, seq] = decodeFunctionResult({
+		const [tObs, sigma15E9, sigma5E9, devPips, kE4, flags, seq] = decodeFunctionResult({
 			abi: RISK_DESK_ABI,
 			functionName: 'state',
 			data: bytesToHex(reply.data),
 		})
-		return { tObs, sigmaE9, kE4, flags, seq }
+		return { tObs, sigma15E9, sigma5E9, devPips, kE4, flags, seq }
 	} catch (e) {
-		runtime.log(`desk state unreadable: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`)
+		runtime.log(`desk state unreadable: ${msg(e)}`)
+		return null
+	}
+}
+
+/** Pool mid from StateView on the desk's own chain (pool D on Robinhood testnet); null if unreadable. */
+export function readPoolMidEvm(runtime: Runtime<Config>, evm: EVMClient): number | null {
+	const cfg = runtime.config
+	try {
+		const reply = evm
+			.callContract(runtime, {
+				call: encodeCallMsg({
+					from: zeroAddress,
+					to: cfg.pool.stateView as Address,
+					data: slot0CallData(cfg.pool.poolId as Hex),
+				}),
+				blockNumber: LATEST_BLOCK_NUMBER,
+			})
+			.result()
+		return poolMidFromSqrtPriceX96(decodeSlot0(bytesToHex(reply.data)), cfg.pool)
+	} catch (e) {
+		runtime.log(`pool read failed: ${msg(e)}`)
 		return null
 	}
 }
@@ -134,24 +166,27 @@ export const onTick = (runtime: Runtime<Config>): string => {
 	try {
 		obs = runtime.runInNodeMode(observe, observationAggregation)(tObs).result()
 	} catch (e) {
-		const msg = e instanceof Error ? e.message : String(e)
-		runtime.log(`clim: no report (${msg})`)
-		return `SKIP: ${msg}`
+		const m = e instanceof Error ? e.message : String(e)
+		runtime.log(`clim: no report (${m})`)
+		return `SKIP: ${m}`
 	}
-
-	const report = buildReport(obs, tObs)
-	runtime.log(
-		`consensus: sigma=${pct(report.sigmaE9)}%/yr sigmaE9=${report.sigmaE9} n=${report.nSources} disp=${report.dispBp}bp tick=${report.refTick} dvol=${(report.dvolE2 / 100).toFixed(2)} price=${(obs.priceE6 / 1e6).toFixed(2)} tObs=${report.tObs}`,
-	)
-	if (report.nSources < 3) {
-		runtime.log(`clim: no report (consensus nSources=${report.nSources} < 3)`)
+	if (obs.nSources < 3) {
+		runtime.log(`clim: no report (consensus nSources=${obs.nSources} < 3)`)
 		return 'SKIP: quorum'
 	}
 
 	const evm = evmClientFor(cfg)
+	const poolMid = cfg.pool.source === 'evm' ? readPoolMidEvm(runtime, evm) : obs.poolMidE6 > 0 ? obs.poolMidE6 / 1e6 : null
+	if (poolMid === null) runtime.log('pool mid unreadable: devPips = 0 (no directional premium)')
+	const devPips = poolMid === null ? 0 : devPipsOf(obs.venueMidE6 / 1e6, poolMid)
+	const report = buildReport(obs, tObs, devPips, cfg.kE4)
+	runtime.log(
+		`consensus: sigma5=${pct(report.sigma5E9)}%/yr sigma15=${pct(report.sigma15E9)}%/yr sigma5E9=${report.sigma5E9} sigma15E9=${report.sigma15E9} n=${report.nSources} disp=${report.dispBp}bp venue=${(obs.venueMidE6 / 1e6).toFixed(2)} pool=${poolMid === null ? 'n/a' : poolMid.toFixed(2)} dev=${report.devPips}pips tObs=${report.tObs}`,
+	)
+
 	const prev = readDeskState(runtime, evm)
 	if (prev !== null) {
-		runtime.log(`desk before: seq=${prev.seq} tObs=${prev.tObs} sigma=${pct(prev.sigmaE9)}%/yr flags=${prev.flags}`)
+		runtime.log(`desk before: seq=${prev.seq} tObs=${prev.tObs} sigma5=${pct(prev.sigma5E9)}%/yr dev=${prev.devPips} flags=${prev.flags}`)
 		if (prev.tObs > 0 && report.tObs < prev.tObs + MIN_GAP_SEC) {
 			runtime.log(`clim: no report (${report.tObs - prev.tObs} s since the last report < ${MIN_GAP_SEC} s)`)
 			return 'SKIP: min gap'
@@ -159,29 +194,23 @@ export const onTick = (runtime: Runtime<Config>): string => {
 	}
 
 	const signed = runtime.report(prepareReportRequest(encodeRiskReport(report))).result()
-	const reply = evm
-		.writeReport(runtime, {
-			receiver: cfg.deskAddress,
-			report: signed,
-			gasConfig: { gasLimit: cfg.gasLimit },
-		})
-		.result()
+	const reply = evm.writeReport(runtime, { receiver: cfg.deskAddress, report: signed, gasConfig: { gasLimit: cfg.gasLimit } }).result()
 	const txHash = bytesToHex(reply.txHash ?? new Uint8Array(32))
 	if (reply.txStatus !== TxStatus.SUCCESS) {
 		throw new Error(`writeReport failed: status=${reply.txStatus} ${reply.errorMessage ?? ''} tx=${txHash}`)
 	}
-	// Exact line parsed by plan 04's bots/src/sim-loop.ts (the CRE docs and templates format).
+	// Exact line parsed by bots/src/lib/simParse.ts (the CRE docs and templates format).
 	runtime.log(`Write report transaction succeeded: ${txHash}`)
 	if (reply.receiverContractExecutionStatus === EVM_PB.ReceiverContractExecutionStatus.REVERTED) {
 		runtime.log(`REJECTED by RiskDesk (onReport reverted) tx=${txHash}`)
 		return `REJECTED ${txHash}`
 	}
 	if (/^0x0+$/.test(txHash)) {
-		runtime.log(`DRY RUN: report encoded and simulated, not broadcast (sigmaE9=${report.sigmaE9})`)
+		runtime.log(`DRY RUN: report encoded and simulated, not broadcast (sigma5E9=${report.sigma5E9} dev=${report.devPips})`)
 		return 'DRY RUN'
 	}
-	// The forwarders never revert when the receiver reverts (they emit ReportProcessed(result=false)),
-	// and the simulator then still reports receiver SUCCESS: re-read the desk to know if it applied.
+	// Forwarders never revert when the receiver reverts, and the simulator then still reports receiver SUCCESS:
+	// re-read the desk to know if it applied.
 	const after = readDeskState(runtime, evm)
 	if (after === null) {
 		runtime.log(`REPORT sent, desk state unreadable after tx=${txHash}`)
@@ -189,7 +218,7 @@ export const onTick = (runtime: Runtime<Config>): string => {
 	}
 	if (after.tObs === report.tObs) {
 		runtime.log(
-			`REPORT applied seq=${after.seq} sigmaReported=${pct(report.sigmaE9)}% sigmaApplied=${pct(after.sigmaE9)}% flags=${after.flags} tx=${txHash}`,
+			`REPORT applied seq=${after.seq} sigma5Reported=${pct(report.sigma5E9)}% sigma5Applied=${pct(after.sigma5E9)}% dev=${after.devPips} flags=${after.flags} tx=${txHash}`,
 		)
 		return `OK ${txHash}`
 	}
@@ -209,10 +238,7 @@ export function initWorkflow(config: Config) {
 		handler(cron.trigger({ schedule: config.schedule }), onCron),
 		handler(
 			http.trigger({
-				authorizedKeys: config.httpAuthorizedKeys.map((publicKey) => ({
-					type: 'KEY_TYPE_ECDSA_EVM' as const,
-					publicKey,
-				})),
+				authorizedKeys: config.httpAuthorizedKeys.map((publicKey) => ({ type: 'KEY_TYPE_ECDSA_EVM' as const, publicKey })),
 			}),
 			onHttp,
 		),

@@ -1,21 +1,21 @@
-# clim risk-desk workflow settings, one block per target of ../project.yaml.
-staging-settings:
+# clim risk-desk workflow settings, one block per target of ../project.yaml (plan 03).
+rh-testnet-settings:
   user-workflow:
-    workflow-name: "clim-risk-desk-staging"
+    workflow-name: "clim-desk-rh-testnet"
   workflow-artifacts:
     workflow-path: "./main.ts"
-    config-path: "./config.staging.json"
+    config-path: "./config.testnet.json"
     secrets-path: ""
-replay-settings:
+rh-shadow-settings:
   user-workflow:
-    workflow-name: "clim-risk-desk-replay"
+    workflow-name: "clim-desk-rh-shadow"
   workflow-artifacts:
     workflow-path: "./main.ts"
-    config-path: "./config.replay.json"
+    config-path: "./config.shadow.json"
     secrets-path: ""
-production-settings:
+rh-production-settings:
   user-workflow:
-    workflow-name: "clim-risk-desk"
+    workflow-name: "clim-desk-rh"
     deployment-registry: "private"
   workflow-artifacts:
     workflow-path: "./main.ts"

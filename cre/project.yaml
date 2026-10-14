@@ -1,17 +1,17 @@
-# clim CRE project settings (cre CLI >= 1.37).
-# Targets: staging-settings = live simulation, replay-settings = replay simulation,
-# production-settings = a DON target (private registry) that was never used: DON deploy access was not granted,
-# so its config.production.json keeps the placeholder desk 0x...dEaD (riskDesks.don is null in shared/deployments).
-# Every target must also exist in risk-desk/workflow.yaml.
-staging-settings:
+# clim × Fables CRE project settings (cre CLI >= 1.37). Every target must also exist in risk-desk/workflow.yaml.
+# rh-testnet-settings: the live desk on Robinhood Chain testnet (simulation with --broadcast, MockKeystoneForwarder).
+# rh-shadow-settings: dry run only; devPips against Fables' mainnet ETH/USDG pool, read over HTTP (never a write).
+# rh-production-settings: a DON target (KeystoneForwarder); unused until DON deploy access is granted.
+# The Sepolia v1 targets live at tag token2049-submission.
+rh-testnet-settings:
   rpcs:
-    - chain-name: ethereum-testnet-sepolia
-      url: https://ethereum-sepolia-rpc.publicnode.com
-replay-settings:
+    - chain-name: robinhood-testnet
+      url: https://rpc.testnet.chain.robinhood.com
+rh-shadow-settings:
   rpcs:
-    - chain-name: ethereum-testnet-sepolia
-      url: https://ethereum-sepolia-rpc.publicnode.com
-production-settings:
+    - chain-name: robinhood-testnet
+      url: https://rpc.testnet.chain.robinhood.com
+rh-production-settings:
   rpcs:
-    - chain-name: ethereum-testnet-sepolia
-      url: https://ethereum-sepolia-rpc.publicnode.com
+    - chain-name: robinhood-testnet
+      url: https://rpc.testnet.chain.robinhood.com

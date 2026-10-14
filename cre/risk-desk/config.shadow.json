@@ -1,0 +1,24 @@
+{
+  "schedule": "*/30 * * * * *",
+  "deskAddress": "0x000000000000000000000000000000000000dEaD",
+  "chainSelectorName": "robinhood-testnet",
+  "gasLimit": "1000000",
+  "venues": [
+    "coinbase",
+    "kraken",
+    "binance",
+    "hyperliquid"
+  ],
+  "sigmaEstimator": "venue-range",
+  "kE4": 10000,
+  "pool": {
+    "source": "http",
+    "rpcUrl": "https://rpc.mainnet.chain.robinhood.com",
+    "stateView": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+    "poolId": "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551",
+    "token0IsEth": true,
+    "decimals0": 18,
+    "decimals1": 6
+  },
+  "httpAuthorizedKeys": []
+}

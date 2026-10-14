@@ -1,39 +1,46 @@
-// Copies the RiskDesk addresses and the pool token order from shared/deployments/sepolia.json
-// (written by plan 01) into the workflow configs. Usage (from cre/risk-desk): bun scripts/sync-config.ts
+// Copies the testnet desk, pool D and the token order from shared/deployments/robinhood-testnet.json (plan 03 Task 12)
+// and the estimator from shared/params-fables.json into the workflow configs.
+// Usage (from cre/risk-desk): bun scripts/sync-config.ts
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const DEPLOYMENTS = process.env.DEPLOYMENTS ?? '../../shared/deployments/sepolia.json'
-// Key paths inside DEPLOYMENTS. If plan 01 named them differently, change them here and log it in docs/sessions.
-// Shape agreed with plan 04 (shared/src/config.ts): tokens.<sym> = { address, symbol, decimals }, riskDesks.<pair> = address.
-const KEYS = {
-	tEth: 'tokens.tETH.address',
-	tUsd: 'tokens.tUSD.address',
-	desks: [
-		['config.staging.json', 'riskDesks.live'],
-		['config.replay.json', 'riskDesks.replay'],
-		['config.production.json', 'riskDesks.don'],
-	],
-} as const
+const DEPLOYMENTS = process.env.DEPLOYMENTS ?? '../../shared/deployments/robinhood-testnet.json'
+const PARAMS = process.env.PARAMS ?? '../../shared/params-fables.json'
 
-const dep: unknown = JSON.parse(readFileSync(DEPLOYMENTS, 'utf8'))
-const get = (path: string): unknown =>
-	path.split('.').reduce<unknown>((o, k) => (typeof o === 'object' && o !== null ? (o as Record<string, unknown>)[k] : undefined), dep)
+type Json = Record<string, unknown>
+const dep = JSON.parse(readFileSync(DEPLOYMENTS, 'utf8')) as Json
+const params = JSON.parse(readFileSync(PARAMS, 'utf8')) as Json
+const get = (o: Json, path: string): unknown =>
+	path.split('.').reduce<unknown>((x, k) => (typeof x === 'object' && x !== null ? (x as Json)[k] : undefined), o)
 const isAddr = (x: unknown): x is string => typeof x === 'string' && /^0x[0-9a-fA-F]{40}$/.test(x)
 
-const tEth = get(KEYS.tEth)
-const tUsd = get(KEYS.tUsd)
-if (!isAddr(tEth) || !isAddr(tUsd)) throw new Error(`${DEPLOYMENTS}: missing ${KEYS.tEth} or ${KEYS.tUsd}`)
-const token0IsEth = BigInt(tEth) < BigInt(tUsd)
-
-for (const [file, key] of KEYS.desks) {
-	const desk = get(key)
-	if (!isAddr(desk)) {
-		console.log(`${file}: ${key} not in deployments yet, unchanged`)
-		continue
-	}
-	const cfg = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
-	cfg.deskAddress = desk
-	cfg.token0IsEth = token0IsEth
-	writeFileSync(file, `${JSON.stringify(cfg, null, 2)}\n`)
-	console.log(`${file}: deskAddress=${desk} token0IsEth=${token0IsEth}`)
+const desk = get(dep, 'riskDesk')
+const poolId = get(dep, 'pools.D.poolId')
+const token0IsEth = get(dep, 'pools.D.token0IsEth')
+const estimator = get(params, 'sigmaEstimator')
+if (!isAddr(desk) || typeof poolId !== 'string' || typeof token0IsEth !== 'boolean') {
+	throw new Error(`${DEPLOYMENTS}: riskDesk, pools.D.poolId or pools.D.token0IsEth missing`)
 }
+if (typeof estimator !== 'string') throw new Error(`${PARAMS}: sigmaEstimator missing (plan 03 Task 2)`)
+
+function update(file: string, f: (cfg: Json) => void): void {
+	const cfg = JSON.parse(readFileSync(file, 'utf8')) as Json
+	f(cfg)
+	writeFileSync(file, `${JSON.stringify(cfg, null, 2)}\n`)
+}
+
+update('config.testnet.json', (cfg) => {
+	cfg.deskAddress = desk
+	cfg.sigmaEstimator = estimator
+	const pool = cfg.pool as Json
+	pool.poolId = poolId
+	pool.token0IsEth = token0IsEth
+	pool.decimals0 = token0IsEth ? 18 : 6
+	pool.decimals1 = token0IsEth ? 6 : 18
+})
+for (const file of ['config.shadow.json', 'config.production.json']) {
+	update(file, (cfg) => {
+		cfg.sigmaEstimator = estimator
+	})
+}
+console.log(`config.testnet.json: deskAddress=${desk} pool D=${poolId} token0IsEth=${token0IsEth} sigmaEstimator=${estimator}`)
+console.log(`config.shadow.json, config.production.json: sigmaEstimator=${estimator}`)

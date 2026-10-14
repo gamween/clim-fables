@@ -1,0 +1,24 @@
+{
+  "schedule": "*/30 * * * * *",
+  "deskAddress": "0x63f543430982685387C83e4ec55E5a26fd1371Ef",
+  "chainSelectorName": "robinhood-testnet",
+  "gasLimit": "1000000",
+  "venues": [
+    "coinbase",
+    "kraken",
+    "binance",
+    "hyperliquid"
+  ],
+  "sigmaEstimator": "venue-range",
+  "kE4": 10000,
+  "pool": {
+    "source": "evm",
+    "rpcUrl": "",
+    "stateView": "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+    "poolId": "0xb8978741176d138b7779643a80b6b59ad9bb80103587c809513d2e17eb444e52",
+    "token0IsEth": true,
+    "decimals0": 18,
+    "decimals1": 6
+  },
+  "httpAuthorizedKeys": []
+}
