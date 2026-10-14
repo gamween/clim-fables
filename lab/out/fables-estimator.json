@@ -1,0 +1,73 @@
+{
+  "generatedAt": "2026-10-14T07:09:15Z",
+  "window": {
+    "start": 1788739200,
+    "end": 1791763200
+  },
+  "dtEffSec": 1.4480277,
+  "windowSec": 300,
+  "keeper": {
+    "meanFeeBp": 10.383346
+  },
+  "venues": [
+    "binance (ETHUSDT 1 min, USDT converted with Coinbase USDT-USD)",
+    "coinbase (ETH-USD 1 min)",
+    "kraken (ETHUSD 1 min rebuilt from the public trade history)"
+  ],
+  "excluded": {
+    "hyperliquid": "its API serves only the last 5,000 one-minute candles, so the window cannot be replayed"
+  },
+  "estimators": {
+    "median-close": {
+      "etaE4": 173649,
+      "meanFeeBp": 10.383346,
+      "meanSigmaPctYr": 35.052753,
+      "corrWithBinance1s": 0.87807423,
+      "corrKeeper": {
+        "pearson": 0.89394679,
+        "spearman": 0.6118596
+      },
+      "sharePctAtFloor": 45.706283,
+      "sharePctAtCap": 0.23214286,
+      "arbVsKeeperPct": 3.1554786,
+      "arbVsKeeperPctEvery15s": 9.3420889
+    },
+    "venue-range": {
+      "etaE4": 196450,
+      "meanFeeBp": 10.383346,
+      "meanSigmaPctYr": 31.126414,
+      "corrWithBinance1s": 0.96469198,
+      "corrKeeper": {
+        "pearson": 0.88794974,
+        "spearman": 0.60839451
+      },
+      "sharePctAtFloor": 45.412632,
+      "sharePctAtCap": 0.26190476,
+      "arbVsKeeperPct": -3.2934356,
+      "arbVsKeeperPctEvery15s": 3.841284
+    },
+    "binance-1s": {
+      "etaE4": 175198,
+      "meanFeeBp": 10.383346,
+      "meanSigmaPctYr": 35.263477,
+      "corrWithBinance1s": 1.0,
+      "corrKeeper": {
+        "pearson": 0.83313189,
+        "spearman": 0.53647127
+      },
+      "sharePctAtFloor": 41.657672,
+      "sharePctAtCap": 0.20634921,
+      "arbVsKeeperPct": -4.3837777,
+      "arbVsKeeperPctEvery15s": 4.6101482
+    }
+  },
+  "chosen": "binance-1s",
+  "chosenEtaE4": 175198,
+  "rule": "prefer a multi-venue estimator (median-close or venue-range): the lower arbitrage loss at equal average fee, within 1 point the higher Pearson correlation with the keeper; binance-1s only if it loses less than that estimator by more than 1 point",
+  "caveats": [
+    "three venues replayed, four live (Hyperliquid has no history); the live median can differ slightly",
+    "the simulated arbitrageur trades on the Binance 1 s path binance-1s is computed from, which favours binance-1s (study 2's caveat); the rule's 1-point margin for a multi-venue estimator is partly for this",
+    "1 s grid: the simulator ranks estimators, it does not predict dollars; arbVsKeeperPctEvery15s (the arbitrageur acting every 15 s) is reported as robustness and not used by the rule",
+    "in-sample: eta is fitted on the same five weeks the comparison runs on; one price path, no confidence interval"
+  ]
+}

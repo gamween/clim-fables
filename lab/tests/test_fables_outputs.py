@@ -102,3 +102,27 @@ def test_params_fables():
     assert d["pokeTtlSec"] == 600 and d["tauKillSec"] == 180
     assert d["targetPoolId"] == "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551"
     assert d["decidedBy"] == "lab/scripts/decide_fables_params.py"
+    assert d["sigmaEstimator"] in ("median-close", "venue-range", "binance-1s")
+    est = OUT_DIR / "fables-estimator.json"
+    if est.exists():
+        assert d["etaE4"] == json.loads(est.read_text())["chosenEtaE4"]
+
+
+ESTIMATORS = ("median-close", "venue-range", "binance-1s")
+
+
+def test_estimator_output():
+    d = _load("fables-estimator.json")
+    assert set(d["estimators"]) == set(ESTIMATORS)
+    assert d["chosen"] in ESTIMATORS
+    assert d["windowSec"] in (300, 900)
+    for name in ESTIMATORS:
+        e = d["estimators"][name]
+        assert e["etaE4"] > 0
+        assert e["meanFeeBp"] == pytest.approx(d["keeper"]["meanFeeBp"], rel=0.01)
+        assert -1 <= e["corrKeeper"]["pearson"] <= 1 and -1 <= e["corrKeeper"]["spearman"] <= 1
+        assert -1 <= e["corrWithBinance1s"] <= 1
+        assert "arbVsKeeperPctEvery15s" in e
+    assert d["estimators"]["binance-1s"]["corrWithBinance1s"] == pytest.approx(1.0)
+    assert any("favours binance-1s" in c for c in d["caveats"])
+    assert d["chosenEtaE4"] == d["estimators"][d["chosen"]]["etaE4"]

@@ -5,6 +5,9 @@
     uv run python scripts/fables_fetch.py logs                      # FeePoked, PokeCleared, PoolConfigured of the hook
     uv run python scripts/fables_fetch.py binance                   # Binance ETHUSDT 1 s, one CSV per day
     uv run python scripts/fables_fetch.py usdt                      # Coinbase USDT-USD 1 min
+    uv run python scripts/fables_fetch.py binance1m                 # Binance ETHUSDT 1 min OHLC (daily zips)
+    uv run python scripts/fables_fetch.py coinbase1m                # Coinbase ETH-USD 1 min OHLC
+    uv run python scripts/fables_fetch.py kraken1m                  # Kraken ETHUSD 1 min OHLC rebuilt from trades
 
 Every subcommand resumes: files already written are kept unless --refresh. The Etherscan key comes from
 ETHERSCAN_API_KEY or the ETHERSCAN_API_KEY= line of contracts/.env and is never printed or written.
@@ -264,6 +267,97 @@ def cmd_usdt(args) -> None:
     print(f"wrote {path}: {len(set(rows))} minutes")
 
 
+def _save_ohlc(path: Path, rows) -> None:
+    """[[open_s, open, high, low, close], ...] deduplicated by open time, ascending (plan 03 Task 2)."""
+    by_t = {int(r[0]): [int(r[0])] + [float(x) for x in r[1:5]] for r in rows}
+    path.write_text(json.dumps([by_t[t] for t in sorted(by_t)]))
+
+
+def cmd_binance1m(args) -> None:
+    path = RAW / "binance_ethusdt_1m.json"
+    if path.exists() and not args.refresh:
+        print(f"{path} exists")
+        return
+    rows = []
+    for day in _days():
+        url = f"https://data.binance.vision/data/spot/daily/klines/ETHUSDT/1m/ETHUSDT-1m-{day}.zip"
+        z = zipfile.ZipFile(io.BytesIO(_get(url, timeout=300)))
+        for line in z.read(z.namelist()[0]).decode().splitlines():
+            cols = line.strip().split(",")
+            if len(cols) < 5:
+                continue
+            t = int(cols[0])
+            t = t // 1_000_000 if t > 10**14 else t // 1_000
+            rows.append([t, cols[1], cols[2], cols[3], cols[4]])
+    _save_ohlc(path, rows)
+    print(f"wrote {path}: {len(rows)} minutes")
+
+
+def cmd_coinbase1m(args) -> None:
+    path = RAW / "coinbase_ethusd_1m.json"
+    if path.exists() and not args.refresh:
+        print(f"{path} exists")
+        return
+    rows = []
+    t = START - PAD_BEFORE
+    while t < END + PAD_AFTER:
+        t2 = min(t + 300 * 60, END + PAD_AFTER)
+        q = {
+            "granularity": 60,
+            "start": datetime.fromtimestamp(t, timezone.utc).isoformat(),
+            "end": datetime.fromtimestamp(t2, timezone.utc).isoformat(),
+        }
+        url = "https://api.exchange.coinbase.com/products/ETH-USD/candles?" + urllib.parse.urlencode(q)
+        for c in json.loads(_get(url)):  # [time, low, high, open, close, volume], newest first
+            rows.append([int(c[0]), c[3], c[2], c[1], c[4]])
+        t = t2
+        time.sleep(0.35)
+    _save_ohlc(path, rows)
+    print(f"wrote {path}: {len(rows)} minutes")
+
+
+def cmd_kraken1m(args) -> None:
+    """Kraken's OHLC keeps only its last 720 candles, so the minutes are rebuilt from the public trade history
+    (1,000 trades per call, `since` is a nanosecond cursor). Resumable through a partial file."""
+    path = RAW / "kraken_ethusd_1m.json"
+    partial = RAW / "kraken_ethusd_1m.partial.json"
+    if path.exists() and not args.refresh:
+        print(f"{path} exists")
+        return
+    end = END + PAD_AFTER
+    if partial.exists():
+        state = json.loads(partial.read_text())
+    else:
+        state = {"since": str((START - PAD_BEFORE) * 10**9), "rows": [], "pending": []}
+    calls = 0
+    while True:
+        url = f"https://api.kraken.com/0/public/Trades?pair=ETHUSD&since={state['since']}&count=1000"
+        doc = json.loads(_get(url))
+        if doc.get("error"):
+            raise RuntimeError(f"Kraken error: {doc['error']}")
+        res = doc["result"]
+        trades = next(v for k, v in res.items() if k != "last")
+        pending = state["pending"] + [[float(x[2]), float(x[0])] for x in trades]  # [time s, price]
+        done = len(trades) == 0 or pending[-1][0] >= end
+        # minutes before the last one seen are complete; the last one may continue in the next call
+        cut = end if done else (int(pending[-1][0]) // 60) * 60
+        state["rows"] += venue.ohlc_from_trades([(t, p) for t, p in pending if t < min(cut, end)])
+        state["pending"] = [] if done else [tp for tp in pending if tp[0] >= cut]
+        state["since"] = res["last"]
+        calls += 1
+        if done:
+            break
+        if calls % 20 == 0:
+            RAW.mkdir(parents=True, exist_ok=True)
+            partial.write_text(json.dumps(state))
+            print(f"  {calls} calls, up to {datetime.fromtimestamp(pending[-1][0], timezone.utc):%Y-%m-%d %H:%M}", flush=True)
+        time.sleep(1.1)  # Kraken's public rate limit
+    rows = [r for r in state["rows"] if START - PAD_BEFORE <= r[0] < end]
+    _save_ohlc(path, rows)
+    partial.unlink(missing_ok=True)
+    print(f"wrote {path}: {len(rows)} minutes with trades, {calls} calls")
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -271,7 +365,7 @@ def main() -> None:
     b.add_argument("--step", type=int, default=600)
     b.add_argument("--batch", type=int, default=20)
     b.add_argument("--pause", type=float, default=1.0)
-    for name in ("blocks", "check-clock", "logs", "binance", "usdt"):
+    for name in ("blocks", "check-clock", "logs", "binance", "usdt", "binance1m", "coinbase1m", "kraken1m"):
         sp = b if name == "blocks" else sub.add_parser(name)
         sp.add_argument("--refresh", action="store_true")
     args = p.parse_args()
@@ -281,6 +375,9 @@ def main() -> None:
         "logs": cmd_logs,
         "binance": cmd_binance,
         "usdt": cmd_usdt,
+        "binance1m": cmd_binance1m,
+        "coinbase1m": cmd_coinbase1m,
+        "kraken1m": cmd_kraken1m,
     }[args.cmd](args)
 
 

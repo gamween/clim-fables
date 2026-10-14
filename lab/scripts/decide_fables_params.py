@@ -3,8 +3,9 @@
     uv run python scripts/decide_fables_params.py     # shared/params-fables.json
 
 - dtEffSec from study 1; sqrtHalfDtE6 = round(sqrt(dt / 2) * 1e6).
-- sigmaWindowSec and etaE4 from study 2 (eta at equal average fee with the keeper); pStar = 1 / (eta + 1) is the
-  model-implied probability of an arbitrage per interval at dtEffSec, kept for reference and not used on-chain.
+- sigmaWindowSec from study 2; sigmaEstimator and etaE4 from the estimator study (plan 03 Task 2: eta at equal average
+  fee with the keeper, for the estimator the live desk computes); pStar = 1 / (eta + 1) is the model-implied
+  probability of an arbitrage per interval at dtEffSec, kept for reference and not used on-chain.
 - floor = Fables' flat fee (7 bp), cap = Fables' cap (60 bp), safe = 30 bp.
 - per-direction premium from study 3 (or disabled), with its status (stable, experimental or disabled).
 - pokeTtlSec = 600: if clim goes quiet, Fables' pool returns to its flat fee within 10 minutes.
@@ -22,10 +23,13 @@ from clim_lab.units import round_half_up
 def main() -> None:
     dt = json.loads((OUT_DIR / "fables-dt-eff.json").read_text())
     win = json.loads((OUT_DIR / "fables-window.json").read_text())
+    est = json.loads((OUT_DIR / "fables-estimator.json").read_text())
     dire = json.loads((OUT_DIR / "fables-direction.json").read_text())
     dt_eff = dt["chosen"]["dtEffSec"]
     w = str(win["chosenWindowSec"])
-    eta_e4 = win["windows"][w]["etaE4"]
+    if est["windowSec"] != int(w):
+        raise SystemExit("fables-estimator.json was computed for another window: rerun scripts/study_estimator.py")
+    eta_e4 = est["chosenEtaE4"]
     rule = dire["rule"]
     out = {
         "targetChainId": 4663,
@@ -33,6 +37,7 @@ def main() -> None:
         "dtEffSec": dt_eff,
         "sqrtHalfDtE6": round_half_up((dt_eff / 2.0) ** 0.5 * 1e6),
         "sigmaWindowSec": int(w),
+        "sigmaEstimator": est["chosen"],
         "etaE4": int(eta_e4),
         "pStar": pstar_from_eta(eta_e4 / 1e4, c=1.0),
         "pStarNote": "model-implied at dtEffSec (P_trade per interval, MMR 2023); not measured and not used on-chain; the posted fee depends only on etaE4 * sqrtHalfDtE6",
@@ -46,7 +51,12 @@ def main() -> None:
         "dirMaxPremiumPips": int(rule["maxPremiumPips"]),
         "pokeTtlSec": 600,
         "decidedBy": "lab/scripts/decide_fables_params.py",
-        "sources": ["lab/out/fables-dt-eff.json", "lab/out/fables-window.json", "lab/out/fables-direction.json"],
+        "sources": [
+            "lab/out/fables-dt-eff.json",
+            "lab/out/fables-window.json",
+            "lab/out/fables-estimator.json",
+            "lab/out/fables-direction.json",
+        ],
         "generatedAt": now_iso(),
     }
     write_json(SHARED_DIR / "params-fables.json", out)
