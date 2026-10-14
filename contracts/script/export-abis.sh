@@ -18,6 +18,7 @@ for artifact in \
   IOverrideFeeHook.sol/ISymmetricPokeHook \
   IOverrideFeeHook.sol/IDirectionalPokeHook \
   TestToken.sol/TestToken \
+  TestTokenDecimals.sol/TestTokenDecimals \
   IPoolManager.sol/IPoolManager \
   IStateView.sol/IStateView \
   PoolSwapTest.sol/PoolSwapTest \
