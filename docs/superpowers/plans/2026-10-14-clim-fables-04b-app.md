@@ -4183,6 +4183,31 @@ Expected: FAIL, `@/components/shell/Banner` does not exist.
   background: repeating-linear-gradient(135deg, var(--raised) 0 3px, var(--surface) 3px 6px);
   box-shadow: inset 0 0 0 1px var(--line);
 }
+/* Phone width: brand, pill and menu must fit in 360 px minus the 16 px gutters, the menu being the only nav there. */
+@media (max-width: 575px) {
+  .headerInner {
+    gap: 8px;
+  }
+  .brandLogo {
+    height: 22px;
+  }
+  .brandText {
+    font-size: 22px;
+    line-height: 22px;
+  }
+  .noWalletDot {
+    display: none;
+  }
+  .noWallet {
+    height: 32px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .right {
+    flex: none;
+  }
+}
 
 .menuWrap {
   position: relative;
