@@ -1,0 +1,42 @@
+{
+  "D": {
+    "driver": "ClimPoker (directional)",
+    "key": {
+      "currency0": "0x0Ffb9c4d2feCc89750b68B961d6eb05F953d864b",
+      "currency1": "0xcB2498949AC0c2473a06199e24f2c5062b665A19",
+      "fee": 8388608,
+      "hooks": "0xBb4afdfd08921e0731199e565eC11724B09b9080",
+      "tickSpacing": 10
+    },
+    "poolId": "0xb8978741176d138b7779643a80b6b59ad9bb80103587c809513d2e17eb444e52",
+    "token0IsEth": true
+  },
+  "F": {
+    "driver": "none (flat 7 bp)",
+    "key": {
+      "currency0": "0x0Ffb9c4d2feCc89750b68B961d6eb05F953d864b",
+      "currency1": "0xcB2498949AC0c2473a06199e24f2c5062b665A19",
+      "fee": 8388608,
+      "hooks": "0xBb4afdfd08921e0731199e565eC11724B09b9080",
+      "tickSpacing": 12
+    },
+    "poolId": "0xe6fdba8f8a0876230e01a8193d4578a86c727b00677c447bfaec5ffe13254d79",
+    "token0IsEth": true
+  },
+  "K": {
+    "driver": "keeper-style bot (imitation of the pattern observed on Fables' pool, not Fables' code)",
+    "key": {
+      "currency0": "0x0Ffb9c4d2feCc89750b68B961d6eb05F953d864b",
+      "currency1": "0xcB2498949AC0c2473a06199e24f2c5062b665A19",
+      "fee": 8388608,
+      "hooks": "0xBb4afdfd08921e0731199e565eC11724B09b9080",
+      "tickSpacing": 11
+    },
+    "poolId": "0x8ae92356af31ff9f4e497947c9fee6066741c7af0f70ba843fac5fc276410a6e",
+    "token0IsEth": true
+  },
+  "initEthUsd": 2503,
+  "liquidity": "50029991005395953",
+  "sqrtPriceX96": "3963784257962693654236666",
+  "token0IsEth": true
+}
