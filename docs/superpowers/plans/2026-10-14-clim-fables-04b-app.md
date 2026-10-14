@@ -8344,7 +8344,7 @@ Expected: `This file was generated with the generate-license-file npm package!`,
 - [ ] **Step 4: Run every unit test, typecheck, lint, build**
 
 Run: `cd app && npm test && npm run typecheck && npm run lint && npm run build`
-Expected: `Test Files  21 passed (21)`, `Tests  121 passed (121)` (the bundle test of Task 23 brings it to 22 and 122), exit 0, and a route table listing `/`, `/credits`, `/evidence`, `/integrate`, `/markets`, `/markets/d`, `/markets/k`, `/markets/f`, `/markets/eth` and `/run`.
+Expected: `Test Files  22 passed (22)`, `Tests  127 passed (127)` (the fixes after Tasks 12 and 15 added `history.test.ts` with 5 tests and 1 outages test; the bundle test of Task 23 brings it to 23 and 128), exit 0, and a route table listing `/`, `/credits`, `/evidence`, `/integrate`, `/markets`, `/markets/d`, `/markets/k`, `/markets/f`, `/markets/eth` and `/run`.
 
 - [ ] **Step 5: Commit**
 
@@ -8863,7 +8863,7 @@ Also change the workflow's first comment line to: `# CI for clim x Fables: contr
 - [ ] **Step 2: Check the YAML parses and the job runs locally**
 
 Run: `ruby -ryaml -e 'y = YAML.load_file(".github/workflows/ci.yml"); puts y["jobs"].keys.join(" ")'` then `cd app && rm -rf node_modules .next && npm ci && npm run sync:check && npm test && npm run typecheck && npm run lint && npm run build && npm run check:bundle`
-Expected: `contracts lab typescript app`, then every app command exits 0 (`Tests  122 passed (122)`).
+Expected: `contracts lab typescript app`, then every app command exits 0 (`Tests  128 passed (128)`).
 
 - [ ] **Step 3: Commit**
 
