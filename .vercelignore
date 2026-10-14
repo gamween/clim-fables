@@ -1,6 +1,7 @@
-# Vercel deploys the dashboard only: the project's Root Directory is app/, and `vercel deploy --prod` runs
-# from the repo root. Upload app/ and nothing else. `npm run sync` (in app/) has already copied what the
-# build reads from shared/, lab/out and docs/faq.md into app/src/generated and app/public/data (committed).
+# Vercel deploys the showcase app only: the project clim-fables has Root Directory app/, and `vercel deploy --prod`
+# runs from the repo root. Upload app/ and nothing else. `npm run sync` (in app/) has already copied what the build
+# reads from shared/, docs/, lab/out and bots/out into app/src/vendor and app/src/generated (committed).
+# app/public/fables/ (Fables' brand files, gitignored) is uploaded from the maintainer's machine on purpose.
 /*
 !/app
 /app/node_modules
@@ -10,3 +11,5 @@
 !/app/.env.example
 /app/coverage
 /app/*.tsbuildinfo
+/app/test-results
+/app/playwright-report
