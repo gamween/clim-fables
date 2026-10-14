@@ -1810,25 +1810,53 @@ contract LiveWriteDeployments is LiveScript {
         string memory d = _read("desk");
         bytes memory routerArgs = vm.parseJsonBytes(t, ".argsRouter");
         string memory o = "verify";
-        vm.serializeString(o, "tETH", _entry("tETH", _addr("tokens", ".tETH"), TOKEN_ID, vm.parseJsonBytes(t, ".argsTETH")));
-        vm.serializeString(o, "tUSDG", _entry("tUSDG", _addr("tokens", ".tUSDG"), TOKEN_ID, vm.parseJsonBytes(t, ".argsTUSDG")));
+        vm.serializeString(
+            o, "tETH", _entry("tETH", _addr("tokens", ".tETH"), TOKEN_ID, vm.parseJsonBytes(t, ".argsTETH"))
+        );
+        vm.serializeString(
+            o, "tUSDG", _entry("tUSDG", _addr("tokens", ".tUSDG"), TOKEN_ID, vm.parseJsonBytes(t, ".argsTUSDG"))
+        );
         vm.serializeString(o, "swapRouter", _entry("swapRouter", _addr("tokens", ".swapRouter"), SWAP_ID, routerArgs));
         vm.serializeString(o, "arbRouter", _entry("arbRouter", _addr("tokens", ".arbRouter"), SWAP_ID, routerArgs));
         vm.serializeString(o, "lpRouter", _entry("lpRouter", _addr("tokens", ".lpRouter"), LP_ID, routerArgs));
         vm.serializeString(
-            o, "accessManager", _entry("accessManager", _addr("hook", ".accessManager"), AM_ID, vm.parseJsonBytes(h, ".argsAccessManager"))
+            o,
+            "accessManager",
+            _entry("accessManager", _addr("hook", ".accessManager"), AM_ID, vm.parseJsonBytes(h, ".argsAccessManager"))
         );
         vm.serializeString(
-            o, "hook", _entry("hook", _addr("hook", ".hook"), "src/v2/PokeFeeHook.sol:PokeFeeHook", vm.parseJsonBytes(h, ".argsHook"))
+            o,
+            "hook",
+            _entry(
+                "hook", _addr("hook", ".hook"), "src/v2/PokeFeeHook.sol:PokeFeeHook", vm.parseJsonBytes(h, ".argsHook")
+            )
         );
         vm.serializeString(
-            o, "riskDesk", _entry("riskDesk", _addr("desk", ".riskDesk"), "src/v2/RiskDeskV2.sol:RiskDeskV2", vm.parseJsonBytes(d, ".argsDesk"))
+            o,
+            "riskDesk",
+            _entry(
+                "riskDesk",
+                _addr("desk", ".riskDesk"),
+                "src/v2/RiskDeskV2.sol:RiskDeskV2",
+                vm.parseJsonBytes(d, ".argsDesk")
+            )
         );
         vm.serializeString(
-            o, "policy", _entry("policy", _addr("desk", ".policy"), "src/v2/ClimFeePolicy.sol:ClimFeePolicy", vm.parseJsonBytes(d, ".argsPolicy"))
+            o,
+            "policy",
+            _entry(
+                "policy",
+                _addr("desk", ".policy"),
+                "src/v2/ClimFeePolicy.sol:ClimFeePolicy",
+                vm.parseJsonBytes(d, ".argsPolicy")
+            )
         );
         return vm.serializeString(
-            o, "poker", _entry("poker", _addr("desk", ".poker"), "src/v2/ClimPoker.sol:ClimPoker", vm.parseJsonBytes(d, ".argsPoker"))
+            o,
+            "poker",
+            _entry(
+                "poker", _addr("desk", ".poker"), "src/v2/ClimPoker.sol:ClimPoker", vm.parseJsonBytes(d, ".argsPoker")
+            )
         );
     }
 }
