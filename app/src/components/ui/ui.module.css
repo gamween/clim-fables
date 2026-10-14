@@ -1,0 +1,475 @@
+/* Fables' component catalog (docs/research/fables-ui-inventory.md §3), rebuilt from the measurements. */
+
+.card {
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-table);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  padding: 8px;
+}
+.dotted {
+  background-image: var(--dot-grid);
+  background-size: var(--dot-grid-size);
+}
+
+/* Section: title Inter 20/24 500, description 14/20 secondary max 76ch, head to body 40. */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+.sectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sectionTitle {
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 500;
+  letter-spacing: -0.3px;
+}
+.sectionDesc {
+  color: var(--ink-secondary);
+  max-width: 76ch;
+}
+.rule {
+  height: 1px;
+  background: var(--line-light);
+  margin: 4px 0;
+  border: 0;
+}
+
+/* Aside grid: 308 px rail and the chart panel, gap 40 (one column below 690 px of container). */
+.aside {
+  container-type: inline-size;
+}
+.asideGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+}
+@container (min-width: 690px) {
+  .asideGrid {
+    grid-template-columns: 308px 1fr;
+  }
+}
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+}
+.railRows {
+  display: flex;
+  flex-direction: column;
+}
+.railRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+}
+.railLabel {
+  color: var(--ink-secondary);
+  text-decoration: underline dashed var(--line-interactive);
+  text-underline-offset: 4px;
+}
+.railValue {
+  font-weight: 500;
+  font-variant-numeric: lining-nums tabular-nums;
+  text-align: right;
+}
+
+/* Stat block. */
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.statLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink-secondary);
+}
+.statValue {
+  font-size: 24px;
+  line-height: 28.8px;
+  font-weight: 500;
+  font-variant-numeric: lining-nums tabular-nums;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.statSecondary {
+  color: var(--ink-secondary);
+  font-variant-numeric: lining-nums tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Tier badge: 20 tall, raised, full radius, padding 2 8, gap 8, Inter 12/16 500 secondary, 6 px dot. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 20px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--raised);
+  color: var(--ink-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: -0.13px;
+  white-space: nowrap;
+}
+.badgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* Asset badge: 20 tall, chip fill, padding 2 6 2 4, Inter 10/10 500, divider before the class. */
+.assetBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 2px 6px 2px 4px;
+  border-radius: var(--radius-full);
+  background: var(--chip-fill);
+  font-size: 10px;
+  line-height: 10px;
+  font-weight: 500;
+  letter-spacing: -0.11px;
+  white-space: nowrap;
+}
+.assetDivider {
+  width: 1px;
+  height: 10px;
+  background: var(--ink-muted);
+}
+.testnet {
+  color: var(--session);
+}
+
+/* Info tooltip: shows after 0.3 s, bubble max 300, surface, hairline, radius 12, padding 8 12, Inter 12/16. */
+.tip {
+  position: relative;
+  display: inline-flex;
+  color: var(--ink-secondary);
+  cursor: help;
+}
+.tipBubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  translate: -50% 2px;
+  width: max-content;
+  max-width: 300px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line-light);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-menu-flat);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+  letter-spacing: -0.13px;
+  white-space: pre-line;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 50;
+  transition:
+    opacity var(--dur) var(--ease-entrance),
+    translate var(--dur) var(--ease-entrance),
+    visibility 0s linear var(--dur);
+}
+.tip:hover .tipBubble,
+.tip:focus-within .tipBubble {
+  opacity: 1;
+  visibility: visible;
+  translate: -50% 0;
+  transition-delay: 0.3s;
+}
+
+/* Live dot: 8 px lime with a ring pulse (scale 2.4, fade), 1.8 s ease-out. */
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+.liveDot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.liveDot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  animation: pulse 1.8s ease-out infinite;
+}
+.liveDotGreen {
+  background: var(--positive);
+}
+@keyframes pulse {
+  from {
+    scale: 1;
+    opacity: 0.6;
+  }
+  to {
+    scale: 2.4;
+    opacity: 0;
+  }
+}
+
+/* Segmented switcher (FilterToggle). */
+.toggle {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line-light);
+}
+.toggleHighlight {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: var(--highlight-left, 2px);
+  width: var(--highlight-width, 0);
+  border-radius: var(--radius-highlight);
+  background: var(--raised);
+  transition:
+    left var(--dur) var(--ease-std),
+    width var(--dur) var(--ease-std);
+}
+.toggleItem {
+  position: relative;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  border-radius: var(--radius-highlight);
+  cursor: pointer;
+  transition: color 0.3s;
+}
+.toggleItem[aria-checked="true"],
+.toggleItem:hover {
+  color: var(--ink);
+}
+
+/* Period buttons: 24 tall, padding 4 8, radius 4, 12/16 500; on white; hover raised. */
+.periods {
+  display: inline-flex;
+  gap: 2px;
+}
+.period {
+  height: 24px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-compact);
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.period[aria-pressed="true"] {
+  color: var(--ink);
+}
+@media (hover: hover) and (min-width: 576px) {
+  .period:hover {
+    background: var(--raised);
+  }
+}
+
+/* Chart panel: card, radius 12, top bar padding 8 12 0, plot with dot grid, legend 38 tall with a top hairline. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  min-width: 0;
+}
+.panelTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 0;
+  min-height: 34px;
+}
+.panelLegend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line-light);
+  color: var(--ink-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  flex-wrap: wrap;
+}
+.swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.swatchLine {
+  width: 12px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+/* Buttons. */
+.primary,
+.secondary,
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  border: 0;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    box-shadow var(--dur-fast) var(--ease-std),
+    scale var(--dur-press) var(--ease-std);
+}
+.primary {
+  background: var(--control-primary);
+  color: var(--canvas);
+  box-shadow: var(--shadow-button);
+}
+.primary:hover {
+  background: var(--control-primary-hover);
+}
+.secondary {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-button), 0 0 0 1px var(--line);
+}
+.secondary:hover {
+  background: color-mix(in srgb, var(--surface), white 6%);
+}
+.cta {
+  height: auto;
+  padding: 10px 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-button), 0 0 0 1px var(--line);
+}
+.cta:hover {
+  box-shadow: var(--shadow-button), 0 0 0 1px var(--line-interactive);
+}
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-secondary);
+  cursor: pointer;
+}
+.iconButton:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+/* Inline links. */
+.extLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-secondary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.extLink:hover {
+  color: var(--ink);
+}
+.address {
+  color: var(--ink);
+  text-decoration: underline dotted var(--ink-muted);
+  text-underline-offset: 3px;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Skeleton. */
+.skeleton {
+  display: inline-block;
+  min-width: 48px;
+  height: 0.9em;
+  border-radius: var(--radius-full);
+  background: var(--skeleton);
+  animation: skeleton 1.5s ease-in-out infinite;
+  vertical-align: middle;
+}
+@keyframes skeleton {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Pair logo: two halves of one circle with a 2 px gap. */
+.pair {
+  position: relative;
+  display: inline-block;
+  flex: none;
+}
+.pairHalf {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.pairHalf img,
+.pairHalf svg {
+  display: block;
+}
+
+/* Error line under a section whose read failed. */
+.readError {
+  color: var(--negative);
+  font-size: 12px;
+  line-height: 16px;
+}
