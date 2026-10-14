@@ -1,6 +1,6 @@
 # clim run-book
 
-How to run clim on Ethereum Sepolia: the Chainlink CRE risk desk loop, the arbitrage and retail bots, the February 2026 replay and the two security demos. Commands run from the repository root unless a `cd` is shown. Expected output follows each command; addresses, prices and hashes will differ.
+Sections 0 to 7: clim v1 on Ethereum Sepolia (the TOKEN2049 Origins stack; its processes ran from the hackathon checkout and were stopped by plan 03 Task 26). Section 8: clim × Fables' live stack on Robinhood Chain testnet. Commands run from the repository root unless a `cd` is shown. Expected output follows each command; addresses, prices and hashes will differ.
 
 ## 0. One-time setup
 
@@ -177,3 +177,104 @@ ls -t bots/out/cre-sim/*.log | head -3                                # latest r
 | `nonce too low` / `replacement transaction underpriced` from fund or cre-loop | two processes sent from one operator key at once (fund and the live loop, or a replay loop started without `ENV_FILE=.env.replay`) | stop the live loop, rerun fund, restart it; start the replay loop with `ENV_FILE=.env.replay` |
 | watch shows `blind` while cre-loop runs | reports failing | look at the last statuses in `bots/out/cre-runs.jsonl` |
 | HTTP 429 from the RPC | public endpoint rate limit | set a keyed `SEPOLIA_RPC_URL` |
+
+## 8. clim × Fables live stack (Robinhood Chain testnet)
+
+The CRE desk v2 (simulation with `--broadcast`, one report every 30 s) writes `RiskDeskV2`; the runner pokes pool D through `ClimPoker` after each report; a keeper-style bot pokes pool K about every 180 s (an imitation of the pattern observed on Fables' pool, not Fables' code); pool F stays flat at 7 bp; an arbitrage bot and a retail bot trade the three pools. Addresses: `shared/deployments/robinhood-testnet.json`. Explorer: https://explorer.testnet.chain.robinhood.com.
+
+### 8.1 Keys and setup (once)
+
+```bash
+bun install && (cd cre/risk-desk && bun install)
+cd bots && bun run live:keys   # creates the missing keys in bots/.env and cre/.env, prints addresses only
+```
+
+| Role | Variable | Holds |
+|---|---|---|
+| Deployer (TestToken owner, AccessManager admin) | `contracts/.env` `PRIVATE_KEY`, copied to `bots/.env` `DEPLOYER_PRIVATE_KEY` | role 0 (ADMIN) |
+| CRE operator (`RiskDeskV2.simOperator`) | `cre/.env` `CRE_ETH_PRIVATE_KEY` (no `0x`) | nothing on the AccessManager |
+| Runner | `bots/.env` `RUNNER_PRIVATE_KEY` | CLIM_RUNNER (7): `ClimPoker.poke()` |
+| Keeper (pool K) | `bots/.env` `KEEPER_PRIVATE_KEY` | FEE_POKER (1): `PokeFeeHook.pokeFee` (any pool; the bot pokes K only) |
+| Arbitrage, retail | `bots/.env` `ARB_RH_PRIVATE_KEY`, `NOISE_RH_PRIVATE_KEY` | tokens only |
+
+### 8.2 Gas budget and funding
+
+At the measured testnet base fee of 0.01 gwei the stack costs about 0.03 ETH a day (plan 03 Task 11; measured figures in `docs/evidence/gas-robinhood-testnet.json`). Testnet ETH comes from Sepolia through the Robinhood Chain bridge: `cast send 0xF2939afA86F6f933A3CE17fCAB007907B6b0B7a4 "depositEth()" --value 0.5ether --private-key "$PRIVATE_KEY" --rpc-url "$SEPOLIA_RPC_URL"` (the Delayed Inbox on Sepolia; credited to the same address on L2 in about 10 minutes), or the faucet https://faucet.testnet.chain.robinhood.com in a browser. Then `cd bots && bun run live:fund` tops up every key (idempotent).
+
+### 8.3 Start (launchd)
+
+The six long-running processes run on the maintainer's Mac as launchd LaunchAgents of the logged-in user, one job per process: launchd starts them at login (so after a reboot), restarts a job that exits 30 s after its last start, and the processes resume by themselves when the Mac wakes (8.6).
+
+| Job | What it runs (from `bots/`, absolute paths in the plist) | Log in `bots/out/logs/` | Expected output |
+|---|---|---|---|
+| `fi.clim-fables.desk` | `bun src/live/desk-loop.ts --target rh-testnet-settings --cre-bin <cre>` (CRE loop + recorder) | `desk.log` | the loop's `=== <time>` and `[USER LOG]` lines, then `[desk] run <time>: applied tx 0x... seq <n> sigma5 <x> dev <y> gas <g>` every 30 s |
+| `fi.clim-fables.runner` | `bun src/live/runner.ts` | `runner.log` | `[runner] seq <n> poked <f01>/<f10> pips, tx 0x..., gas <g>` after each report |
+| `fi.clim-fables.keeper` | `bun src/live/keeper.ts` | `keeper.log` | `[keeper] sigma5 <x>%/yr -> K fee <f> pips (TTL 7200 s), tx 0x...` about every 180 s |
+| `fi.clim-fables.arb` | `bun src/live/arb.ts` | `arb.log` | `[arb] <pool> pool <p> vs <m> (fee <f>) -> buyEth tx 0x...` when a pool leaves its band |
+| `fi.clim-fables.noise` | `bun src/live/noise.ts` | `noise.log` | `[noise] buyEth $<usd> on D (fee <f> pips) tx 0x...`, the same order on K and F |
+| `fi.clim-fables.outages` | `bun src/live/scripts/outages.ts --watch` | `outages.log` | `[outages] block <n>: <k> new reports (<total> in all), <w> windows -> bots/out/outages.json` every 5 minutes |
+
+```bash
+cd bots && bun run live:install            # writes ~/Library/LaunchAgents/fi.clim-fables.*.plist and starts the six jobs
+cd bots && bun run live:logs desk          # follow one job's log (Ctrl+C stops the tail, not the job); no name: all six
+cd bots && bun run live:status --watch     # a snapshot every 15 s, with each job's launchd state; PROBLEM lines name anything wrong
+```
+
+`live:install` resolves `bun` and `cre` on PATH and writes their absolute paths into the plists; rerun it after moving the repository or reinstalling either tool (it reloads the jobs). `bun run live:install <name>` (re)installs one job. The plists carry only `HOME` and `PATH`: the keys stay in `bots/.env` and `cre/.env`, read by the processes as when started by hand. The desk job runs the CRE CLI as this user, so `cre whoami` must show a logged-in account.
+
+Nothing in this stack keeps the Mac awake: sleep is the maintainer's (his Pauline app owns `pmset disablesleep`). While the Mac sleeps the stack pauses and the pools fall back as 8.6 describes; the outage is recorded, and every job resumes on wake.
+
+### 8.4 Check and stop
+
+```bash
+cd bots && bun run live:status          # exit 0: healthy; exit 1 lists each PROBLEM (a job not running included)
+cd bots && bun run live:gas             # docs/evidence/gas-robinhood-testnet.json
+cd bots && bun run live:verify          # docs/evidence/live-check-<date>.json, PASS/FAIL per check
+cd bots && bun run live:outages         # one pass of the outage record now (the outages job runs one every 5 minutes)
+launchctl kickstart -k gui/$(id -u)/fi.clim-fables.runner   # restart one job now
+cd bots && bun run live:uninstall       # stop every job and remove the plists (nothing comes back at login)
+```
+
+`pkill` does not stop a job: launchd starts it again 30 s later (`KeepAlive`). Stop with `bun run live:uninstall` (every job) or `bun run live:uninstall <name>` (one). The jobs' command lines contain `src/live/` (and the desk's child `sim-loop.sh rh-testnet-settings`); none of them matches the Sepolia v1 processes (`--pair live`, `staging-settings`), and the v1 shutdown patterns of section 3 match none of them.
+
+### 8.5 Troubleshooting
+
+- `desk report age > 90 s`: the CRE loop is down or failing; `bun run live:logs desk` and `bots/out/desk-sim/*.log` show why. Credential checks against the CRE API fail now and then (friction log row 24); the loop recovers by itself. After `tauKillSec` (180 s) without a report the policy is blind: the runner stops poking and pool D returns to its flat 7 bp when its last 600 s override ends (8.6).
+- `D fee != last poke`: another FEE_POKER key poked D, or a poke reverted; `bots/out/runner-rh.jsonl` has the error.
+- `job <name> not running` or `bot <name> silent`: `bun run live:logs <name>` shows the last error; launchd restarts an exited job 30 s after its last start; `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>` restarts it now. `job <name> not loaded`: `bun run live:install <name>`.
+- A job exits again at once (`last exit 1` in `live:status`): a key missing from `bots/.env`, the CRE CLI logged out (`cre login`), or a moved repository or tool (`bun run live:install`).
+- The public RPC answers 429: set `RH_TESTNET_RPC_URL` in `bots/.env` to a keyed endpoint (never commit it), then restart the jobs so they read it: `for j in desk runner keeper arb noise outages; do launchctl kickstart -k gui/$(id -u)/fi.clim-fables.$j; done`.
+- Contracts re-deployed: rerun `cd cre/risk-desk && bun scripts/sync-config.ts`, then `cd bots && bun run live:install` (reloads every job; the desk job rebuilds the WASM). `bots/out/outages.json` starts over from the new desk's deployment block by itself.
+
+### 8.6 Outages
+
+The stack runs on a laptop: the Mac sleeps when the maintainer lets it, can be offline or reboot, and a process can crash. An outage is handled and recorded, never prevented with a keep-awake.
+
+**What happens.** When the whole Mac stops (asleep, offline, rebooting), from the last report's `tObs` (asserted by `contracts/test/v2/Outage.t.sol`); if only the desk fails while the Mac runs, the keeper bot keeps posting on K:
+
+| Time | Desk and policy | Pool D (ClimPoker) | Pool K (keeper-style bot) | Pool F |
+|---|---|---|---|---|
+| 0 to 180 s | fresh (`tauKillSec` 180) | the last poke's fees | the last keeper poke | flat 700 pips |
+| from 181 s | blind: `poke()` reverts `DeskBlind`; the runner logs a skip, not an error | the last poke's fees until `tObs + 600` | the last keeper poke (the keeper bot is down too; its poke lives up to 7,200 s) | flat |
+| from 600 s | blind | flat 700 pips (Fables' flat 7 bp) | the last keeper poke until 7,200 s after it, then flat | flat |
+| first report after the gap | a gap above `RESET_GAP` (180 s) is taken as is, no ramp from the stale sigma | poked again after that report | posted again at once, from fresh data | flat |
+
+Each process ticks every 10 s or less. After a wall-clock gap of more than 60 s (the Mac slept, or the process was stopped) it writes a `wake` line to `bots/out/outages-local.jsonl`, re-syncs its nonce from the chain, re-reads the desk, and drops anything it prepared before the gap (a keeper fee, an arbitrage or retail order) instead of sending it late. At start it writes a `restart` line dated from its last log line; after three or more failed ticks in a row it writes an `rpc-errors` line when it recovers. Failed ticks back off from 2 s, doubling up to 60 s; a process never crashes on an RPC error. Each CRE run is a fresh process reading its own nonce, and a report delivered late carries its own `tObs`, to which the policy's freshness and D's TTL are anchored.
+
+**How to check.**
+
+```bash
+cd bots && bun run live:status                                   # desk age, policy mode, each job, the last outage
+cd bots && bun run live:outages && jq '.windows[-3:]' out/outages.json   # the last three windows
+tail -n 20 bots/out/outages-local.jsonl                          # what the Mac's processes saw
+```
+
+A window has `from` (the `tObs` of the last report before the silence), `to` (that of the first report after it; `null` while it lasts), `durationSec`, `seqBefore` and `seqAfter` (consecutive: no report is missing), `reason` and `local` (the overlapping local records: `wall-clock gap seen by ...: the Mac was asleep or the processes were suspended`, `processes stopped and restarted: ...`, `RPC or network errors in ...`, or `unknown`). Pool D's fee at a moment of a window, on chain: `cast call <hook> 'currentFee(bytes32,bool)(uint24)' <pool D id> true --block $(cast find-block <unix time> --rpc-url https://rpc.testnet.chain.robinhood.com) --rpc-url https://rpc.testnet.chain.robinhood.com`. Plan 04's app shows the same windows, derived from the chain with `outageWindows()` of `@clim/shared`; the local reasons stay on the Mac (`bots/out/` is not committed).
+
+**How to restart.**
+
+- After a sleep: nothing to do. The jobs resume on wake; the desk reports within about 30 s, the runner pokes D after that report, the keeper posts on K at once.
+- After a reboot: nothing to do once the maintainer logs in (LaunchAgents start with his session; with nobody logged in, nothing runs and the outage lasts until login).
+- After a crash: launchd restarts the job 30 s after its last start. A job that keeps exiting shows its `last exit` code in `live:status`: read `bun run live:logs <name>`, fix the cause, then `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>`.
+- Offline: the processes back off and retry; the desk's failed CRE runs are recorded in `bots/out/desk-runs.jsonl`; everything resumes with the network.
+- Never add `caffeinate` or change `pmset`: the Mac's sleep is the maintainer's (Pauline).
