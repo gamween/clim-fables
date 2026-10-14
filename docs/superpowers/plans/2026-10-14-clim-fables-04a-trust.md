@@ -2230,6 +2230,18 @@ with
 To reproduce v1, see [Getting started](https://github.com/DVB-ANS/clim/tree/token2049-submission#getting-started) in the README of the submitted version.
 ```
 
+and, since the main README no longer has a "Chainlink CRE evidence" section, replace the start of the v1 section's last bullet
+
+```markdown
+- The main README, section "Chainlink CRE evidence", lists the latest reports with Etherscan links.
+```
+
+with
+
+```markdown
+- The README of the submitted version, section [Chainlink CRE evidence](https://github.com/DVB-ANS/clim/tree/token2049-submission#chainlink-cre-evidence), lists the latest reports with Etherscan links.
+```
+
 Run: `grep -c "$(printf '\342\200\224')" docs/evidence/README.md README.md docs/security.md docs/integrate/README.md`
 Expected: `0` for each file.
 
