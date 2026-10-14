@@ -1,0 +1,425 @@
+/* Global shell (docs/research/fables-ui-inventory.md §1): banner 40, header 80, content column 1200, footer. */
+
+.banner {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: var(--banner-h);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 40px;
+  background:
+    radial-gradient(280px circle at 168px calc(100% + 26px), rgb(171 199 65 / 0.2), transparent 70%),
+    radial-gradient(280px circle at calc(100% - 196px) -26px, rgb(171 199 65 / 0.2), transparent 70%),
+    var(--claim-ground);
+  box-shadow: inset 0 -1px var(--line-light);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: -0.13px;
+  overflow: hidden;
+}
+.banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--dot-grid);
+  background-size: var(--dot-grid-size);
+  mask-image:
+    radial-gradient(280px circle at 168px calc(100% + 26px), black, transparent 70%),
+    radial-gradient(280px circle at calc(100% - 196px) -26px, black, transparent 70%);
+  pointer-events: none;
+}
+.bannerMark {
+  width: 20px;
+  height: 13px;
+  background: var(--brand);
+  mask: url("/fables/logo.svg") center / contain no-repeat;
+  flex: none;
+}
+.bannerMuted {
+  color: var(--ink-secondary);
+}
+@media (max-width: 575px) {
+  .banner {
+    justify-content: flex-start;
+    padding: 0 16px;
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 0 8px;
+  }
+}
+
+.header {
+  position: fixed;
+  top: var(--banner-h);
+  left: 0;
+  right: 0;
+  height: var(--nav-h);
+  z-index: 9000;
+  padding: 0 var(--gutter);
+  background: var(--canvas);
+  transition: box-shadow var(--dur) ease-in-out;
+}
+.headerScrolled {
+  box-shadow: 0 1px 0 var(--line-light);
+}
+.headerInner {
+  position: relative;
+  max-width: var(--max-width);
+  height: 100%;
+  margin: 0 auto;
+  padding: 22px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+}
+.brandLogo {
+  height: 32px;
+  aspect-ratio: 500 / 328;
+  background: currentColor;
+  mask: url("/fables/logo.svg") center / contain no-repeat;
+  transition: color var(--dur-fast);
+}
+.brand:hover .brandLogo {
+  color: var(--brand);
+}
+.brandText {
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 32px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.brandTimes {
+  color: var(--ink-muted);
+  padding: 0 0.12em;
+}
+@media (max-width: 1100px) {
+  .brandLogo {
+    height: 28px;
+  }
+  .brandText {
+    font-size: 28px;
+    line-height: 28px;
+  }
+}
+
+.nav {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: flex;
+  gap: 2px;
+  padding: 6px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line-light);
+  box-shadow: var(--shadow-pill);
+}
+.navIndicator {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: var(--nav-left, 6px);
+  width: var(--nav-width, 0);
+  border-radius: 5px;
+  background: var(--raised);
+  transition:
+    left var(--dur) var(--ease-std),
+    width var(--dur) var(--ease-std);
+}
+.navLink {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 5px;
+  color: var(--ink-secondary);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  --icon-1: var(--ink-faint);
+  --icon-2: var(--ink-muted);
+  transition:
+    background-color var(--dur-fast),
+    color var(--dur-fast),
+    scale var(--dur-fast);
+}
+.navLink[aria-current="page"] {
+  color: var(--ink);
+  --icon-1: var(--ink-muted);
+  --icon-2: var(--ink-secondary);
+}
+@media (hover: hover) and (min-width: 576px) {
+  .navLink:not([aria-current="page"]):hover {
+    background: var(--raised);
+    color: var(--ink);
+  }
+}
+@media (max-width: 1100px) {
+  .nav {
+    display: none;
+  }
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/* The account chip's slot. The showcase never connects a wallet: this pill is inert. */
+.noWallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 8px 12px 8px 8px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-button), inset 0 0 0 1px var(--line-light);
+  color: var(--ink-secondary);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}
+.noWalletDot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: repeating-linear-gradient(135deg, var(--raised) 0 3px, var(--surface) 3px 6px);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.menuWrap {
+  position: relative;
+}
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 12px);
+  width: 234px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-menu);
+  transform-origin: top right;
+  animation: menuIn 0.1s var(--ease-std);
+}
+@keyframes menuIn {
+  from {
+    scale: 0.96;
+    translate: 0 -4px;
+    opacity: 0;
+  }
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink);
+}
+.menuItem:hover {
+  background: var(--hover);
+}
+.menuSep {
+  height: 1px;
+  background: var(--line-light);
+  margin: 4px 0;
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: calc(var(--max-width) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: calc(var(--nav-h) + var(--banner-h) + 48px) var(--gutter) 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.shell::before {
+  content: "";
+  position: fixed;
+  left: 15vw;
+  top: 0;
+  width: 70vw;
+  height: 100%;
+  box-shadow: 0 0 200px 160px var(--canvas);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.footer {
+  width: min(100%, calc(var(--max-width) + 2 * var(--gutter)));
+  margin: 0 auto;
+  padding: 48px var(--gutter);
+}
+.footerTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 48px;
+}
+.footerBlurb {
+  max-width: 46ch;
+  margin-top: 16px;
+  color: var(--ink-secondary);
+}
+.footerCols {
+  display: flex;
+  gap: 48px 72px;
+  flex-wrap: wrap;
+}
+.footerCol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.footerTitle {
+  font-size: 14px;
+  line-height: 1.1;
+  font-weight: 450;
+  margin-bottom: 4px;
+}
+.footerLink {
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 450;
+  color: var(--ink-secondary);
+  transition: color var(--dur-fast);
+}
+.footerLink:hover {
+  color: var(--ink);
+}
+.footerBottom {
+  margin-top: 96px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 24px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 16px;
+  flex-wrap: wrap;
+}
+@media (max-width: 991px) {
+  .footerTop {
+    flex-direction: column;
+  }
+}
+
+.toast {
+  position: fixed;
+  left: 20px;
+  bottom: 16px;
+  width: 220px;
+  aspect-ratio: 13.75 / 9.1875;
+  z-index: 8000;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+  border-radius: var(--radius);
+  background-color: var(--card);
+  background-image: var(--dot-grid);
+  background-size: var(--dot-grid-size);
+  box-shadow: inset 0 0 0 1px var(--line-light);
+  overflow: hidden;
+}
+.toastSlide {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: slideIn var(--dur) var(--ease-std);
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+  }
+}
+.toastBadge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--brand-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+}
+.toastTitle {
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 500;
+}
+.toastBody {
+  font-size: 14px;
+  line-height: 19px;
+  color: var(--ink-muted);
+}
+.toastRing {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+.toastClose {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-muted);
+  opacity: 0;
+  cursor: pointer;
+}
+.toast:hover .toastRing {
+  opacity: 0;
+}
+.toast:hover .toastClose {
+  opacity: 1;
+}
+@media (max-width: 575px) {
+  .toast {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    aspect-ratio: auto;
+    min-height: 96px;
+  }
+}
