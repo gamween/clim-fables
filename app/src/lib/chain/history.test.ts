@@ -76,3 +76,21 @@ describe("mergeHistory", () => {
     expect(blocks(h)).toEqual(range(82, 102));
   });
 });
+
+describe("mergeHistory and a cached history", () => {
+  it("keeps the block a cached history was built at while it only tops it up", async () => {
+    const r = fakeRead();
+    const cached: History<Log> = { items: range(90, 100).map((b) => ({ block: BigInt(b) })), fromBlock: 90n, toBlock: 100n, toTs: 100, windowSec: 60, cacheBlock: 100n };
+    const h = await mergeHistory({ prev: cached, toBlock: 104n, windowSec: 60, bounds: bounds(10n), read: r.read });
+    expect(r.calls).toEqual([[101n, 104n]]);
+    expect(h.cacheBlock).toBe(100n);
+    expect(blocks(h)).toEqual(range(94, 104));
+  });
+
+  it("drops it when the whole window is read again", async () => {
+    const r = fakeRead();
+    const cached: History<Log> = { items: [], fromBlock: 90n, toBlock: 100n, toTs: 100, windowSec: 60, cacheBlock: 100n };
+    const h = await mergeHistory({ prev: cached, toBlock: 102n, windowSec: 60, bounds: bounds(20n), read: r.read });
+    expect(h.cacheBlock).toBeUndefined();
+  });
+});

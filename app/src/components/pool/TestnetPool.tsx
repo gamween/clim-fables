@@ -21,8 +21,8 @@ const DAY = 86_400;
 export function TestnetPool({ name }: { name: LivePoolName }) {
   const pool = LIVE.pools[name];
   const clim = useClimNow();
-  const pokes = usePoolPokes(name, DAY);
-  const swaps = usePoolSwaps(name, DAY);
+  const pokes = usePoolPokes(name);
+  const swaps = usePoolSwaps(name);
   const c = clim.data;
   const now = c?.pools[name];
   const block = c?.quote.blockNumber ?? 0n;
@@ -39,7 +39,7 @@ export function TestnetPool({ name }: { name: LivePoolName }) {
     : [];
   const source = FEE_SOURCE[name];
   const tier = now ? feeTier(Math.max(now.fee0For1, now.fee1For0), LIVE.hookConfig.flatPips) : null;
-  const swapRange = sw && swaps.data ? { fromBlock: swaps.data.fromBlock, toBlock: swaps.data.toBlock, fromTs: swaps.data.toTs - DAY, toTs: swaps.data.toTs } : undefined;
+  const swapRange = sw && swaps.data ? { fromBlock: swaps.data.fromBlock, toBlock: swaps.data.toBlock, fromTs: swaps.data.toTs - DAY, toTs: swaps.data.toTs, cacheBlock: swaps.data.cacheBlock } : undefined;
 
   return (
     <div className={p.pool} data-qa="pool">

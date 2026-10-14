@@ -18,6 +18,7 @@
     "e2e:guardrails": "playwright test e2e/guardrails.spec.ts",
     "check:live": "playwright test e2e/live.spec.ts",
     "qa:visual": "playwright test e2e/visual.spec.ts",
+    "perf": "playwright test e2e/perf.spec.ts",
     "licenses": "npx -y generate-license-file@4.2.5 --input package.json --output public/third-party-licenses.txt --overwrite"
   },
   "dependencies": {

@@ -10,13 +10,13 @@ import { readPoolOverrides } from "../src/lib/chain/readClim";
 import { readFablesPokes, readSwaps } from "../src/lib/chain/readFables";
 import { feeWindow, swapWindow } from "../src/lib/windowStats";
 
-export type LiveElement = { key: string; chain: string; block: string; raw: string; text: string; fromBlock?: string; toBlock?: string; fromTs?: string; toTs?: string };
+export type LiveElement = { key: string; chain: string; block: string; raw: string; text: string; fromBlock?: string; toBlock?: string; fromTs?: string; toTs?: string; source?: string; cacheBlock?: string };
 
 // The public endpoints rate-limit ("Rate Limit Hit, limit will reset in 60 seconds"): batch like the app and back off
 // for up to about a minute (2 + 4 + 8 + 16 + 32 s) before a read fails.
 const transport = (url: string) => http(url, { batch: { batchSize: 50, wait: 16 }, retryCount: 5, retryDelay: 2_000 });
-const mainnet = createPublicClient({ chain: robinhood, transport: transport(process.env.RH_MAINNET_RPC_URL ?? "https://rpc.mainnet.chain.robinhood.com") }) as PublicClient;
-const testnet = createPublicClient({ chain: robinhoodTestnet, transport: transport(process.env.RH_TESTNET_RPC_URL ?? "https://rpc.testnet.chain.robinhood.com") }) as PublicClient;
+export const mainnet = createPublicClient({ chain: robinhood, transport: transport(process.env.RH_MAINNET_RPC_URL ?? "https://rpc.mainnet.chain.robinhood.com") }) as PublicClient;
+export const testnet = createPublicClient({ chain: robinhoodTestnet, transport: transport(process.env.RH_TESTNET_RPC_URL ?? "https://rpc.testnet.chain.robinhood.com") }) as PublicClient;
 const MODES = ["normal", "degraded", "blind"] as const;
 
 function range(e: LiveElement) {

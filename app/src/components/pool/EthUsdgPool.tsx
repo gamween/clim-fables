@@ -20,7 +20,7 @@ import { FeeUpdates, feeUpdateRows } from "./FeeUpdates";
 import { FeeRail, FeeValue, ParamsCard, PoolHeader } from "./parts";
 import { RecentSwaps } from "./RecentSwaps";
 
-const PERIODS = { "24H": 86_400, "7D": 7 * 86_400 } as const;
+const PERIODS = { "24H": 86_400, "7D": 604_800 } as const;
 type Period = keyof typeof PERIODS;
 type View = "both" | "direction";
 
@@ -31,9 +31,9 @@ export function EthUsdgPool() {
   const fables = useFablesNow();
   const clim = useClimNow();
   const pokes = useFablesPokes(windowSec);
-  const points = useClimPoints(PERIODS["24H"]);
-  const reports = useDeskReports(900);
-  const swaps = useFablesSwaps(600);
+  const points = useClimPoints();
+  const reports = useDeskReports();
+  const swaps = useFablesSwaps();
 
   const f = fables.data;
   const c = clim.data;

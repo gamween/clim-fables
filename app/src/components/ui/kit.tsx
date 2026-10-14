@@ -199,9 +199,15 @@ export const ReadError = ({ error }: { error: unknown }) => (
 
 export type LiveKind = "fee" | "avgfee" | "price" | "int" | "count" | "sigma" | "gap" | "mode" | "clock" | "bool";
 
+export type LiveRange = { fromBlock: bigint; toBlock: bigint; fromTs: number; toTs: number; cacheBlock?: bigint };
+
+/** Where a window statistic's logs came from: the server's cache (built at `cacheBlock`), that cache topped up from the
+ *  chain by this browser, or the chain alone. */
+export const liveSource = (r: LiveRange) => (r.cacheBlock === undefined ? "chain" : r.cacheBlock === r.toBlock ? "cache" : "cache+chain");
+
 /** A number read from a chain. The live check (e2e/live.spec.ts) re-reads every [data-live] element's key at its
  *  block and compares both the raw value and the text. */
-export function LiveValue({ k, chain, block, raw, text, range }: { k: string; chain: "mainnet" | "testnet"; block: bigint; raw: string | number | bigint | boolean; text: string; range?: { fromBlock: bigint; toBlock: bigint; fromTs: number; toTs: number } }) {
+export function LiveValue({ k, chain, block, raw, text, range }: { k: string; chain: "mainnet" | "testnet"; block: bigint; raw: string | number | bigint | boolean; text: string; range?: LiveRange }) {
   return (
     <span
       data-live={k}
@@ -212,6 +218,8 @@ export function LiveValue({ k, chain, block, raw, text, range }: { k: string; ch
       data-to-block={range?.toBlock.toString()}
       data-from-ts={range?.fromTs}
       data-to-ts={range?.toTs}
+      data-source={range ? liveSource(range) : undefined}
+      data-cache-block={range?.cacheBlock?.toString()}
       className="tabular"
     >
       {text}

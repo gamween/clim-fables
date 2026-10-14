@@ -63,11 +63,11 @@ export function FeeRail({ prefix, chain, current, win, history, label, extra }: 
   chain: Chain;
   current: ReactNode;
   win: FeeWindow | null;
-  history: { fromBlock: bigint; toBlock: bigint } | null;
+  history: { fromBlock: bigint; toBlock: bigint; cacheBlock?: bigint } | null;
   label: string;
   extra?: Array<{ label: string; tip?: string; value: ReactNode }>;
 }) {
-  const range = win && history ? { fromBlock: history.fromBlock, toBlock: history.toBlock, fromTs: win.fromTs, toTs: win.toTs } : undefined;
+  const range = win && history ? { fromBlock: history.fromBlock, toBlock: history.toBlock, fromTs: win.fromTs, toTs: win.toTs, cacheBlock: history.cacheBlock } : undefined;
   const v = (k: string, raw: number | null, text: string) =>
     range && raw !== null && history ? <LiveValue k={`${prefix}:${k}`} chain={chain} block={history.toBlock} raw={raw} text={text} range={range} /> : <Skeleton />;
   return (

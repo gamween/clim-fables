@@ -21,7 +21,7 @@ export function MarketsHeadStats() {
         </dt>
         <dd className={`${u.statValue} ${p.headValue}`} style={{ margin: "4px 0 0" }}>
           {win && pokes.data ? (
-            <LiveValue k="fables:changes" chain="mainnet" block={pokes.data.toBlock} raw={win.changes} text={formatInt(win.changes)} range={{ fromBlock: pokes.data.fromBlock, toBlock: pokes.data.toBlock, fromTs: win.fromTs, toTs: win.toTs }} />
+            <LiveValue k="fables:changes" chain="mainnet" block={pokes.data.toBlock} raw={win.changes} text={formatInt(win.changes)} range={{ fromBlock: pokes.data.fromBlock, toBlock: pokes.data.toBlock, fromTs: win.fromTs, toTs: win.toTs, cacheBlock: pokes.data.cacheBlock }} />
           ) : (
             <Skeleton />
           )}

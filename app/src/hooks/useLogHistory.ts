@@ -1,46 +1,42 @@
 "use client";
 import { useRef } from "react";
 import type { PublicClient } from "viem";
-import { blockTime, firstBlockAtOrAfter } from "@/lib/chain/blockTimes";
-import { type History, mergeHistory } from "@/lib/chain/history";
-import { laggedHead, withRetry } from "@/lib/chain/retry";
+import { mainnetClient, testnetClient } from "@/lib/chain/clients";
+import type { History } from "@/lib/chain/history";
+import { fetchSeed, seededPoll } from "@/lib/chain/seed";
+import { pollSeries, SERIES, type SeriesDef, type SeriesItem, type SeriesKey } from "@/lib/chain/series";
 import { usePoll } from "./usePoll";
 
 export type { History };
 
-type Options<T> = {
-  key: string;
-  client: () => PublicClient;
-  read: (client: PublicClient, fromBlock: bigint, toBlock: bigint) => Promise<T[]>;
-  windowSec: number;
-  /** Extra history before the window (a poke's TTL), so the state at the window's start is known. */
-  lookbackSec: number;
-  minBlockSec: number;
-  pollMs: number;
-};
+const clientOf = (chain: "mainnet" | "testnet"): PublicClient => (chain === "mainnet" ? mainnetClient() : testnetClient());
 
-/** Logs over a sliding time window whose first block is found exactly from block timestamps: the first call reads the
- *  whole window (in ranges the RPC accepts), each next one only the blocks since the last call (mergeHistory). */
-export function useLogHistory<T extends { block: bigint }>(o: Options<T>) {
-  const state = useRef<{ key: string; history: History<T> | null }>({ key: o.key, history: null });
+/** Logs over a sliding time window (lib/chain/series.ts). The first call shows the server's cached copy at once and
+ *  tops it up from the chain (lib/chain/seed.ts); each next one reads only the blocks since the last call. */
+export function useLogHistory<K extends SeriesKey>(key: K, pollMs: number) {
+  type T = SeriesItem<K> & { block: bigint };
+  const state = useRef<{ key: string; history: History<T> | null }>({ key, history: null });
   return usePoll<History<T>>(
-    async () => {
-      if (state.current.key !== o.key) state.current = { key: o.key, history: null };
-      const client = o.client();
-      const next = await mergeHistory({
-        prev: state.current.history,
-        toBlock: laggedHead(await withRetry(() => client.getBlockNumber({ cacheTime: 0 }))),
-        windowSec: o.windowSec,
-        bounds: async (toBlock) => {
-          const toTs = await blockTime(client, toBlock);
-          return { fromBlock: await firstBlockAtOrAfter(client, toTs - o.windowSec - o.lookbackSec, toBlock, toTs, o.minBlockSec), toTs };
-        },
-        read: (fromBlock, toBlock) => o.read(client, fromBlock, toBlock),
-      });
-      state.current = { key: o.key, history: next };
+    async (publish) => {
+      if (state.current.key !== key) state.current = { key, history: null };
+      const def = SERIES[key] as unknown as SeriesDef<T>; // every series' items carry their block
+      const client = clientOf(def.chain);
+      const poll = (prev: History<T> | null) => pollSeries(def, client, prev);
+      const next =
+        state.current.history === null && def.cached !== false
+          ? await seededPoll<T>({
+              seed: () => fetchSeed<T>(key, def.windowSec),
+              poll,
+              publish: (h) => {
+                state.current = { key, history: h };
+                publish(h);
+              },
+            })
+          : await poll(state.current.history);
+      state.current = { key, history: next };
       return next;
     },
-    o.pollMs,
-    o.key,
+    pollMs,
+    key,
   );
 }

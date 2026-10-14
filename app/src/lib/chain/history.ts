@@ -7,6 +7,9 @@ export type History<T> = {
   toBlock: bigint;
   toTs: number;
   windowSec: number;
+  /** Set when the history started from the server's cache (app/api/history): the block that cache was built at. The
+   *  items up to it came from the cache, the later ones from this client's own reads. */
+  cacheBlock?: bigint;
 };
 
 type Merge<T> = {
@@ -25,9 +28,9 @@ export async function mergeHistory<T extends { block: bigint }>(o: Merge<T>): Pr
   const { prev, toBlock } = o;
   if (prev !== null && toBlock <= prev.toBlock) return prev;
   const { fromBlock, toTs } = await o.bounds(toBlock);
-  const items =
-    prev === null || fromBlock < prev.fromBlock
-      ? await o.read(fromBlock, toBlock)
-      : [...prev.items, ...(await o.read(prev.toBlock + 1n, toBlock))];
-  return { items: items.filter((x) => x.block >= fromBlock), fromBlock, toBlock, toTs, windowSec: o.windowSec };
+  const whole = prev === null || fromBlock < prev.fromBlock;
+  const items = whole ? await o.read(fromBlock, toBlock) : [...prev.items, ...(await o.read(prev.toBlock + 1n, toBlock))];
+  const next: History<T> = { items: items.filter((x) => x.block >= fromBlock), fromBlock, toBlock, toTs, windowSec: o.windowSec };
+  if (!whole && prev.cacheBlock !== undefined) next.cacheBlock = prev.cacheBlock;
+  return next;
 }
