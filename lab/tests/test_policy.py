@@ -61,8 +61,15 @@ def test_choose_estimator_breaks_close_calls_on_correlation():
     assert policy.choose_estimator(r) == "median-close"
 
 
-def test_choose_estimator_takes_binance_1s_only_when_it_wins_by_more_than_a_point():
+def test_choose_estimator_never_takes_the_single_venue_estimator():
+    # binance-1s loses far less here: still out of scope, the desk must not depend on one venue (spec section 3)
     r = {"median-close": _est(2.0, 0.70), "venue-range": _est(1.5, 0.60), "binance-1s": _est(-4.4, 0.83)}
-    assert policy.choose_estimator(r) == "binance-1s"
-    r["binance-1s"] = _est(1.2, 0.83)  # beats median-close (the multi-venue pick, by correlation) by 0.8 point only
     assert policy.choose_estimator(r) == "median-close"
+    del r["binance-1s"]  # measured as a reference only, so the rule does not need it
+    assert policy.choose_estimator(r) == "median-close"
+
+
+def test_choose_estimator_on_the_measured_five_weeks():
+    # lab/out/fables-estimator.json, 2026-09-07 to 2026-10-12, 300 s window
+    r = {"median-close": _est(3.16, 0.894), "venue-range": _est(-3.29, 0.888), "binance-1s": _est(-4.38, 0.833)}
+    assert policy.choose_estimator(r) == "venue-range"

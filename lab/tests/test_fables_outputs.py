@@ -102,7 +102,7 @@ def test_params_fables():
     assert d["pokeTtlSec"] == 600 and d["tauKillSec"] == 180
     assert d["targetPoolId"] == "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551"
     assert d["decidedBy"] == "lab/scripts/decide_fables_params.py"
-    assert d["sigmaEstimator"] in ("median-close", "venue-range", "binance-1s")
+    assert d["sigmaEstimator"] in ("median-close", "venue-range")  # multi-venue only (spec section 3)
     est = OUT_DIR / "fables-estimator.json"
     if est.exists():
         assert d["etaE4"] == json.loads(est.read_text())["chosenEtaE4"]
@@ -114,8 +114,12 @@ ESTIMATORS = ("median-close", "venue-range", "binance-1s")
 def test_estimator_output():
     d = _load("fables-estimator.json")
     assert set(d["estimators"]) == set(ESTIMATORS)
-    assert d["chosen"] in ESTIMATORS
+    assert d["chosen"] in ("median-close", "venue-range")  # binance-1s is measured as a reference only
     assert d["windowSec"] in (300, 900)
+    assert d["chosen"] in d["framing"] and "<" not in d["framing"]
+    best = min(ESTIMATORS, key=lambda k: d["estimators"][k]["arbVsKeeperPct"])
+    if best == "binance-1s":
+        assert "excluded because the desk must not depend on one venue (spec §3)" in d["framing"]
     for name in ESTIMATORS:
         e = d["estimators"][name]
         assert e["etaE4"] > 0

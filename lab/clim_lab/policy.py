@@ -49,17 +49,16 @@ def choose_estimator(results: dict, tolerance_pts: float = 1.0) -> str:
     """The volatility estimator the live desk computes (plan 03 Task 1), from results[name] = {"arbVsKeeperPct",
     "corrKeeper": {"pearson"}} measured at equal average fee with Fables' keeper.
 
-    1. Among the multi-venue estimators, the lower arbitrage loss; within tolerance_pts, the higher Pearson
-       correlation with the keeper's fee.
-    2. binance-1s (one exchange decides sigma) replaces it only if its loss is lower by more than tolerance_pts:
-       clim's pitch is a baseline no single venue controls, so a single-venue estimator must earn its place.
+    Only the multi-venue estimators are candidates: the spec (section 3, point 1) promises a public baseline
+    recomputed from four exchanges that no single venue controls, so binance-1s (one exchange decides sigma) is out of
+    scope for the live desk whatever it scores. It stays measured and published as a reference: in-sample, on a
+    simulator whose arbitrageur trades on the same Binance path, it can score best.
+
+    Among median-close and venue-range: the lower arbitrage loss; within tolerance_pts, the higher Pearson correlation
+    with the keeper's fee.
     """
     a, b = MULTI_VENUE_ESTIMATORS
     ra, rb = results[a]["arbVsKeeperPct"], results[b]["arbVsKeeperPct"]
     if abs(ra - rb) < tolerance_pts:
-        best = max(MULTI_VENUE_ESTIMATORS, key=lambda k: results[k]["corrKeeper"]["pearson"])
-    else:
-        best = a if ra < rb else b
-    if results[SINGLE_VENUE_ESTIMATOR]["arbVsKeeperPct"] < results[best]["arbVsKeeperPct"] - tolerance_pts:
-        return SINGLE_VENUE_ESTIMATOR
-    return best
+        return max(MULTI_VENUE_ESTIMATORS, key=lambda k: results[k]["corrKeeper"]["pearson"])
+    return a if ra < rb else b

@@ -9,11 +9,14 @@ venue path, and the keeper's own fee path as the reference.
 
 - median-close: realized volatility of the cross-venue median of 1-minute closes;
 - venue-range: median across venues of each venue's Parkinson volatility on its 1-minute high and low;
-- binance-1s: the lab's estimator (Binance 1 s, 5 s returns), which the desk can fetch from Binance alone.
+- binance-1s: the lab's estimator (Binance 1 s, 5 s returns), which the desk can fetch from Binance alone. It is
+  measured and published as a reference only: the desk must not depend on one venue (spec section 3), so the rule
+  chooses between the two multi-venue estimators.
 
 Venues replayed: Binance (USDT converted with Coinbase USDT-USD), Coinbase, Kraken (minutes rebuilt from trades).
 Hyperliquid serves only its last 5,000 one-minute candles, so it cannot be replayed; the live desk uses it as a fourth
-venue. The rule (clim_lab.policy.choose_estimator) is fixed before the run.
+venue. The rule (clim_lab.policy.choose_estimator) is fixed before the run. minute_venues and desk_sigma are reused by
+scripts/export_fork_reports.py.
 """
 
 import json
@@ -30,7 +33,7 @@ from clim_lab import venue  # noqa: E402
 from clim_lab.constants import SECONDS_PER_YEAR  # noqa: E402
 from clim_lab.data import OUT_DIR, load_1m_pairs_json  # noqa: E402
 from clim_lab.desk import log_bands  # noqa: E402
-from clim_lab.policy import calibrate_eta, choose_estimator, policy_fee_pips  # noqa: E402
+from clim_lab.policy import SINGLE_VENUE_ESTIMATOR, calibrate_eta, choose_estimator, policy_fee_pips  # noqa: E402
 from clim_lab.report import now_iso, write_json  # noqa: E402
 from clim_lab.sim import run_arb  # noqa: E402
 
@@ -44,7 +47,8 @@ def _ranks(x: np.ndarray) -> np.ndarray:
     return r
 
 
-def _venues() -> list[venue.MinuteOhlc]:
+def minute_venues() -> list[venue.MinuteOhlc]:
+    """Binance (USDT converted to USD), Coinbase and Kraken 1-minute candles over the study span."""
     usdt = load_1m_pairs_json(RAW / "usdtusd_1m.json")
 
     def rows(name: str):
@@ -56,6 +60,17 @@ def _venues() -> list[venue.MinuteOhlc]:
         venue.ohlc_from_rows(rows("coinbase_ethusd")),
         venue.ohlc_from_rows(rows("kraken_ethusd")),
     ]
+
+
+def desk_sigma(name: str, w, venues: list[venue.MinuteOhlc], t_obs: np.ndarray, window_sec: int) -> np.ndarray:
+    """Volatility per sqrt second at each t_obs by the named estimator (w: fables_load.load_window())."""
+    if name == "median-close":
+        return venue.median_close_rv(venues, t_obs, window_sec)
+    if name == "venue-range":
+        return venue.range_rv(venues, t_obs, window_sec)
+    if name == "binance-1s":
+        return venue.rv_window(w.venue, t_obs, window_sec=window_sec, step_sec=5)
+    raise ValueError(f"unknown estimator {name}")
 
 
 def main() -> None:
@@ -76,12 +91,8 @@ def main() -> None:
     arb_keeper = arb(keeper)
     arb_keeper_15 = arb(keeper, 15)
 
-    venues = _venues()
-    sig = {
-        "median-close": venue.median_close_rv(venues, t_obs, win),
-        "venue-range": venue.range_rv(venues, t_obs, win),
-        "binance-1s": venue.rv_window(w.venue, t_obs, window_sec=win, step_sec=5),
-    }
+    venues = minute_venues()
+    sig = {name: desk_sigma(name, w, venues, t_obs, win) for name in ESTIMATORS}
     est = {}
     for name in ESTIMATORS:
         s = sig[name]
@@ -104,6 +115,18 @@ def main() -> None:
             "arbVsKeeperPctEvery15s": float(100 * (arb(fee_sec, 15) / arb_keeper_15 - 1)),
         }
     chosen = choose_estimator(est)
+    best = min(ESTIMATORS, key=lambda k: est[k]["arbVsKeeperPct"])
+    if best == SINGLE_VENUE_ESTIMATOR:
+        margin = est[chosen]["arbVsKeeperPct"] - est[best]["arbVsKeeperPct"]
+        framing = (
+            f"{best} scored best in-sample by {margin:.2f} points on a simulator driven by the same Binance path; it "
+            f"is excluded because the desk must not depend on one venue (spec §3); {chosen} is the best multi-venue "
+            "estimator."
+        )
+    else:
+        framing = (
+            f"{chosen} scored best in-sample; {SINGLE_VENUE_ESTIMATOR} is measured as a reference only (spec §3)."
+        )
     out = {
         "generatedAt": now_iso(),
         "window": {"start": int(START), "end": int(END)},
@@ -121,15 +144,16 @@ def main() -> None:
         "estimators": est,
         "chosen": chosen,
         "chosenEtaE4": est[chosen]["etaE4"],
+        "framing": framing,
         "rule": (
-            "prefer a multi-venue estimator (median-close or venue-range): the lower arbitrage loss at equal average "
-            "fee, within 1 point the higher Pearson correlation with the keeper; binance-1s only if it loses less "
-            "than that estimator by more than 1 point"
+            "multi-venue estimators only (median-close or venue-range): the lower arbitrage loss at equal average "
+            "fee, within 1 point the higher Pearson correlation with the keeper; binance-1s is measured as a "
+            "reference and never chosen, since the desk must not depend on one venue (spec §3)"
         ),
         "caveats": [
             "three venues replayed, four live (Hyperliquid has no history); the live median can differ slightly",
             "the simulated arbitrageur trades on the Binance 1 s path binance-1s is computed from, which favours "
-            "binance-1s (study 2's caveat); the rule's 1-point margin for a multi-venue estimator is partly for this",
+            "binance-1s (study 2's caveat); its in-sample lead is not a reason to depend on one venue",
             "1 s grid: the simulator ranks estimators, it does not predict dollars; arbVsKeeperPctEvery15s (the "
             "arbitrageur acting every 15 s) is reported as robustness and not used by the rule",
             "in-sample: eta is fitted on the same five weeks the comparison runs on; one price path, no confidence interval",

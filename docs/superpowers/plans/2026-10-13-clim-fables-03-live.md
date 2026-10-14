@@ -374,11 +374,18 @@ def test_choose_estimator_breaks_close_calls_on_correlation():
     assert policy.choose_estimator(r) == "median-close"
 
 
-def test_choose_estimator_takes_binance_1s_only_when_it_wins_by_more_than_a_point():
+def test_choose_estimator_never_takes_the_single_venue_estimator():
+    # binance-1s loses far less here: still out of scope, the desk must not depend on one venue (spec section 3)
     r = {"median-close": _est(2.0, 0.70), "venue-range": _est(1.5, 0.60), "binance-1s": _est(-4.4, 0.83)}
-    assert policy.choose_estimator(r) == "binance-1s"
-    r["binance-1s"] = _est(1.2, 0.83)  # beats median-close (the multi-venue pick, by correlation) by 0.8 point only
     assert policy.choose_estimator(r) == "median-close"
+    del r["binance-1s"]  # measured as a reference only, so the rule does not need it
+    assert policy.choose_estimator(r) == "median-close"
+
+
+def test_choose_estimator_on_the_measured_five_weeks():
+    # lab/out/fables-estimator.json, 2026-09-07 to 2026-10-12, 300 s window
+    r = {"median-close": _est(3.16, 0.894), "venue-range": _est(-3.29, 0.888), "binance-1s": _est(-4.38, 0.833)}
+    assert policy.choose_estimator(r) == "venue-range"
 ```
 
 - [ ] **Step 6: Run it to see it fail**
@@ -399,26 +406,25 @@ def choose_estimator(results: dict, tolerance_pts: float = 1.0) -> str:
     """The volatility estimator the live desk computes (plan 03 Task 1), from results[name] = {"arbVsKeeperPct",
     "corrKeeper": {"pearson"}} measured at equal average fee with Fables' keeper.
 
-    1. Among the multi-venue estimators, the lower arbitrage loss; within tolerance_pts, the higher Pearson
-       correlation with the keeper's fee.
-    2. binance-1s (one exchange decides sigma) replaces it only if its loss is lower by more than tolerance_pts:
-       clim's pitch is a baseline no single venue controls, so a single-venue estimator must earn its place.
+    Only the multi-venue estimators are candidates: the spec (section 3, point 1) promises a public baseline
+    recomputed from four exchanges that no single venue controls, so binance-1s (one exchange decides sigma) is out of
+    scope for the live desk whatever it scores. It stays measured and published as a reference: in-sample, on a
+    simulator whose arbitrageur trades on the same Binance path, it can score best.
+
+    Among median-close and venue-range: the lower arbitrage loss; within tolerance_pts, the higher Pearson correlation
+    with the keeper's fee.
     """
     a, b = MULTI_VENUE_ESTIMATORS
     ra, rb = results[a]["arbVsKeeperPct"], results[b]["arbVsKeeperPct"]
     if abs(ra - rb) < tolerance_pts:
-        best = max(MULTI_VENUE_ESTIMATORS, key=lambda k: results[k]["corrKeeper"]["pearson"])
-    else:
-        best = a if ra < rb else b
-    if results[SINGLE_VENUE_ESTIMATOR]["arbVsKeeperPct"] < results[best]["arbVsKeeperPct"] - tolerance_pts:
-        return SINGLE_VENUE_ESTIMATOR
-    return best
+        return max(MULTI_VENUE_ESTIMATORS, key=lambda k: results[k]["corrKeeper"]["pearson"])
+    return a if ra < rb else b
 ```
 
 - [ ] **Step 8: Run the lab suite**
 
 Run: `cd lab && uv run pytest -q`
-Expected: no failure; the passed count is the previous one plus the 11 new tests (plan 01 ended at 150 passed, 1 skipped, so `161 passed, 1 skipped`).
+Expected: no failure; the passed count is the previous one plus the 12 new tests (plan 01 ended at 150 passed, 1 skipped, so `162 passed, 1 skipped`).
 
 - [ ] **Step 9: Commit**
 
@@ -597,8 +603,12 @@ ESTIMATORS = ("median-close", "venue-range", "binance-1s")
 def test_estimator_output():
     d = _load("fables-estimator.json")
     assert set(d["estimators"]) == set(ESTIMATORS)
-    assert d["chosen"] in ESTIMATORS
+    assert d["chosen"] in ("median-close", "venue-range")  # binance-1s is measured as a reference only
     assert d["windowSec"] in (300, 900)
+    assert d["chosen"] in d["framing"] and "<" not in d["framing"]
+    best = min(ESTIMATORS, key=lambda k: d["estimators"][k]["arbVsKeeperPct"])
+    if best == "binance-1s":
+        assert "excluded because the desk must not depend on one venue (spec §3)" in d["framing"]
     for name in ESTIMATORS:
         e = d["estimators"][name]
         assert e["etaE4"] > 0
@@ -614,7 +624,7 @@ def test_estimator_output():
 and in `test_params_fables`, after the `assert d["decidedBy"] == ...` line, add:
 
 ```python
-    assert d["sigmaEstimator"] in ("median-close", "venue-range", "binance-1s")
+    assert d["sigmaEstimator"] in ("median-close", "venue-range")  # multi-venue only (spec section 3)
     est = OUT_DIR / "fables-estimator.json"
     if est.exists():
         assert d["etaE4"] == json.loads(est.read_text())["chosenEtaE4"]
@@ -641,11 +651,14 @@ venue path, and the keeper's own fee path as the reference.
 
 - median-close: realized volatility of the cross-venue median of 1-minute closes;
 - venue-range: median across venues of each venue's Parkinson volatility on its 1-minute high and low;
-- binance-1s: the lab's estimator (Binance 1 s, 5 s returns), which the desk can fetch from Binance alone.
+- binance-1s: the lab's estimator (Binance 1 s, 5 s returns), which the desk can fetch from Binance alone. It is
+  measured and published as a reference only: the desk must not depend on one venue (spec section 3), so the rule
+  chooses between the two multi-venue estimators.
 
 Venues replayed: Binance (USDT converted with Coinbase USDT-USD), Coinbase, Kraken (minutes rebuilt from trades).
 Hyperliquid serves only its last 5,000 one-minute candles, so it cannot be replayed; the live desk uses it as a fourth
-venue. The rule (clim_lab.policy.choose_estimator) is fixed before the run.
+venue. The rule (clim_lab.policy.choose_estimator) is fixed before the run. minute_venues and desk_sigma are reused by
+scripts/export_fork_reports.py.
 """
 
 import json
@@ -662,7 +675,7 @@ from clim_lab import venue  # noqa: E402
 from clim_lab.constants import SECONDS_PER_YEAR  # noqa: E402
 from clim_lab.data import OUT_DIR, load_1m_pairs_json  # noqa: E402
 from clim_lab.desk import log_bands  # noqa: E402
-from clim_lab.policy import calibrate_eta, choose_estimator, policy_fee_pips  # noqa: E402
+from clim_lab.policy import SINGLE_VENUE_ESTIMATOR, calibrate_eta, choose_estimator, policy_fee_pips  # noqa: E402
 from clim_lab.report import now_iso, write_json  # noqa: E402
 from clim_lab.sim import run_arb  # noqa: E402
 
@@ -676,7 +689,8 @@ def _ranks(x: np.ndarray) -> np.ndarray:
     return r
 
 
-def _venues() -> list[venue.MinuteOhlc]:
+def minute_venues() -> list[venue.MinuteOhlc]:
+    """Binance (USDT converted to USD), Coinbase and Kraken 1-minute candles over the study span."""
     usdt = load_1m_pairs_json(RAW / "usdtusd_1m.json")
 
     def rows(name: str):
@@ -688,6 +702,17 @@ def _venues() -> list[venue.MinuteOhlc]:
         venue.ohlc_from_rows(rows("coinbase_ethusd")),
         venue.ohlc_from_rows(rows("kraken_ethusd")),
     ]
+
+
+def desk_sigma(name: str, w, venues: list[venue.MinuteOhlc], t_obs: np.ndarray, window_sec: int) -> np.ndarray:
+    """Volatility per sqrt second at each t_obs by the named estimator (w: fables_load.load_window())."""
+    if name == "median-close":
+        return venue.median_close_rv(venues, t_obs, window_sec)
+    if name == "venue-range":
+        return venue.range_rv(venues, t_obs, window_sec)
+    if name == "binance-1s":
+        return venue.rv_window(w.venue, t_obs, window_sec=window_sec, step_sec=5)
+    raise ValueError(f"unknown estimator {name}")
 
 
 def main() -> None:
@@ -708,12 +733,8 @@ def main() -> None:
     arb_keeper = arb(keeper)
     arb_keeper_15 = arb(keeper, 15)
 
-    venues = _venues()
-    sig = {
-        "median-close": venue.median_close_rv(venues, t_obs, win),
-        "venue-range": venue.range_rv(venues, t_obs, win),
-        "binance-1s": venue.rv_window(w.venue, t_obs, window_sec=win, step_sec=5),
-    }
+    venues = minute_venues()
+    sig = {name: desk_sigma(name, w, venues, t_obs, win) for name in ESTIMATORS}
     est = {}
     for name in ESTIMATORS:
         s = sig[name]
@@ -736,6 +757,18 @@ def main() -> None:
             "arbVsKeeperPctEvery15s": float(100 * (arb(fee_sec, 15) / arb_keeper_15 - 1)),
         }
     chosen = choose_estimator(est)
+    best = min(ESTIMATORS, key=lambda k: est[k]["arbVsKeeperPct"])
+    if best == SINGLE_VENUE_ESTIMATOR:
+        margin = est[chosen]["arbVsKeeperPct"] - est[best]["arbVsKeeperPct"]
+        framing = (
+            f"{best} scored best in-sample by {margin:.2f} points on a simulator driven by the same Binance path; it "
+            f"is excluded because the desk must not depend on one venue (spec §3); {chosen} is the best multi-venue "
+            "estimator."
+        )
+    else:
+        framing = (
+            f"{chosen} scored best in-sample; {SINGLE_VENUE_ESTIMATOR} is measured as a reference only (spec §3)."
+        )
     out = {
         "generatedAt": now_iso(),
         "window": {"start": int(START), "end": int(END)},
@@ -753,15 +786,16 @@ def main() -> None:
         "estimators": est,
         "chosen": chosen,
         "chosenEtaE4": est[chosen]["etaE4"],
+        "framing": framing,
         "rule": (
-            "prefer a multi-venue estimator (median-close or venue-range): the lower arbitrage loss at equal average "
-            "fee, within 1 point the higher Pearson correlation with the keeper; binance-1s only if it loses less "
-            "than that estimator by more than 1 point"
+            "multi-venue estimators only (median-close or venue-range): the lower arbitrage loss at equal average "
+            "fee, within 1 point the higher Pearson correlation with the keeper; binance-1s is measured as a "
+            "reference and never chosen, since the desk must not depend on one venue (spec §3)"
         ),
         "caveats": [
             "three venues replayed, four live (Hyperliquid has no history); the live median can differ slightly",
             "the simulated arbitrageur trades on the Binance 1 s path binance-1s is computed from, which favours "
-            "binance-1s (study 2's caveat); the rule's 1-point margin for a multi-venue estimator is partly for this",
+            "binance-1s (study 2's caveat); its in-sample lead is not a reason to depend on one venue",
             "1 s grid: the simulator ranks estimators, it does not predict dollars; arbVsKeeperPctEvery15s (the "
             "arbitrageur acting every 15 s) is reported as robustness and not used by the rule",
             "in-sample: eta is fitted on the same five weeks the comparison runs on; one price path, no confidence interval",
@@ -779,7 +813,7 @@ if __name__ == "__main__":
 - [ ] **Step 7: Run the study**
 
 Run: `cd lab && uv run python scripts/study_estimator.py`
-Expected: one line `chosen <name> (etaE4 <n>); arbitrage vs keeper {'median-close': <x>, 'venue-range': <y>, 'binance-1s': -4.38}`. The `binance-1s` figure must reproduce study 2's 300 s result (-4.38 %, etaE4 175,198): that is the check that the machinery is the same (it did, in a dry run of this script on stand-in minute data while the plan was written). If it does not, stop and compare with `scripts/study_window.py` before going on. The run takes about 10 seconds after the data is loaded.
+Expected: one line `chosen <name> (etaE4 <n>); arbitrage vs keeper {'median-close': <x>, 'venue-range': <y>, 'binance-1s': -4.38}`, where `<name>` is `median-close` or `venue-range` (binance-1s is measured as a reference and never chosen), and `fables-estimator.json` carries a `framing` line saying so with the measured margin. The `binance-1s` figure must reproduce study 2's 300 s result (-4.38 %, etaE4 175,198): that is the check that the machinery is the same (it did, in a dry run of this script on stand-in minute data while the plan was written). If it does not, stop and compare with `scripts/study_window.py` before going on. The run takes about 10 seconds after the data is loaded.
 
 - [ ] **Step 8: Feed the decision into the parameters**
 
@@ -826,14 +860,14 @@ cd lab && uv run python scripts/decide_fables_params.py && uv run pytest -q
 git diff --stat ../shared/params-fables.json && git diff ../shared/params-fables.json
 ```
 
-Expected: the printed JSON has `"sigmaEstimator": "<chosen>"` and `"etaE4": <chosenEtaE4>`; the suite passes with no failure (one more test than after Task 1); the diff shows only `etaE4`, `pStar`, `sigmaEstimator`, `sources` and `generatedAt` changing (`etaE4` is unchanged if `binance-1s` was chosen).
+Expected: the printed JSON has `"sigmaEstimator": "<chosen>"` and `"etaE4": <chosenEtaE4>`; the suite passes with no failure (one more test than after Task 1); the diff shows only `etaE4`, `pStar`, `sigmaEstimator`, `sources` and `generatedAt` changing (`sigmaEstimator` is `median-close` or `venue-range`, never `binance-1s`).
 
 - [ ] **Step 10: Record the outcome**
 
 Append to `docs/sessions/<today>.md` (create the file with the heading `# Session log · <today>` if it does not exist) a bullet in this shape, every number copied from `lab/out/fables-estimator.json`:
 
 ```markdown
-- (lab) Estimator for the live desk (plan 03 Task 2): on 2026-09-07 to 2026-10-12, equal average fee with the keeper (<keeper.meanFeeBp> bp), 300 s window: median-close etaE4 <n>, Pearson <p>, arbitrage vs keeper <x> %; venue-range etaE4 <n>, Pearson <p>, <y> %; binance-1s etaE4 175,198, Pearson 0.833, -4.38 %. Correlation of each with binance-1s: <a>, <b>. Chosen: <name> by the rule in `clim_lab.policy.choose_estimator` (multi-venue first; binance-1s only if it loses more than 1 point less). `shared/params-fables.json`: etaE4 <old> -> <new>, sigmaEstimator <name>. Venues replayed: Binance, Coinbase, Kraken (from trades); Hyperliquid has no history. The fork-run evidence (`docs/evidence/fork-run-2026-10-07.json`) keeps the parameters it was recorded with (etaE4 175,198, Binance 1 s reports); `ForkRun.s.sol` reads the current file, so a rerun would differ: plan 04 states which parameters each piece of evidence used.
+- (lab) Estimator for the live desk (plan 03 Task 2): on 2026-09-07 to 2026-10-12, equal average fee with the keeper (<keeper.meanFeeBp> bp), 300 s window: median-close etaE4 <n>, Pearson <p>, arbitrage vs keeper <x> %; venue-range etaE4 <n>, Pearson <p>, <y> %; binance-1s etaE4 175,198, Pearson 0.833, -4.38 %. Correlation of each with binance-1s: <a>, <b>. Chosen: <name> by the rule in `clim_lab.policy.choose_estimator` (multi-venue estimators only; binance-1s is a reference, spec §3). Framing: <framing>. `shared/params-fables.json`: etaE4 <old> -> <new>, sigmaEstimator <name>. Venues replayed: Binance, Coinbase, Kraken (from trades); Hyperliquid has no history.
 ```
 
 - [ ] **Step 11: Commit**
@@ -2760,7 +2794,7 @@ K currentFee zeroForOne 1480 oneForZero 1480 | swap paid zeroForOne 1480 oneForZ
 F currentFee zeroForOne 700 oneForZero 700 | swap paid zeroForOne 700 oneForZero 700
 ```
 
-where `<f01> <f10>` are the policy's two fees: the base fee `ceil(85475 × etaE4 × 850890 × 10000 / 1e17)` on one side and the base plus `min(567, floor(2753 × 1200 / 10000) = 330)` on the toxic side. With `devPips = +1200` (venue above the pool, ETH buyers toxic) the premium is on `fee1For0` when tETH is token0 and on `fee0For1` otherwise. With etaE4 175,198 the base is 1,275 and the toxic side 1,605. Every "swap paid" equals the "currentFee" beside it. A rehearsal of this plan's scripts on 2026-10-13 (anvil's public test keys, tUSDG sorted first) printed `report gasUsed 94727`, `poke gasUsed 96839`, `keeper poke gasUsed 63147`, `policy quoteDirectional: 1605 1275 0` and `D currentFee zeroForOne 1605 oneForZero 1275 | swap paid zeroForOne 1605 oneForZero 1275`.
+where `<f01> <f10>` are the policy's two fees: the base fee `ceil(85475 × etaE4 × 850890 × 10000 / 1e17)` on one side and the base plus `min(567, floor(2753 × 1200 / 10000) = 330)` on the toxic side. With `devPips = +1200` (venue above the pool, ETH buyers toxic) the premium is on `fee1For0` when tETH is token0 and on `fee0For1` otherwise. With etaE4 196,450 (venue-range, the live estimator) the base is 1,429 and the toxic side 1,759; with the earlier 175,198 they were 1,275 and 1,605. Every "swap paid" equals the "currentFee" beside it. A rehearsal of this plan's scripts on 2026-10-13 (anvil's public test keys, tUSDG sorted first) printed `report gasUsed 94727`, `poke gasUsed 96839`, `keeper poke gasUsed 63147`, `policy quoteDirectional: 1605 1275 0` and `D currentFee zeroForOne 1605 oneForZero 1275 | swap paid zeroForOne 1605 oneForZero 1275`.
 
 - [ ] **Step 5: Record the fork gas and stop the fork**
 
