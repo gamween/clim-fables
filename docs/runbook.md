@@ -216,7 +216,7 @@ The six long-running processes run on the maintainer's Mac as launchd LaunchAgen
 
 ```bash
 cd bots && bun run live:install            # writes ~/Library/LaunchAgents/fi.clim-fables.*.plist and starts the six jobs
-cd bots && bun run live:logs desk          # follow one job's log (Ctrl+C stops the tail, not the job); no name: all six
+cd bots && bun run live:logs desk          # follow one job's log (Ctrl+C, a kill or an alarm stops the tail, never the job); no name: all six
 cd bots && bun run live:status --watch     # a snapshot every 15 s, with each job's launchd state; PROBLEM lines name anything wrong
 ```
 
@@ -243,7 +243,9 @@ cd bots && bun run live:uninstall       # stop every job and remove the plists (
 - `D fee != last poke`: another FEE_POKER key poked D, or a poke reverted; `bots/out/runner-rh.jsonl` has the error.
 - `job <name> not running` or `bot <name> silent`: `bun run live:logs <name>` shows the last error; launchd restarts an exited job 30 s after its last start; `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>` restarts it now. `job <name> not loaded`: `bun run live:install <name>`.
 - A job exits again at once (`last exit 1` in `live:status`): a key missing from `bots/.env`, the CRE CLI logged out (`cre login`), or a moved repository or tool (`bun run live:install`).
-- The public RPC answers 429: set `RH_TESTNET_RPC_URL` in `bots/.env` to a keyed endpoint (never commit it), then restart the jobs so they read it: `for j in desk runner keeper arb noise outages; do launchctl kickstart -k gui/$(id -u)/fi.clim-fables.$j; done`.
+- RPC endpoint: every process and script of `bots/` (the runner, keeper, arbitrage and retail bots, the desk job's receipt reads, `live:status`, `live:verify`, `live:gas`, `live:outages`, `live:fund`) uses `RH_TESTNET_RPC_URL` from `bots/.env` when it is set, else the public `https://rpc.testnet.chain.robinhood.com`. The CRE workflow itself reads and writes through the URL in `cre/project.yaml`, which this variable does not change.
+- The public RPC answers 429, or lags too often: set `RH_TESTNET_RPC_URL` in `bots/.env` to a keyed endpoint (an Alchemy Robinhood Chain testnet URL, for instance; never commit it), then restart the jobs so they read it: `for j in desk runner keeper arb noise outages; do launchctl kickstart -k gui/$(id -u)/fi.clim-fables.$j; done`.
+- The public RPC is load-balanced and some of its nodes lag the head by a few blocks. `live:status` and `live:verify` read 3 blocks behind the head and retry a failed read up to 3 times, 1 s apart; if one still fails (`BlockNotFoundError`, `Missing or invalid parameters`, `historical state not available`), run it again. The runner retries a `DeskBlind` revert of its `poke()` simulation that follows a fresh desk read 3 times, 2 s apart (`[runner] seq <n>: DeskBlind after a fresh read (a lagging RPC node), retry <k>/3 in 2 s` in `runner.log`), and logs a skip only if the revert persists.
 - Contracts re-deployed: rerun `cd cre/risk-desk && bun scripts/sync-config.ts`, then `cd bots && bun run live:install` (reloads every job; the desk job rebuilds the WASM). `bots/out/outages.json` starts over from the new desk's deployment block by itself.
 
 ### 8.6 Outages

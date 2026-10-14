@@ -6284,11 +6284,11 @@ git commit -m "feat(bots): arbitrage and retail bots on the three live pools, pe
 ### Task 22: Funding, status, gas evidence and the final checks script
 
 **Files:**
-- Create: `bots/src/live/lib/gas.ts`, `bots/src/live/scripts/fund.ts`, `bots/src/live/scripts/status.ts`, `bots/src/live/scripts/gas.ts`, `bots/src/live/scripts/verify-live.ts`
+- Create: `bots/src/live/lib/gas.ts`, `bots/src/live/lib/retry.ts`, `bots/src/live/scripts/fund.ts`, `bots/src/live/scripts/status.ts`, `bots/src/live/scripts/gas.ts`, `bots/src/live/scripts/verify-live.ts`
 - Modify: `bots/package.json`
-- Test: `bots/test/live/gas.test.ts`
+- Test: `bots/test/live/gas.test.ts`, `bots/test/live/retry.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
 
 Create `bots/test/live/gas.test.ts`:
 
@@ -6325,12 +6325,77 @@ describe("gas summary", () => {
 });
 ```
 
-- [ ] **Step 2: Run it to see it fail**
+Create `bots/test/live/retry.test.ts`:
 
-Run: `cd bots && bun test test/live/gas.test.ts`
-Expected: FAIL with `Cannot find module '../../src/live/lib/gas'`.
+```ts
+import { describe, expect, test } from "bun:test";
+import { HEAD_LAG_BLOCKS, laggedHead, READ_RETRIES, READ_RETRY_DELAY_MS, withRetry } from "../../src/live/lib/retry";
 
-- [ ] **Step 3: Implement the summary helpers**
+describe("reads behind the head", () => {
+  test("three blocks behind the head, never below block 0", () => {
+    expect(HEAD_LAG_BLOCKS).toBe(3n);
+    expect(laggedHead(134_931_100n)).toBe(134_931_097n);
+    expect(laggedHead(3n)).toBe(0n);
+    expect(laggedHead(1n)).toBe(0n);
+  });
+});
+
+describe("retry of a failed read", () => {
+  const lagging = (failures: number, error = "BlockNotFoundError") => {
+    let calls = 0;
+    const fn = async () => {
+      calls += 1;
+      if (calls <= failures) throw new Error(error);
+      return calls;
+    };
+    return { fn, calls: () => calls };
+  };
+  const sleeps: number[] = [];
+  const sleep = async (ms: number) => {
+    sleeps.push(ms);
+  };
+
+  test("up to 3 retries, 1 s apart, then the read's value", async () => {
+    sleeps.length = 0;
+    const r = lagging(3);
+    expect(await withRetry(r.fn, { sleep })).toBe(4);
+    expect(r.calls()).toBe(1 + READ_RETRIES);
+    expect(sleeps).toEqual([READ_RETRY_DELAY_MS, READ_RETRY_DELAY_MS, READ_RETRY_DELAY_MS]);
+    expect(READ_RETRY_DELAY_MS).toBe(1_000);
+  });
+  test("a read that never succeeds throws its last error after 4 tries", async () => {
+    sleeps.length = 0;
+    const r = lagging(10, "Missing or invalid parameters");
+    await expect(withRetry(r.fn, { sleep })).rejects.toThrow("Missing or invalid parameters");
+    expect(r.calls()).toBe(4);
+    expect(sleeps.length).toBe(3);
+  });
+  test("no retry when the first try succeeds", async () => {
+    sleeps.length = 0;
+    const r = lagging(0);
+    expect(await withRetry(r.fn, { sleep })).toBe(1);
+    expect(sleeps.length).toBe(0);
+  });
+  test("an error shouldRetry rejects is thrown at once; onRetry sees each retry", async () => {
+    sleeps.length = 0;
+    const seen: number[] = [];
+    const r = lagging(10, "execution reverted: SomethingElse");
+    await expect(withRetry(r.fn, { sleep, shouldRetry: (e) => String(e).includes("historical state"), onRetry: (_e, n) => seen.push(n) })).rejects.toThrow("SomethingElse");
+    expect(r.calls()).toBe(1);
+    const r2 = lagging(2, "historical state not available");
+    expect(await withRetry(r2.fn, { sleep, retries: 3, delayMs: 2_000, onRetry: (_e, n) => seen.push(n) })).toBe(3);
+    expect(seen).toEqual([1, 2]);
+    expect(sleeps).toEqual([2_000, 2_000]);
+  });
+});
+```
+
+- [ ] **Step 2: Run them to see them fail**
+
+Run: `cd bots && bun test test/live/gas.test.ts test/live/retry.test.ts`
+Expected: FAIL with `Cannot find module '../../src/live/lib/gas'` (and the same for `retry`).
+
+- [ ] **Step 3: Implement the summary and retry helpers**
 
 Create `bots/src/live/lib/gas.ts`:
 
@@ -6387,8 +6452,55 @@ export function hashesFromJsonl(text: string, pick: (o: Record<string, unknown>)
 }
 ```
 
-Run: `cd bots && bun test test/live/gas.test.ts`
-Expected: `3 pass`.
+Create `bots/src/live/lib/retry.ts` (the status and final checks scripts read a few blocks behind the head and retry a failed read):
+
+```ts
+// Reads on Robinhood Chain testnet's public RPC, which is load-balanced: some of its nodes lag the head by a few blocks,
+// so a read pinned to the head block can fail (BlockNotFoundError, "Missing or invalid parameters", "historical state not
+// available") on a node that has not seen that block yet. The scripts read a few blocks behind the head and retry a
+// failed read; a check never changes because of a retry, it only gets its data.
+
+/** Blocks behind the head the scripts read at (0.3 s of chain at 0.1 s blocks). */
+export const HEAD_LAG_BLOCKS = 3n;
+export const READ_RETRIES = 3;
+export const READ_RETRY_DELAY_MS = 1_000;
+
+export function laggedHead(head: bigint, lag: bigint = HEAD_LAG_BLOCKS): bigint {
+  return head > lag ? head - lag : 0n;
+}
+
+export type RetryOptions = {
+  /** retries after the first try (default READ_RETRIES) */
+  retries?: number;
+  /** wait before each retry (default READ_RETRY_DELAY_MS) */
+  delayMs?: number;
+  /** false: throw this error at once (default: retry any error) */
+  shouldRetry?: (e: unknown) => boolean;
+  /** called before each retry with its number, from 1 */
+  onRetry?: (e: unknown, retry: number) => void;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+/** `fn()`, tried again up to `retries` times, `delayMs` apart, while it throws an error `shouldRetry` accepts; the last
+ *  error is thrown when every try failed. */
+export async function withRetry<T>(fn: () => Promise<T>, o: RetryOptions = {}): Promise<T> {
+  const retries = o.retries ?? READ_RETRIES;
+  const delayMs = o.delayMs ?? READ_RETRY_DELAY_MS;
+  const sleep = o.sleep ?? ((ms: number) => Bun.sleep(ms));
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (attempt >= retries || (o.shouldRetry !== undefined && !o.shouldRetry(e))) throw e;
+      o.onRetry?.(e, attempt + 1);
+      await sleep(delayMs);
+    }
+  }
+}
+```
+
+Run: `cd bots && bun test test/live/gas.test.ts test/live/retry.test.ts`
+Expected: `8 pass` (gas 3, retry 5).
 
 - [ ] **Step 4: Write the funding script**
 
@@ -6467,7 +6579,9 @@ Create `bots/src/live/scripts/status.ts`:
 ```ts
 // Health of the live stack on Robinhood Chain testnet: desk seq and age, the policy's quote and mode, each pool's fee
 // both ways and price against the venues, the last pokes on D (ClimPoker) and K (keeper), every key's balances, and the
-// age of each bot's last log line. Exits 1 on a problem; --watch prints a snapshot every 15 s instead.
+// age of each bot's last log line. Exits 1 on a problem; --watch prints a snapshot every 15 s instead. The snapshot is
+// read 3 blocks behind the head (balances at the latest block) and a failed read is retried up to 3 times, 1 s apart
+// (lib/retry.ts: some nodes of the public RPC lag the head).
 // Usage: bun src/live/scripts/status.ts [--watch]
 import { climPokerAbi, FeeMode, LIVE_POOLS, pipsToBp, pokeFeeHookAbi, sigmaE9ToAnnual, stateViewAbi } from "@clim/shared";
 import { join } from "node:path";
@@ -6479,6 +6593,7 @@ import { aggregate, fetchVenueQuotes } from "../../lib/market";
 import { liveClient, readLiveBalances, readLiveState } from "../lib/chain";
 import { loadLiveDeployments } from "../lib/deployments";
 import { liveKey, type LiveRole } from "../lib/env";
+import { laggedHead, withRetry } from "../lib/retry";
 import { lastTs } from "../lib/tail";
 
 const d = loadLiveDeployments();
@@ -6495,8 +6610,12 @@ const LOGS: Array<[string, string, number]> = [
 
 async function snapshot(): Promise<string[]> {
   const problems: string[] = [];
-  const head = await client.getBlockNumber();
-  const [s, block, quotes] = await Promise.all([readLiveState(client, d, head), client.getBlock({ blockNumber: head }), fetchVenueQuotes().catch(() => [])]);
+  const head = laggedHead(await withRetry(() => client.getBlockNumber()));
+  const [s, block, quotes] = await Promise.all([
+    withRetry(() => readLiveState(client, d, head)),
+    withRetry(() => client.getBlock({ blockNumber: head })),
+    fetchVenueQuotes().catch(() => []),
+  ]);
   const now = Number(block.timestamp);
   const m = aggregate(quotes);
   const age = s.desk.seq === 0 ? Number.POSITIVE_INFINITY : now - s.desk.tObs;
@@ -6508,14 +6627,16 @@ async function snapshot(): Promise<string[]> {
 
   const from = head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
   const [poked, kPokes] = await Promise.all([
-    client.getLogs({ address: d.poker, event: climPokerAbi[1], fromBlock: from, toBlock: head }),
-    client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.K.poolId }, fromBlock: from, toBlock: head }),
+    withRetry(() => client.getLogs({ address: d.poker, event: climPokerAbi[1], fromBlock: from, toBlock: head })),
+    withRetry(() => client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.K.poolId }, fromBlock: from, toBlock: head })),
   ]);
   const lastPoke = poked[poked.length - 1]?.args;
   const lastK = kPokes[kPokes.length - 1];
   for (const name of LIVE_POOLS) {
     const ps = s.pools[name];
-    const liq = await client.readContract({ address: d.uniswap.stateView, abi: stateViewAbi, functionName: "getLiquidity", args: [d.pools[name].poolId] });
+    const liq = await withRetry(() =>
+      client.readContract({ address: d.uniswap.stateView, abi: stateViewAbi, functionName: "getLiquidity", args: [d.pools[name].poolId], blockNumber: head }),
+    );
     console.log(
       `  ${name}: fee ${ps.fee0For1}/${ps.fee1For0} pips (${pipsToBp(ps.fee0For1).toFixed(2)}/${pipsToBp(ps.fee1For0).toFixed(2)} bp) price ${ps.ethUsd.toFixed(2)}${m ? ` gap ${((ps.ethUsd / m.price - 1) * 1e4).toFixed(1)} bp` : ""} L ${Number(liq).toExponential(3)}`,
     );
@@ -6547,7 +6668,7 @@ async function snapshot(): Promise<string[]> {
     }
   }
   for (const [name, addr, router] of keys) {
-    const b = await readLiveBalances(client, d, addr, router ?? addr);
+    const b = await withRetry(() => readLiveBalances(client, d, addr, router ?? addr));
     const tokens = router ? `, ${formatUnits(b.tETH, 18)} tETH, ${formatUnits(b.tUSDG, 6)} tUSDG` : "";
     console.log(`  ${name} ${addr}: ${formatEther(b.native)} ETH${tokens}`);
     if (b.native < 10n ** 16n) problems.push(`${name} has under 0.01 ETH (bun run live:fund)`);
@@ -6641,7 +6762,8 @@ Create `bots/src/live/scripts/verify-live.ts`:
 // 30 minutes): the desk reports regularly and seq rises by one; pool D's fee is the policy's quote, poke by poke, and
 // what the hook recorded; the keeper pokes K about every 180 s with a 7,200 s TTL from its own key; F is never poked and
 // charges its flat 700 pips; arbitrage and retail swaps land on D, K and F. Writes docs/evidence/live-check-<date>.json;
-// exits 1 if a check fails. Usage: bun src/live/scripts/verify-live.ts
+// exits 1 if a check fails. The window ends 3 blocks behind the head and a failed read is retried up to 3 times, 1 s apart
+// (lib/retry.ts: some nodes of the public RPC lag the head); no check is relaxed. Usage: bun src/live/scripts/verify-live.ts
 import { climFeePolicyAbi, climPokerAbi, LIVE_POOLS, pokeFeeHookAbi, poolManagerSwapEventAbi, riskDeskV2Abi } from "@clim/shared";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -6649,18 +6771,19 @@ import { envNum } from "../../lib/env";
 import { liveClient, readLiveState } from "../lib/chain";
 import { loadLiveDeployments, REPO_ROOT } from "../lib/deployments";
 import { median } from "../../lib/market";
+import { laggedHead, withRetry } from "../lib/retry";
 import { chunkedRanges } from "../lib/tail";
 
 const d = loadLiveDeployments();
 const client = liveClient();
-const head = await client.getBlockNumber();
+const head = laggedHead(await withRetry(() => client.getBlockNumber()));
 const window = BigInt(envNum("WINDOW_BLOCKS", 18_000));
 const from = head > window ? head - window : 0n;
 const ranges = chunkedRanges(from, head);
 
 async function collect<T>(get: (a: bigint, b: bigint) => Promise<T[]>): Promise<T[]> {
   const out: T[] = [];
-  for (const [a, b] of ranges) out.push(...(await get(a, b)));
+  for (const [a, b] of ranges) out.push(...(await withRetry(() => get(a, b))));
   return out;
 }
 
@@ -6689,7 +6812,7 @@ const hookMatches = pokes.filter((p) => {
 let quoteMatches = 0;
 const lastTen = pokes.slice(-10);
 for (const p of lastTen) {
-  const [q01, q10] = await client.readContract({ address: d.policy, abi: climFeePolicyAbi, functionName: "quoteDirectional", blockNumber: p.blockNumber });
+  const [q01, q10] = await withRetry(() => client.readContract({ address: d.policy, abi: climFeePolicyAbi, functionName: "quoteDirectional", blockNumber: p.blockNumber }));
   if (p.args.eventApplied || (q01 === p.args.fee0For1 && q10 === p.args.fee1For0)) quoteMatches++;
 }
 checks.poolDFollowsPolicy = {
@@ -6703,7 +6826,10 @@ const kTimes: number[] = [];
 let kFromKeeper = 0;
 let kTtlOk = 0;
 for (const l of kPokes) {
-  const [tx, blk] = await Promise.all([client.getTransaction({ hash: l.transactionHash }), client.getBlock({ blockNumber: l.blockNumber })]);
+  const [tx, blk] = await Promise.all([
+    withRetry(() => client.getTransaction({ hash: l.transactionHash })),
+    withRetry(() => client.getBlock({ blockNumber: l.blockNumber })),
+  ]);
   const t = Number(blk.timestamp);
   kTimes.push(t);
   if (tx.from.toLowerCase() === d.roles.keeper.toLowerCase()) kFromKeeper++;
@@ -6718,7 +6844,7 @@ checks.poolKKeeperPattern = {
 // 4. F: never poked in the window, flat fee both ways now
 const fSym = await collect((a, b) => client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.F.poolId }, fromBlock: a, toBlock: b }));
 const fDir = await collect((a, b) => client.getLogs({ address: d.hook, event: pokeFeeHookAbi[4], args: { poolId: d.pools.F.poolId }, fromBlock: a, toBlock: b }));
-const state = await readLiveState(client, d, head);
+const state = await withRetry(() => readLiveState(client, d, head));
 checks.poolFFlat = {
   pass: fSym.length + fDir.length === 0 && state.pools.F.fee0For1 === d.hookConfig.flatPips && state.pools.F.fee1For0 === d.hookConfig.flatPips,
   detail: { pokes: fSym.length + fDir.length, fee0For1: state.pools.F.fee0For1, fee1For0: state.pools.F.fee1For0 },
@@ -6771,7 +6897,7 @@ Expected: `0 fail`, `tsc` exits 0, then one `[fund] ... ready` line per key (the
 - [ ] **Step 9: Commit**
 
 ```bash
-git add bots/src/live/lib/gas.ts bots/src/live/scripts/fund.ts bots/src/live/scripts/status.ts bots/src/live/scripts/gas.ts bots/src/live/scripts/verify-live.ts bots/test/live/gas.test.ts bots/package.json
+git add bots/src/live/lib/gas.ts bots/src/live/lib/retry.ts bots/src/live/scripts/fund.ts bots/src/live/scripts/status.ts bots/src/live/scripts/gas.ts bots/src/live/scripts/verify-live.ts bots/test/live/gas.test.ts bots/test/live/retry.test.ts bots/package.json
 git commit -m "feat(bots): live funding, status, gas evidence and final on-chain checks" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
 ```
 
@@ -6794,8 +6920,8 @@ What the pools do when the whole Mac stops (asleep, offline, rebooting), asserte
 
 **Files:**
 - Create: `shared/src/outages.ts`, `bots/src/live/lib/supervise.ts`, `bots/src/live/lib/outages.ts`, `bots/src/live/lib/launchd.ts`, `bots/src/live/lib/supervisor.ts`, `bots/src/live/scripts/outages.ts`, `bots/src/live/scripts/launchd.ts`
-- Modify: `shared/src/index.ts`, `shared/package.json`, `bots/src/live/runner.ts`, `bots/src/live/keeper.ts`, `bots/src/live/arb.ts`, `bots/src/live/noise.ts`, `bots/src/live/desk-loop.ts`, `bots/src/live/scripts/status.ts`, `bots/package.json`, `cre/scripts/sim-loop.sh`
-- Test: `shared/test/outages.test.ts`, `bots/test/live/supervise.test.ts`, `bots/test/live/outages.test.ts`, `bots/test/live/launchd.test.ts`, `contracts/test/v2/Outage.t.sol`
+- Modify: `shared/src/index.ts`, `shared/package.json`, `bots/src/live/lib/runner.ts`, `bots/src/live/runner.ts`, `bots/src/live/keeper.ts`, `bots/src/live/arb.ts`, `bots/src/live/noise.ts`, `bots/src/live/desk-loop.ts`, `bots/src/live/scripts/status.ts`, `bots/package.json`, `cre/scripts/sim-loop.sh`
+- Test: `shared/test/outages.test.ts`, `bots/test/live/supervise.test.ts`, `bots/test/live/outages.test.ts`, `bots/test/live/launchd.test.ts`, `bots/test/live/runner.test.ts`, `contracts/test/v2/Outage.t.sol`
 
 - [ ] **Step 1: Write the failing test of the outage windows**
 
@@ -7040,11 +7166,12 @@ Create `bots/test/live/launchd.test.ts`:
 
 ```ts
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { jobLabel, jobPathVar, LIVE_JOB_NAMES, liveJobSpec, parseLaunchctlPrint, plistFor, type JobPaths } from "../../src/live/lib/launchd";
+import { exitCodeFor, FORWARDED_SIGNALS, forwardSignals, jobLabel, jobPathVar, LIVE_JOB_NAMES, liveJobSpec, parseLaunchctlPrint, plistFor, type JobPaths } from "../../src/live/lib/launchd";
 
 const P: JobPaths = { bun: "/opt/homebrew/bin/bun", cre: "/Users/me/.cre/bin/cre", botsDir: "/Users/me/clim-fables/bots", home: "/Users/me" };
 
@@ -7109,12 +7236,127 @@ describe("launchctl print", () => {
     expect(parseLaunchctlPrint(waiting)).toEqual({ state: "not running", pid: null, lastExitCode: "1" });
   });
 });
+
+describe("live:logs follows the logs in the foreground", () => {
+  test("SIGINT, SIGTERM, SIGHUP and SIGALRM (perl's alarm) go to the child", () => {
+    expect([...FORWARDED_SIGNALS]).toEqual(["SIGINT", "SIGTERM", "SIGHUP", "SIGALRM"]);
+    const source = new EventEmitter();
+    const sent: string[] = [];
+    forwardSignals({ kill: (s: NodeJS.Signals) => sent.push(s) > 0 }, source);
+    for (const s of ["SIGTERM", "SIGALRM", "SIGINT", "SIGHUP", "SIGUSR1"]) source.emit(s);
+    expect(sent).toEqual(["SIGTERM", "SIGALRM", "SIGINT", "SIGHUP"]);
+  });
+  test("exits with the child's code, or 128 + the signal that ended it", () => {
+    expect(exitCodeFor(0, null)).toBe(0);
+    expect(exitCodeFor(1, null)).toBe(1);
+    expect(exitCodeFor(null, "SIGTERM")).toBe(143);
+    expect(exitCodeFor(null, "SIGALRM")).toBe(142);
+    expect(exitCodeFor(null, "SIGINT")).toBe(130);
+    expect(exitCodeFor(null, null)).toBe(1);
+  });
+  test.skipIf(process.platform === "win32")("killing the parent ends the child too (no orphan tail)", async () => {
+    const lib = join(import.meta.dir, "..", "..", "src", "live", "lib", "launchd.ts");
+    const code = `import { execForwarding } from ${JSON.stringify(lib)}; const c = execForwarding("sleep", ["30"], "ignore"); console.log(c.pid);`;
+    for (const [signal, status] of [["SIGTERM", 143], ["SIGALRM", 142]] as const) {
+      const parent = spawn(process.execPath, ["-e", code], { stdio: ["ignore", "pipe", "inherit"] });
+      const childPid = await new Promise<number>((resolve) => parent.stdout.once("data", (b: Buffer) => resolve(Number(b.toString().trim()))));
+      const alive = (pid: number) => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      expect(alive(childPid)).toBe(true);
+      const exited = new Promise<number | null>((resolve) => parent.once("exit", (c) => resolve(c)));
+      parent.kill(signal);
+      expect(await exited).toBe(status);
+      expect(alive(childPid)).toBe(false);
+    }
+  });
+});
+```
+
+Replace `bots/test/live/runner.test.ts` with (Task 19's two tests, then the runner's answer to a node of the load-balanced public RPC that simulates `poke()` before it has seen the report the runner just read):
+
+```ts
+import { describe, expect, test } from "bun:test";
+import { climPokerAbi, FeeMode } from "@clim/shared";
+import { ContractFunctionExecutionError, ContractFunctionRevertedError } from "viem";
+import { POKE_LAG_DELAY_MS, POKE_LAG_RETRIES, pokeDecision, simulatePoke } from "../../src/live/lib/runner";
+
+describe("when the runner pokes", () => {
+  test("once per new desk report", () => {
+    expect(pokeDecision(0, 0, FeeMode.Normal)).toBe("wait"); // no report yet
+    expect(pokeDecision(5, 4, FeeMode.Normal)).toBe("poke");
+    expect(pokeDecision(5, 5, FeeMode.Normal)).toBe("wait");
+    expect(pokeDecision(9, 5, FeeMode.Degraded)).toBe("poke"); // degraded still pokes (at least the safe fee)
+  });
+  test("never on a blind desk (ClimPoker would revert DeskBlind)", () => {
+    expect(pokeDecision(6, 5, FeeMode.Blind)).toBe("blind");
+  });
+});
+
+describe("a fresh report the simulating RPC node has not seen yet", () => {
+  // the revert viem throws when eth_call of poke() lands on a node still at the previous seq
+  const deskBlind = () =>
+    new ContractFunctionExecutionError(new ContractFunctionRevertedError({ abi: climPokerAbi, functionName: "poke", data: "0x5caf72fd" }), {
+      abi: climPokerAbi,
+      functionName: "poke",
+    });
+  /** A client whose simulateContract answers from `script`, one entry per call (the last one repeats). */
+  const mockClient = (script: Array<"blind" | "ok" | "nonce">) => {
+    let calls = 0;
+    return {
+      calls: () => calls,
+      simulateContract: async () => {
+        const step = script[Math.min(calls, script.length - 1)];
+        calls += 1;
+        if (step === "blind") throw deskBlind();
+        if (step === "nonce") throw new Error("nonce too low");
+        return { request: { functionName: "poke" as const } };
+      },
+    };
+  };
+  const recorder = () => {
+    const sleeps: number[] = [];
+    const retries: number[] = [];
+    return { sleeps, retries, sleep: async (ms: number) => void sleeps.push(ms), onRetry: (_e: unknown, n: number) => void retries.push(n) };
+  };
+
+  test("waits 2 s and simulates again until the node catches up", async () => {
+    const client = mockClient(["blind", "blind", "ok"]);
+    const r = recorder();
+    const out = await simulatePoke(() => client.simulateContract(), r);
+    expect(out.request.functionName).toBe("poke");
+    expect(client.calls()).toBe(3);
+    expect(r.sleeps).toEqual([2_000, 2_000]);
+    expect(r.retries).toEqual([1, 2]);
+    expect(POKE_LAG_DELAY_MS).toBe(2_000);
+  });
+  test("still DeskBlind after 3 retries: the DeskBlind error comes back (the runner logs a skip)", async () => {
+    const client = mockClient(["blind"]);
+    const r = recorder();
+    await expect(simulatePoke(() => client.simulateContract(), r)).rejects.toThrow(/DeskBlind/);
+    expect(client.calls()).toBe(1 + POKE_LAG_RETRIES);
+    expect(POKE_LAG_RETRIES).toBe(3);
+    expect(r.sleeps).toEqual([2_000, 2_000, 2_000]);
+  });
+  test("any other error is not retried here (the supervisor backs off)", async () => {
+    const client = mockClient(["nonce", "ok"]);
+    const r = recorder();
+    await expect(simulatePoke(() => client.simulateContract(), r)).rejects.toThrow("nonce too low");
+    expect(client.calls()).toBe(1);
+    expect(r.sleeps).toEqual([]);
+  });
+});
 ```
 
 - [ ] **Step 6: Run them to see them fail**
 
-Run: `cd bots && bun test test/live/supervise.test.ts test/live/outages.test.ts test/live/launchd.test.ts`
-Expected: FAIL with `Cannot find module '../../src/live/lib/supervise'` (and the same for `outages` and `launchd`).
+Run: `cd bots && bun test test/live/supervise.test.ts test/live/outages.test.ts test/live/launchd.test.ts test/live/runner.test.ts`
+Expected: FAIL with `Cannot find module '../../src/live/lib/supervise'` (and the same for `outages` and `launchd`), and `Export named 'POKE_LAG_DELAY_MS' not found` for `runner`.
 
 - [ ] **Step 7: Implement the pure parts**
 
@@ -7304,7 +7546,8 @@ Create `bots/src/live/lib/launchd.ts`:
 // RunAtLoad and KeepAlive bring every job back after a reboot (the plists stay in ~/Library/LaunchAgents) and after a
 // crash (no sooner than ThrottleInterval after its last start). Nothing here keeps the Mac awake: sleep is the
 // maintainer's (his Pauline app), and outages are recorded (scripts/outages.ts), not prevented.
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { constants } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 
 export const LABEL_PREFIX = "fi.clim-fables.";
@@ -7440,12 +7683,69 @@ export function jobState(name: LiveJobName): JobState | null {
   const r = spawnSync("launchctl", ["print", `${guiDomain()}/${jobLabel(name)}`], { encoding: "utf8" });
   return r.status === 0 ? parseLaunchctlPrint(r.stdout) : null;
 }
+
+/** The signals that would end `live:logs` (Ctrl+C, kill, a closed terminal, the alarm of `perl -e 'alarm ...'`). */
+export const FORWARDED_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP", "SIGALRM"] as const;
+export type ForwardedSignal = (typeof FORWARDED_SIGNALS)[number];
+
+/** Sends each of `signals` received by `source` (this process) to `child` instead of letting it end this process. */
+export function forwardSignals(
+  child: { kill(signal: NodeJS.Signals): unknown },
+  source: { on(signal: ForwardedSignal, listener: () => void): unknown } = process,
+  signals: readonly ForwardedSignal[] = FORWARDED_SIGNALS,
+): void {
+  for (const s of signals) source.on(s, () => void child.kill(s));
+}
+
+/** The shell's exit status for a child that exited with `code` or was ended by `signal` (128 + its number). */
+export function exitCodeFor(code: number | null, signal: NodeJS.Signals | null): number {
+  if (code !== null) return code;
+  const n = signal === null ? undefined : constants.signals[signal];
+  return n === undefined ? 1 : 128 + n;
+}
+
+/** Runs `cmd` in the foreground as if this process exec'd into it: the signals that would end this process go to the
+ *  child, and this process exits with the child's status when it exits, so killing it never leaves the child behind. */
+export function execForwarding(cmd: string, args: readonly string[], stdio: "inherit" | "ignore" = "inherit"): ChildProcess {
+  const child = spawn(cmd, [...args], { stdio });
+  forwardSignals(child);
+  child.on("exit", (code, signal) => process.exit(exitCodeFor(code, signal)));
+  return child;
+}
+```
+
+Replace `bots/src/live/lib/runner.ts` with (the poke simulation retried after a fresh read, `simulatePoke`):
+
+```ts
+import { FeeMode } from "@clim/shared";
+import { shortError } from "../../lib/jsonl";
+import { withRetry, type RetryOptions } from "./retry";
+import { isDeskBlindError } from "./supervise";
+
+export type PokeDecision = "wait" | "poke" | "blind";
+
+/** Poke once per new desk report; never on a blind desk (ClimPoker reverts DeskBlind and the pool keeps its last
+ *  override until it expires, then its flat fee). A degraded desk still pokes: the policy quotes at least the safe fee. */
+export function pokeDecision(seq: number, lastPokedSeq: number, mode: number): PokeDecision {
+  if (seq === 0 || seq <= lastPokedSeq) return "wait";
+  return mode === FeeMode.Blind ? "blind" : "poke";
+}
+
+export const POKE_LAG_RETRIES = 3;
+export const POKE_LAG_DELAY_MS = 2_000;
+
+/** The poke() simulation, after a read that found a fresh report. A DeskBlind revert then usually means the simulation
+ *  ran on a node of the load-balanced public RPC still at the previous seq: wait 2 s and simulate again, up to 3 times,
+ *  before the DeskBlind error is returned to the runner (which logs a skip). Any other error is thrown at once. */
+export function simulatePoke<T>(simulate: () => Promise<T>, o: Pick<RetryOptions, "onRetry" | "sleep"> = {}): Promise<T> {
+  return withRetry(simulate, { ...o, retries: POKE_LAG_RETRIES, delayMs: POKE_LAG_DELAY_MS, shouldRetry: (e) => isDeskBlindError(shortError(e)) });
+}
 ```
 
 - [ ] **Step 8: Run the tests**
 
-Run: `cd bots && bun test test/live/supervise.test.ts test/live/outages.test.ts test/live/launchd.test.ts`
-Expected: `20 pass` (supervise 7, outages 5, launchd 8; the `plutil -lint` test runs on macOS only and prints `OK`).
+Run: `cd bots && bun test test/live/supervise.test.ts test/live/outages.test.ts test/live/launchd.test.ts test/live/runner.test.ts`
+Expected: `28 pass` (supervise 7, outages 5, launchd 11, runner 5; the `plutil -lint` test runs on macOS only and prints `OK`; the orphan test starts `sleep 30` under a child bun and checks that SIGTERM and SIGALRM to that bun end it).
 
 - [ ] **Step 9: Write the supervised loop**
 
@@ -7571,7 +7871,7 @@ export function watchClock(name: string, onGap: (gap: ClockGap) => void, everyMs
 
 - [ ] **Step 10: Resume handling in the runner, the keeper, the arbitrage and the retail bots**
 
-Each bot keeps its Task 19 to 21 behaviour; the `setInterval` loop becomes `runSupervised`, errors are thrown to it (logged first), receipts wait at most 60 s, and actions prepared before a gap are dropped. The arbitrage bot polls the block number through the same loop instead of `watchBlockNumber` (same 2 s period, same "new block only" rule).
+Each bot keeps its Task 19 to 21 behaviour; the `setInterval` loop becomes `runSupervised`, errors are thrown to it (logged first), receipts wait at most 60 s, and actions prepared before a gap are dropped. The arbitrage bot polls the block number through the same loop instead of `watchBlockNumber` (same 2 s period, same "new block only" rule). The runner simulates `poke()` through `simulatePoke` (Step 7): after a read that found a fresh report, a `DeskBlind` revert is first taken as a node of the load-balanced public RPC still at the previous seq, and the simulation is retried 3 times, 2 s apart, before the skip is logged.
 
 Replace `bots/src/live/runner.ts` with:
 
@@ -7581,7 +7881,8 @@ Replace `bots/src/live/runner.ts` with:
 // Outages (plan 03 Task 23): a blind desk is a normal skip, logged once per blind spell (ClimPoker would revert
 // DeskBlind, and a DeskBlind revert met anyway is logged the same way); after a wall-clock jump the nonce is re-synced and
 // the desk re-read; failed ticks back off (2 s doubling to 60 s). A poke never carries a stale fee: ClimPoker reads the
-// policy when the transaction runs.
+// policy when the transaction runs. A DeskBlind revert right after a fresh read is first taken as a lagging node of the
+// load-balanced public RPC: the simulation is retried 3 times, 2 s apart, before the skip is logged.
 // Usage: bun src/live/runner.ts     Log: bots/out/runner-rh.jsonl     Env: RUNNER_POLL_MS (default 2000)
 import { climFeePolicyAbi, climPokerAbi, FeeMode, riskDeskV2Abi } from "@clim/shared";
 import { join } from "node:path";
@@ -7591,7 +7892,7 @@ import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
 import { liveClient, liveWallet } from "./lib/chain";
 import { loadLiveDeployments } from "./lib/deployments";
 import { liveKey } from "./lib/env";
-import { pokeDecision } from "./lib/runner";
+import { POKE_LAG_DELAY_MS, POKE_LAG_RETRIES, pokeDecision, simulatePoke } from "./lib/runner";
 import { isDeskBlindError } from "./lib/supervise";
 import { runSupervised } from "./lib/supervisor";
 
@@ -7629,7 +7930,9 @@ async function tick(): Promise<void> {
   blindLogged = false;
   if (pokeDecision(seq, lastSeq, q[2]) !== "poke") return;
   try {
-    const { request } = await client.simulateContract({ account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" });
+    const { request } = await simulatePoke(() => client.simulateContract({ account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" }), {
+      onRetry: (_e, n) => console.log(`[runner] seq ${seq}: DeskBlind after a fresh read (a lagging RPC node), retry ${n}/${POKE_LAG_RETRIES} in ${POKE_LAG_DELAY_MS / 1_000} s`),
+    });
     const hash = await wallet.writeContract(request);
     const r = await client.waitForTransactionReceipt({ hash, timeout: 60_000 });
     const ev = parseEventLogs({ abi: climPokerAbi, eventName: "Poked", logs: r.logs })[0]?.args;
@@ -7651,7 +7954,7 @@ async function tick(): Promise<void> {
   } catch (e) {
     const error = shortError(e);
     if (isDeskBlindError(error)) {
-      // the desk went blind between the read and the poke: the same skip as above
+      // still DeskBlind after simulatePoke's retries: the desk went blind between the read and the poke, the same skip
       appendJsonl(logFile, { ...base, action: "skip", reason: "desk blind (DeskBlind revert)" });
       console.log(`[runner] seq ${seq}: DeskBlind, no poke`);
       blindLogged = true;
@@ -8268,14 +8571,15 @@ if (hasFlag("--watch")) {
 }
 ```
 
-Create `bots/src/live/scripts/launchd.ts`:
+Create `bots/src/live/scripts/launchd.ts` (`logs` runs `tail` through `execForwarding`, so a Ctrl+C, a kill or the alarm of `perl -e 'alarm ...'` that ends it ends the tail too, instead of leaving it running):
 
 ```ts
 // Installs, removes and tails the live stack's launchd LaunchAgents (fi.clim-fables.<name>) on the maintainer's Mac.
 // install: resolves bun and cre on PATH, writes ~/Library/LaunchAgents/fi.clim-fables.<name>.plist (no secret in it) and
 //          bootstraps it into gui/<uid> (a job already loaded is booted out first, so install also reloads).
 // uninstall: boots the jobs out and removes their plists (they then stay stopped after a reboot).
-// logs: tails bots/out/logs/<name>.log and .err.log. print: prints the plists without writing or loading anything.
+// logs: tails bots/out/logs/<name>.log and .err.log (a signal that ends this process ends the tail too).
+// print: prints the plists without writing or loading anything.
 // Health: bun run live:status.
 // Usage: bun src/live/scripts/launchd.ts <install|uninstall|logs|print> [name ...]   (names: desk runner keeper arb noise outages)
 import { spawnSync } from "node:child_process";
@@ -8283,7 +8587,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { REPO_ROOT } from "../lib/deployments";
-import { guiDomain, isLiveJobName, jobLabel, jobState, LIVE_JOB_NAMES, liveJobSpec, logPaths, plistFor, type JobPaths, type LiveJobName } from "../lib/launchd";
+import { execForwarding, guiDomain, isLiveJobName, jobLabel, jobState, LIVE_JOB_NAMES, liveJobSpec, logPaths, plistFor, type JobPaths, type LiveJobName } from "../lib/launchd";
 
 const BOTS_DIR = join(REPO_ROOT, "bots");
 const AGENTS_DIR = join(homedir(), "Library", "LaunchAgents");
@@ -8345,8 +8649,8 @@ function logs(): void {
     const p = logPaths(n, BOTS_DIR);
     return [p.stdout, p.stderr];
   });
-  const r = spawnSync("tail", ["-n", "20", "-F", ...files], { stdio: "inherit" });
-  process.exit(r.status ?? 0);
+  // tail in the foreground: Ctrl+C, a kill or perl's alarm reach it through this process, never orphaning it
+  execForwarding("tail", ["-n", "20", "-F", ...files]);
 }
 
 function print(): void {
@@ -8369,7 +8673,8 @@ Replace `bots/src/live/scripts/status.ts` with:
 // Health of the live stack on Robinhood Chain testnet: desk seq and age, the policy's quote and mode, each pool's fee
 // both ways and price against the venues, the last pokes on D (ClimPoker) and K (keeper), every key's balances, the
 // age of each bot's last log line, the launchd jobs (plan 03 Task 23) and the outage record. Exits 1 on a problem;
-// --watch prints a snapshot every 15 s instead.
+// --watch prints a snapshot every 15 s instead. The snapshot is read 3 blocks behind the head (balances at the latest
+// block) and a failed read is retried up to 3 times, 1 s apart (lib/retry.ts: some nodes of the public RPC lag the head).
 // Usage: bun src/live/scripts/status.ts [--watch]
 import { climPokerAbi, FeeMode, LIVE_POOLS, pipsToBp, pokeFeeHookAbi, sigmaE9ToAnnual, stateViewAbi } from "@clim/shared";
 import { existsSync, readFileSync } from "node:fs";
@@ -8383,6 +8688,7 @@ import { liveClient, readLiveBalances, readLiveState } from "../lib/chain";
 import { loadLiveDeployments } from "../lib/deployments";
 import { liveKey, type LiveRole } from "../lib/env";
 import { jobLabel, jobState, LIVE_JOB_NAMES } from "../lib/launchd";
+import { laggedHead, withRetry } from "../lib/retry";
 import { lastTs } from "../lib/tail";
 
 const d = loadLiveDeployments();
@@ -8399,8 +8705,12 @@ const LOGS: Array<[string, string, number]> = [
 
 async function snapshot(): Promise<string[]> {
   const problems: string[] = [];
-  const head = await client.getBlockNumber();
-  const [s, block, quotes] = await Promise.all([readLiveState(client, d, head), client.getBlock({ blockNumber: head }), fetchVenueQuotes().catch(() => [])]);
+  const head = laggedHead(await withRetry(() => client.getBlockNumber()));
+  const [s, block, quotes] = await Promise.all([
+    withRetry(() => readLiveState(client, d, head)),
+    withRetry(() => client.getBlock({ blockNumber: head })),
+    fetchVenueQuotes().catch(() => []),
+  ]);
   const now = Number(block.timestamp);
   const m = aggregate(quotes);
   const age = s.desk.seq === 0 ? Number.POSITIVE_INFINITY : now - s.desk.tObs;
@@ -8412,14 +8722,16 @@ async function snapshot(): Promise<string[]> {
 
   const from = head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
   const [poked, kPokes] = await Promise.all([
-    client.getLogs({ address: d.poker, event: climPokerAbi[1], fromBlock: from, toBlock: head }),
-    client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.K.poolId }, fromBlock: from, toBlock: head }),
+    withRetry(() => client.getLogs({ address: d.poker, event: climPokerAbi[1], fromBlock: from, toBlock: head })),
+    withRetry(() => client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.K.poolId }, fromBlock: from, toBlock: head })),
   ]);
   const lastPoke = poked[poked.length - 1]?.args;
   const lastK = kPokes[kPokes.length - 1];
   for (const name of LIVE_POOLS) {
     const ps = s.pools[name];
-    const liq = await client.readContract({ address: d.uniswap.stateView, abi: stateViewAbi, functionName: "getLiquidity", args: [d.pools[name].poolId] });
+    const liq = await withRetry(() =>
+      client.readContract({ address: d.uniswap.stateView, abi: stateViewAbi, functionName: "getLiquidity", args: [d.pools[name].poolId], blockNumber: head }),
+    );
     console.log(
       `  ${name}: fee ${ps.fee0For1}/${ps.fee1For0} pips (${pipsToBp(ps.fee0For1).toFixed(2)}/${pipsToBp(ps.fee1For0).toFixed(2)} bp) price ${ps.ethUsd.toFixed(2)}${m ? ` gap ${((ps.ethUsd / m.price - 1) * 1e4).toFixed(1)} bp` : ""} L ${Number(liq).toExponential(3)}`,
     );
@@ -8451,7 +8763,7 @@ async function snapshot(): Promise<string[]> {
     }
   }
   for (const [name, addr, router] of keys) {
-    const b = await readLiveBalances(client, d, addr, router ?? addr);
+    const b = await withRetry(() => readLiveBalances(client, d, addr, router ?? addr));
     const tokens = router ? `, ${formatUnits(b.tETH, 18)} tETH, ${formatUnits(b.tUSDG, 6)} tUSDG` : "";
     console.log(`  ${name} ${addr}: ${formatEther(b.native)} ETH${tokens}`);
     if (b.native < 10n ** 16n) problems.push(`${name} has under 0.01 ETH (bun run live:fund)`);
@@ -8515,7 +8827,7 @@ In `bots/package.json`, add after `"live:verify"` (`live:status` stays Task 22's
 - [ ] **Step 13: Run the whole suites, the typecheck and the plists**
 
 Run: `cd bots && bun test && bun run typecheck && cd ../shared && bun test && cd ../cre && bash -n scripts/sim-loop.sh && echo "sim-loop ok"`
-Expected: bots `0 fail` with 20 more tests than after Task 22 (111 in all), `tsc` exits 0, shared `0 fail` (77), then `sim-loop ok`.
+Expected: bots `0 fail` with 26 more tests than after Task 22 (122 in all), `tsc` exits 0, shared `0 fail` (77), then `sim-loop ok`.
 
 Then print the six plists without installing anything, and lint them:
 
@@ -8768,6 +9080,7 @@ git add shared/src/outages.ts shared/src/index.ts shared/package.json shared/tes
   bots/src/live/lib/supervise.ts bots/src/live/lib/outages.ts bots/src/live/lib/launchd.ts bots/src/live/lib/supervisor.ts \
   bots/src/live/runner.ts bots/src/live/keeper.ts bots/src/live/arb.ts bots/src/live/noise.ts bots/src/live/desk-loop.ts \
   bots/src/live/scripts/outages.ts bots/src/live/scripts/launchd.ts bots/src/live/scripts/status.ts bots/package.json \
+  bots/src/live/lib/runner.ts bots/test/live/runner.test.ts \
   bots/test/live/supervise.test.ts bots/test/live/outages.test.ts bots/test/live/launchd.test.ts \
   cre/scripts/sim-loop.sh contracts/test/v2/Outage.t.sol
 git commit -m "feat(bots): launchd supervision, resume after sleep and an on-chain outage record" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
@@ -8831,7 +9144,7 @@ The six long-running processes run on the maintainer's Mac as launchd LaunchAgen
 
 ```bash
 cd bots && bun run live:install            # writes ~/Library/LaunchAgents/fi.clim-fables.*.plist and starts the six jobs
-cd bots && bun run live:logs desk          # follow one job's log (Ctrl+C stops the tail, not the job); no name: all six
+cd bots && bun run live:logs desk          # follow one job's log (Ctrl+C, a kill or an alarm stops the tail, never the job); no name: all six
 cd bots && bun run live:status --watch     # a snapshot every 15 s, with each job's launchd state; PROBLEM lines name anything wrong
 ```
 
@@ -8858,7 +9171,9 @@ cd bots && bun run live:uninstall       # stop every job and remove the plists (
 - `D fee != last poke`: another FEE_POKER key poked D, or a poke reverted; `bots/out/runner-rh.jsonl` has the error.
 - `job <name> not running` or `bot <name> silent`: `bun run live:logs <name>` shows the last error; launchd restarts an exited job 30 s after its last start; `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>` restarts it now. `job <name> not loaded`: `bun run live:install <name>`.
 - A job exits again at once (`last exit 1` in `live:status`): a key missing from `bots/.env`, the CRE CLI logged out (`cre login`), or a moved repository or tool (`bun run live:install`).
-- The public RPC answers 429: set `RH_TESTNET_RPC_URL` in `bots/.env` to a keyed endpoint (never commit it), then restart the jobs so they read it: `for j in desk runner keeper arb noise outages; do launchctl kickstart -k gui/$(id -u)/fi.clim-fables.$j; done`.
+- RPC endpoint: every process and script of `bots/` (the runner, keeper, arbitrage and retail bots, the desk job's receipt reads, `live:status`, `live:verify`, `live:gas`, `live:outages`, `live:fund`) uses `RH_TESTNET_RPC_URL` from `bots/.env` when it is set, else the public `https://rpc.testnet.chain.robinhood.com`. The CRE workflow itself reads and writes through the URL in `cre/project.yaml`, which this variable does not change.
+- The public RPC answers 429, or lags too often: set `RH_TESTNET_RPC_URL` in `bots/.env` to a keyed endpoint (an Alchemy Robinhood Chain testnet URL, for instance; never commit it), then restart the jobs so they read it: `for j in desk runner keeper arb noise outages; do launchctl kickstart -k gui/$(id -u)/fi.clim-fables.$j; done`.
+- The public RPC is load-balanced and some of its nodes lag the head by a few blocks. `live:status` and `live:verify` read 3 blocks behind the head and retry a failed read up to 3 times, 1 s apart; if one still fails (`BlockNotFoundError`, `Missing or invalid parameters`, `historical state not available`), run it again. The runner retries a `DeskBlind` revert of its `poke()` simulation that follows a fresh desk read 3 times, 2 s apart (`[runner] seq <n>: DeskBlind after a fresh read (a lagging RPC node), retry <k>/3 in 2 s` in `runner.log`), and logs a skip only if the revert persists.
 - Contracts re-deployed: rerun `cd cre/risk-desk && bun scripts/sync-config.ts`, then `cd bots && bun run live:install` (reloads every job; the desk job rebuilds the WASM). `bots/out/outages.json` starts over from the new desk's deployment block by itself.
 
 ### 8.6 Outages
