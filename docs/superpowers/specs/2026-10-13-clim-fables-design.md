@@ -224,12 +224,14 @@ alongside.
 - "clim × Fables" in the nav;
 - no wallet connection and no real transaction: live data is read only, and actions are the recorded fork run.
 
-**Routes:**
-- `/`: the thesis in one line and the live number (the keeper's override against clim's recommendation now);
-- `/pool/eth-usdg`: their pool page with the clim panel, showing the live overrides against clim's recommendation,
-  sigma, the toxic side and the gaps;
-- `/integrate`: the three levels with exact code (RPC read, `grantRole`, `ClimPoker`) and the recorded run;
-- `/evidence`: the lab, every number with its script.
+**Routes (mirroring Fables', plan 04b):**
+- `/`: the thesis in one line and the live number (the keeper's fee against clim's recommendation now);
+- `/markets`: Fables' list with a "Fee source" column (Fables keeper; clim, keeper-style and flat on testnet);
+- `/markets/eth` (`/pool/eth-usdg` redirects there): their pool page with clim in its Dynamic Fee section, showing the
+  live overrides against clim's recommendation, sigma, the per-direction fees and the gap;
+- `/markets/d`, `/markets/k`, `/markets/f`: clim's testnet pools, with the desk's outages on D;
+- `/integrate`: the three levels with exact code (RPC read, the AccessManager batch, `ClimPoker`);
+- `/evidence`: the lab, every number with its file; `/run`: the recorded fork run replayed.
 
 **Data:**
 - Fables mainnet logs and StateView, read live;
@@ -290,7 +292,7 @@ The README opens with a "Verify in 10 minutes" path, and `/integrate` mirrors it
 | Does it work on my data? | `README.md` "Results, as measured" (the `framing` strings of `lab/out/fables-*.json`, verbatim); `lab/README.md` to rerun |
 | Latency and cadence? | `docs/integrate/README.md` "Gas and cost": the desk's cadence read from the chain into `docs/evidence/gas-robinhood-testnet.json` |
 | Cost to run? | The same section, generated from the evidence file by `cd bots && bun run live:cost-doc`; CRE DON costs are not measured while the desk runs in the simulator |
-| Code quality? | `.github/workflows/ci.yml` (forge format, build, tests, ABI sync, coverage in the job summary; lab; shared, bots, integrate and CRE tests and typecheck; the cost section against the evidence); MIT license; no copied Fables code. App tests and lint join CI with plan 04b |
+| Code quality? | `.github/workflows/ci.yml` (forge format, build, tests, ABI sync, coverage in the job summary; lab; shared, bots, integrate and CRE tests and typecheck; the cost section against the evidence); MIT license; no copied Fables code. the `app` job: synced data check, unit and guardrail tests, typecheck, lint, build, bundle scan and browser guardrails |
 | Path to mainnet? | `docs/integrate/README.md` "Honest status and the path to mainnet": what changes when CRE writes to `robinhood-mainnet` (configuration only), and what stays |
 | Per-direction fees for the new hooks? | `README.md` results (the directional study, verbatim), `ClimFeePolicy.quoteDirectional()` live on pool D (`ClimPoker.directional()` is true), `docs/security.md` §8 on symmetric hooks |
 

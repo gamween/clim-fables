@@ -13,7 +13,7 @@
 
 **Showcase by clim, not affiliated with Fables · Continued from TOKEN2049 Origins, Singapore, October 2026**
 
-**[Verify in 10 minutes](#verify-in-10-minutes)** · **[Integrate](docs/integrate/README.md)** · **[Security](docs/security.md)** · **[Runbook](docs/runbook.md)** · **[Evidence](docs/evidence/)** · **[Lab](lab/README.md)**
+**[Showcase app](https://clim-fables.vercel.app)** · **[Verify in 10 minutes](#verify-in-10-minutes)** · **[Integrate](docs/integrate/README.md)** · **[Security](docs/security.md)** · **[Runbook](docs/runbook.md)** · **[Evidence](docs/evidence/)** · **[Lab](lab/README.md)**
 
 </div>
 
@@ -122,6 +122,7 @@ The exact keeper diff, the batch calldata, its revocation, the path to mainnet a
 
 | Piece | Status |
 |---|---|
+| The showcase app | [clim-fables.vercel.app](https://clim-fables.vercel.app): Fables' interface rebuilt with clim grafted in; reads Fables on mainnet and clim on testnet live; no wallet, no transaction ([`app/`](app/)) |
 | `RiskDeskV2`, `ClimFeePolicy`, `ClimPoker`, `PokeFeeHook`, pools D, K, F | Live on Robinhood Chain testnet (46630), verified |
 | The CRE desk | The CRE simulator (`cre workflow simulate --broadcast`), one node, on the maintainer's Mac under launchd; reports go through the `MockKeystoneForwarder` with clim's operator key, and the desk accepts them only from that key while `simMode` is on. DON deploy access is pending |
 | Arbitrage, retail and keeper-style bots | Live on testnet, with test tokens (tETH, tUSDG) and no value at stake |
@@ -151,6 +152,7 @@ from a separate download the README names).
 | [`shared/`](shared/) | Deployments, parameters, ABIs and typed loaders used by every package |
 | [`lab/`](lab/) | Python (uv): the studies on Fables' pool and their outputs in `lab/out/` |
 | [`docs/`](docs/) | [`integrate/`](docs/integrate/README.md), [`security.md`](docs/security.md), [`runbook.md`](docs/runbook.md), [`evidence/`](docs/evidence/), the design spec and plans in `superpowers/`, session logs in `sessions/` |
+| [`app/`](app/) | The showcase app (Next.js): Fables' interface with clim's desk, pools, integration and evidence, read live; deployed at [clim-fables.vercel.app](https://clim-fables.vercel.app) |
 
 Run every test (no secret needed; the fork suites skip without an RPC):
 
@@ -160,6 +162,7 @@ git submodule update --init --recursive
 (cd lab && uv run --frozen pytest -q)
 bun install --frozen-lockfile && bun run test && bun run typecheck
 (cd cre/risk-desk && bun install --frozen-lockfile && bun test && bun run typecheck)
+(cd app && npm ci && npm run sync:check && npm test && npm run typecheck && npm run lint && npm run build)
 ```
 
 CI runs the same commands on every push ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
@@ -184,6 +187,5 @@ continues it for Fables' pools on Robinhood Chain, as a showcase not affiliated 
   internal libraries, and UNLICENSED for its `src/test` routers. clim's testnet routers are v4-core's unmodified
   `PoolSwapTest` and `PoolModifyLiquidityTest`, compiled from the submodule, used on testnet only.
 - Fables' contracts are not in this repository: clim uses only their published ABI.
-- `app/` (the TOKEN2049 dashboard) lists its third-party components in
-  [`app/THIRD_PARTY_NOTICES.md`](app/THIRD_PARTY_NOTICES.md).
+- `app/` (the showcase) lists what is not clim's (Fables' brand files and fonts, which belong to Fables and 205TF and are not committed; its npm packages) in [`app/THIRD_PARTY_NOTICES.md`](app/THIRD_PARTY_NOTICES.md); the TOKEN2049 dashboard's notices stay at tag `token2049-submission`.
 - npm dependencies keep their own licenses, including `@chainlink/cre-sdk` (BUSL-1.1).
