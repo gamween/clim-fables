@@ -14,7 +14,9 @@
     "fund": "bun src/scripts/fund.ts",
     "status": "bun src/scripts/status.ts",
     "forge-report": "bun src/scripts/forge-report.ts",
-    "live:keys": "bun src/live/scripts/keys.ts"
+    "live:keys": "bun src/live/scripts/keys.ts",
+    "live:desk": "bun src/live/desk-loop.ts",
+    "live:runner": "bun src/live/runner.ts"
   },
   "dependencies": {
     "@clim/shared": "workspace:*",
