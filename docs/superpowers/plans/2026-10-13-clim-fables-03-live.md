@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Run clim's Chainlink CRE desk v2 every 30 s on Robinhood Chain testnet, feeding three live reference pools (D driven by `ClimPoker`, K poked by a keeper-style bot, F flat 7 bp) that bots trade against real venue prices, with every contract verified on Sourcify and Blockscout, gas measured, and the Sepolia v1 stack stopped at the end.
+**Goal:** Run clim's Chainlink CRE desk v2 every 30 s on Robinhood Chain testnet, feeding three live reference pools (D driven by `ClimPoker`, K poked by a keeper-style bot, F flat 7 bp) that bots trade against real venue prices, with every contract verified on Sourcify and Blockscout, gas measured, the processes supervised by launchd on the maintainer's Mac with every outage handled and recorded, and the Sepolia v1 stack stopped at the end.
 
-**Architecture:** The lab first measures which volatility estimator the live desk can compute (the lab's own uses Binance 1 s prices, the desk reads four venues' 1-minute candles) and re-decides `etaE4` for it. Foundry scripts deploy our AccessManager, an independent `PokeFeeHook` hosting the three pools of test tokens, `RiskDeskV2`, `ClimFeePolicy` and a directional `ClimPoker`, first on an anvil fork of the testnet, then on the testnet. The CRE workflow `cre/risk-desk` becomes v2 (two volatility windows, the venue-versus-pool gap, a config switch for the target pool) and runs in the CRE simulator with `--broadcast`; Bun bots (runner, keeper, arbitrage, retail) and a status script run beside it.
+**Architecture:** The lab first measures which volatility estimator the live desk can compute (the lab's own uses Binance 1 s prices, the desk reads four venues' 1-minute candles) and re-decides `etaE4` for it. Foundry scripts deploy our AccessManager, an independent `PokeFeeHook` hosting the three pools of test tokens, `RiskDeskV2`, `ClimFeePolicy` and a directional `ClimPoker`, first on an anvil fork of the testnet, then on the testnet. The CRE workflow `cre/risk-desk` becomes v2 (two volatility windows, the venue-versus-pool gap, a config switch for the target pool) and runs in the CRE simulator with `--broadcast`; Bun bots (runner, keeper, arbitrage, retail) and a status script run beside it. The long-running processes run on the maintainer's Mac as launchd LaunchAgents; they resume cleanly after a sleep, a reboot, a network loss or a crash, and an outage record derived from the desk's on-chain reports shows every gap.
 
 **Tech Stack:** Python 3.12 + numpy (lab, uv), Foundry (solc 0.8.26) + Uniswap v4 + OpenZeppelin 5.5, Chainlink CRE TypeScript SDK 1.23.0 + CRE CLI v1.37.0, Bun 1.3.9 + viem 2.57.3 (bots, shared).
 
@@ -62,9 +62,9 @@ Contracts as built (plan 02, `contracts/src/v2/`):
 - `TestToken` has 18 decimals hard-wired; the brief asks for tUSDG with 6 decimals like USDG, hence `TestTokenDecimals` (Task 4).
 - `shared/params-fables.json` (plan 01): `etaE4` 175,198, `sqrtHalfDtE6` 850,890, `sigmaWindowSec` 300, floor 700, cap 6,000, safe 3,000, `tauKillSec` 180, `pokeTtlSec` 600, `dirEnabled` true with `dirStatus` "experimental" (plan 01 review r2), `dirSlopeE4` 2,753, `dirMaxPremiumPips` 567. Task 2 may change `etaE4` and adds `sigmaEstimator`.
 
-Checked while writing this plan, on scratch copies outside the repository (nothing sent to a real chain): the plan's contracts and scripts compile and the contracts suite gives 156 passed, 3 skipped; `deploy-live.sh` then `live-smoke.sh` run clean on an anvil fork of the testnet (anvil's public test keys); the CRE workflow's 48 tests pass, `tsc` and `cre workflow build` succeed, and dry runs of `rh-testnet-settings` and `rh-shadow-settings` complete in the CRE simulator on `robinhood-testnet` (the shadow run read Fables' mainnet pool at 2,507.48 against a venue mid of 2,506.55, devPips -369); `shared` gives 72 tests passing and `bots` 91, both typecheck; the runner, keeper, arbitrage, retail, fund, status, gas and verify scripts ran against a fork answering as chain 46630; `study_estimator.py` reproduced study 2's `binance-1s` result on stand-in minute data. Code blocks below are those versions.
+Checked while writing this plan, on scratch copies outside the repository (nothing sent to a real chain): the plan's contracts and scripts compile and the contracts suite gives 156 passed, 3 skipped; `deploy-live.sh` then `live-smoke.sh` run clean on an anvil fork of the testnet (anvil's public test keys); the CRE workflow's 48 tests pass, `tsc` and `cre workflow build` succeed, and dry runs of `rh-testnet-settings` and `rh-shadow-settings` complete in the CRE simulator on `robinhood-testnet` (the shadow run read Fables' mainnet pool at 2,507.48 against a venue mid of 2,506.55, devPips -369); `shared` gives 72 tests passing and `bots` 91, both typecheck; the runner, keeper, arbitrage, retail, fund, status, gas and verify scripts ran against a fork answering as chain 46630; `study_estimator.py` reproduced study 2's `binance-1s` result on stand-in minute data. Task 23 (added 2026-10-14) was checked the same way on a scratch copy: `shared` 77 and `bots` 111 tests pass and both typecheck, the six generated plists pass `plutil -lint`, the supervised loop was run with a forced 120 s clock jump and a streak of failing ticks (it wrote the `wake` and `rpc-errors` records and backed off 2, 4, 8 s), and `Outage.t.sol` passes (6 tests) beside the contracts suite; no launchd job was installed. Code blocks below are those versions.
 
-The running Sepolia v1 stack lives in another checkout, `/Users/fianso/Development/hackathons/clim/bots` (processes `bun run cre-loop --pair live`, `bun src/sim-loop.ts --pair live`, `bash scripts/sim-loop.sh staging-settings --broadcast`, `bun run arb --pair live`, `bun run noise --pair live`, `bun run status --pair live --watch`). Nothing in this repository is running, so `cre/risk-desk` is changed in place (its Sepolia version stays at tag `token2049-submission` and in that checkout). Every v2 process started by this plan has a command line without `--pair live` and without `staging-settings`, so the shutdown patterns of Task 25 can never hit it.
+The running Sepolia v1 stack lives in another checkout, `/Users/fianso/Development/hackathons/clim/bots` (processes `bun run cre-loop --pair live`, `bun src/sim-loop.ts --pair live`, `bash scripts/sim-loop.sh staging-settings --broadcast`, `bun run arb --pair live`, `bun run noise --pair live`, `bun run status --pair live --watch`). Nothing in this repository is running, so `cre/risk-desk` is changed in place (its Sepolia version stays at tag `token2049-submission` and in that checkout). Every v2 process started by this plan has a command line without `--pair live` and without `staging-settings`, so the shutdown patterns of Task 26 can never hit it.
 
 ## Decisions taken in this plan (beyond the brief)
 
@@ -86,6 +86,7 @@ The running Sepolia v1 stack lives in another checkout, `/Users/fianso/Developme
 - **Venue mid** for devPips is the median of real-time tickers (USD, Binance converted with Kraken's USDT/USD, v1's source; the lab converts with Coinbase's USDT-USD 1-minute closes, the same market on another venue), as the lab used 1 s prices; with fewer than 3 tickers it falls back to the median 1-minute close. If the pool cannot be read, devPips is 0 (no directional premium), and the log says so.
 - **The volatility estimator** is a workflow config field (`sigmaEstimator`) with all three candidates implemented and tested, synced from `shared/params-fables.json`, so the CRE tasks are the same whichever estimator Task 2 picks.
 - **Public RPCs** for the testnet everywhere (deploy, CRE, bots), so no keyed URL appears in a command or a log; `bots/.env` may override `RH_TESTNET_RPC_URL` if the public endpoint rate-limits.
+- **Runs on the maintainer's Mac** (his decision, 2026-10-14), not on a server: six launchd LaunchAgents `fi.clim-fables.<name>` (desk, runner, keeper, arb, noise, outages), installed at go-live (Task 25). The Mac's sleep is his (his Pauline app owns `pmset disablesleep`): nothing in this plan keeps the Mac awake (no `caffeinate`, no `pmset`). Outages are handled (resume after a wall-clock jump, nonce re-sync, stale actions dropped, capped backoff) and recorded from the chain in `bots/out/outages.json` (Task 23); plan 04's app shows those windows as measured.
 
 ## File structure
 
@@ -107,8 +108,13 @@ The running Sepolia v1 stack lives in another checkout, `/Users/fianso/Developme
 | `cre/risk-desk/{venues,estimator,pool,report,workflow}.ts` (modify/create) | Desk v2: OHLC and tickers, three estimators, pool mid, v2 report, workflow |
 | `cre/risk-desk/config.{testnet,shadow,production}.json`, `workflow.yaml`, `../project.yaml`, `scripts/sync-config.ts` | Targets `rh-testnet-settings`, `rh-shadow-settings`, `rh-production-settings` |
 | `bots/src/live/lib/*.ts` (create) | Env, deployments loader, chain reads, directional arbitrage, retail flow, keeper map, env-file merge, log tail, gas summary |
-| `bots/src/live/{desk-loop,runner,keeper,arb,noise}.ts` (create) | The five live processes |
-| `bots/src/live/scripts/{keys,fund,status,gas,verify-live}.ts` (create) | Keys, funding, status, gas evidence, final on-chain checks |
+| `bots/src/live/{desk-loop,runner,keeper,arb,noise}.ts` (create; Task 23 modifies) | The five live processes; Task 23 adds resume after a wall-clock jump, nonce re-sync, stale-action drops and backoff |
+| `bots/src/live/scripts/{keys,fund,status,gas,verify-live}.ts` (create) | Keys, funding, status (Task 23 adds the launchd jobs and the outage record), gas evidence, final on-chain checks |
+| `shared/src/outages.ts` (create) | Outage windows from consecutive `RiskReportedV2` reports, for the bots and plan 04's app |
+| `bots/src/live/lib/{supervise,supervisor,outages,launchd}.ts` (create) | Wake detection and backoff (pure), the supervised loop and local outage records, the outage scan state, the launchd plist generator |
+| `bots/src/live/scripts/{outages,launchd}.ts` (create) | `bots/out/outages.json` from the chain; install, uninstall, logs and print of the LaunchAgents |
+| `cre/scripts/sim-loop.sh` (modify) | `CRE_BIN`, the CRE CLI's absolute path for the launchd desk job |
+| `contracts/test/v2/Outage.t.sol` (create) | Pools D, K, F during an outage and after it |
 | `docs/runbook.md`, `cre/README.md`, `docs/feedback/cre-friction-log.md`, `docs/sessions/*.md` (modify) | Operations and records |
 
 ---
@@ -2754,7 +2760,7 @@ git commit -m "docs: plan 03 fork rehearsal of the live stack" -m "Claude-Sessio
 
 This task sends one transaction on Ethereum Sepolia from the testnet deployer key. That is allowed: it is a testnet key on a testnet. Nothing here touches any mainnet.
 
-**Budget** (gas price 0.01 gwei = 1e-8 ETH per million gas; v1's measured gas per transaction; Task 24 replaces these with testnet measurements):
+**Budget** (gas price 0.01 gwei = 1e-8 ETH per million gas; v1's measured gas per transaction; Task 25 replaces these with testnet measurements):
 
 | Flow | Rate | Gas per tx | ETH per day |
 |---|---|---|---|
@@ -2766,7 +2772,7 @@ This task sends one transaction on Ethereum Sepolia from the testnet deployer ke
 | **Total** | | | **about 0.03 ETH/day** |
 | Deployment (one time, Task 10 total × 2 margin) | | about 40M | 0.0004 |
 
-0.5 ETH bridged runs the stack for about two weeks with margin; the Sepolia balance keeps about 0.36 ETH for v1's Sepolia loop until Task 25 stops it. If the base fee rises, the per-day cost scales with it (Task 24 measures it).
+0.5 ETH bridged runs the stack for about two weeks with margin; the Sepolia balance keeps about 0.36 ETH for v1's Sepolia loop until Task 26 stops it. If the base fee rises, the per-day cost scales with it (Task 25 measures it).
 
 - [ ] **Step 1: Check balances and simulate the deposit (read only)**
 
@@ -2892,7 +2898,7 @@ git commit -m "feat: clim live reference stack deployed on Robinhood Chain testn
 
 ## Part C: the CRE desk v2
 
-`cre/risk-desk` changes in place: its Sepolia v1 is frozen at tag `token2049-submission` and is what still runs in the hackathon checkout until Task 25. The v1 targets (`staging-settings`, `replay-settings`, `production-settings`), the replay mode and DVOL go; the v2 targets are `rh-testnet-settings`, `rh-shadow-settings` and `rh-production-settings`. Install once: `cd cre/risk-desk && bun install`.
+`cre/risk-desk` changes in place: its Sepolia v1 is frozen at tag `token2049-submission` and is what still runs in the hackathon checkout until Task 26. The v1 targets (`staging-settings`, `replay-settings`, `production-settings`), the replay mode and DVOL go; the v2 targets are `rh-testnet-settings`, `rh-shadow-settings` and `rh-production-settings`. Install once: `cd cre/risk-desk && bun install`.
 
 Tasks 13 to 15 replace the modules under `workflow.ts` one by one, so until Task 16 replaces `workflow.ts` itself, `workflow.test.ts` and `bun run typecheck` fail in `cre/risk-desk`: each step of Tasks 13 to 15 runs only its own test files, and Task 16 Step 6 runs everything.
 
@@ -4943,7 +4949,7 @@ cast call "$DESK" 'state()(uint40,uint32,uint32,int32,uint16,uint8,uint32)' --rp
 cast receipt <hash> --rpc-url https://rpc.testnet.chain.robinhood.com --json | jq '{status, gasUsed, gasUsedForL1, effectiveGasPrice}'
 ```
 
-Expected: `seq` = 1, the reported `tObs`; the receipt with `status` `0x1` and its gas (the first report gas figure for Task 24).
+Expected: `seq` = 1, the reported `tObs`; the receipt with `status` `0x1` and its gas (the first report gas figure for Task 25).
 
 - [ ] **Step 5: Run the loop for two minutes**
 
@@ -5044,7 +5050,7 @@ git commit -m "feat(cre): first desk v2 reports on Robinhood Chain testnet, fric
 
 ## Part D: the live bots
 
-All live bots live under `bots/src/live/` and reuse v1's pure modules (`bots/src/lib/arb.ts`, `market.ts`, `rng.ts`, `swap.ts`, `jsonl.ts`, `simParse.ts`, `env.ts`) unchanged. Their logs go to `bots/out/*-rh.jsonl` and `bots/out/desk-runs.jsonl` (gitignored). Their `package.json` scripts are named `live:*`, so no command line contains `--pair live`.
+All live bots live under `bots/src/live/` and reuse v1's pure modules (`bots/src/lib/arb.ts`, `market.ts`, `rng.ts`, `swap.ts`, `jsonl.ts`, `simParse.ts`, `env.ts`) unchanged. Their logs go to `bots/out/*-rh.jsonl` and `bots/out/desk-runs.jsonl` (gitignored). Their `package.json` scripts are named `live:*`, so no command line contains `--pair live`. Task 23 puts the long-running ones under launchd and adds their outage handling.
 
 ### Task 18: Live bot library (env, deployments, chain reads, log tail, chunked logs)
 
@@ -6550,7 +6556,7 @@ console.log(`wrote docs/evidence/gas-robinhood-testnet.json`);
 Create `bots/src/live/scripts/verify-live.ts`:
 
 ```ts
-// Final on-chain checks of the live stack (plan 03 Task 25) over the last WINDOW_BLOCKS blocks (default 18,000, about
+// Final on-chain checks of the live stack (plan 03 Task 26) over the last WINDOW_BLOCKS blocks (default 18,000, about
 // 30 minutes): the desk reports regularly and seq rises by one; pool D's fee is the policy's quote, poke by poke, and
 // what the hook recorded; the keeper pokes K about every 180 s with a 7,200 s TTL from its own key; F is never poked and
 // charges its flat 700 pips; arbitrage and retail swaps land on D, K and F. Writes docs/evidence/live-check-<date>.json;
@@ -6688,9 +6694,2007 @@ git add bots/src/live/lib/gas.ts bots/src/live/scripts/fund.ts bots/src/live/scr
 git commit -m "feat(bots): live funding, status, gas evidence and final on-chain checks" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
 ```
 
+### Task 23: Supervision and outage handling
+
+The live stack runs on the maintainer's Mac, not on a server (his decision). The Mac sleeps whenever his Pauline app lets it (Pauline owns `pmset disablesleep`); it can also lose the network or reboot, and a process can crash. This task makes every such outage clean and visible. It adds nothing that keeps the Mac awake: no `caffeinate`, no `pmset`, no keep-awake step anywhere in this plan.
+
+- **Supervision.** One launchd LaunchAgent per long-running process (`fi.clim-fables.desk`, `.runner`, `.keeper`, `.arb`, `.noise`, `.outages`), written by a tested plist generator: absolute `bun` and `cre` paths resolved at install time, absolute `WorkingDirectory` (`bots/`), `RunAtLoad` and `KeepAlive` (back after a reboot, a crash or an exit), `ThrottleInterval` 30 s, logs under `bots/out/logs/`, and only `HOME` and `PATH` in the plist: keys and RPC URLs stay in `bots/.env` and `cre/.env`, which the processes read as when started by hand. The agents are installed by the go-live task (Task 25), not before.
+- **Resume.** Each process ticks on a timer of at most 10 s, so a wall-clock gap of more than 60 s between two firings means the Mac slept or the process was stopped. The process then re-syncs its nonce from the chain, re-reads the desk, and drops any action prepared before the gap (a keeper fee, an arbitrage or retail order sized on old prices) instead of sending it late. Failed ticks (an RPC error, the network down) back off from 2 s, doubling up to 60 s, and never crash the process. A blind desk is a normal skip for the runner, logged once per blind spell.
+- **Outage record.** `bots/out/outages.json` lists the windows in which the desk sent no report for more than 90 s, derived from consecutive `RiskReportedV2` events (on-chain truth): `{from, to, durationSec, seqBefore, seqAfter}`, plus the local reason when the Mac recorded one (`bots/out/outages-local.jsonl`: a wake, a restart, a streak of RPC errors). Plan 04's app derives the same windows from the chain with `outageWindows()` of `@clim/shared` and shows them honestly, as measured: the live pools run on a laptop, and their gaps are published, not hidden.
+
+What the pools do when the whole Mac stops (asleep, offline, rebooting), asserted by `contracts/test/v2/Outage.t.sol` on the deployed contracts' code (the bots' side by `bots/test/live/supervise.test.ts`). If only the desk fails while the Mac runs, the keeper bot keeps posting on K.
+
+| Time after the last report's tObs | Desk and policy | Pool D (ClimPoker) | Pool K (keeper-style bot) | Pool F |
+|---|---|---|---|---|
+| 0 to 180 s | fresh (`tauKillSec` 180) | the last poke's fees | the last keeper poke | flat 700 pips |
+| from 181 s | blind: `ClimPoker.poke()` reverts `DeskBlind`, the runner logs a skip | the last poke's fees until `tObs + 600` (the TTL is anchored to the observation) | the last keeper poke: the keeper bot is down too, and its poke lives up to 7,200 s | flat |
+| from 600 s | blind | flat 700 pips, Fables' flat 7 bp | the last keeper poke until 7,200 s after it, then flat | flat |
+| first report after the gap | a gap above `RESET_GAP` (180 s) is taken as is (absolute bounds only, no ramp from the stale sigma) | poked again after that report | posted again at once, from fresh 1 s data | flat |
+
+**Files:**
+- Create: `shared/src/outages.ts`, `bots/src/live/lib/supervise.ts`, `bots/src/live/lib/outages.ts`, `bots/src/live/lib/launchd.ts`, `bots/src/live/lib/supervisor.ts`, `bots/src/live/scripts/outages.ts`, `bots/src/live/scripts/launchd.ts`
+- Modify: `shared/src/index.ts`, `shared/package.json`, `bots/src/live/runner.ts`, `bots/src/live/keeper.ts`, `bots/src/live/arb.ts`, `bots/src/live/noise.ts`, `bots/src/live/desk-loop.ts`, `bots/src/live/scripts/status.ts`, `bots/package.json`, `cre/scripts/sim-loop.sh`
+- Test: `shared/test/outages.test.ts`, `bots/test/live/supervise.test.ts`, `bots/test/live/outages.test.ts`, `bots/test/live/launchd.test.ts`, `contracts/test/v2/Outage.t.sol`
+
+- [ ] **Step 1: Write the failing test of the outage windows**
+
+Create `shared/test/outages.test.ts`:
+
+```ts
+import { describe, expect, test } from "bun:test";
+import { OUTAGE_GAP_SEC, outageWindows } from "../src/index";
+
+const T = 1_800_000_000;
+const every30 = (n: number, seq0 = 1, t0 = T) => Array.from({ length: n }, (_, i) => ({ seq: seq0 + i, tObs: t0 + 30 * i }));
+
+describe("outage windows from consecutive reports", () => {
+  test("reports every 30 s: no window", () => {
+    expect(OUTAGE_GAP_SEC).toBe(90);
+    expect(outageWindows(every30(10))).toEqual([]);
+    expect(outageWindows([])).toEqual([]);
+  });
+  test("a gap of exactly 90 s is not an outage, 91 s is", () => {
+    expect(outageWindows([{ seq: 1, tObs: T }, { seq: 2, tObs: T + 90 }])).toEqual([]);
+    expect(outageWindows([{ seq: 1, tObs: T }, { seq: 2, tObs: T + 91 }])).toEqual([
+      { from: T, to: T + 91, durationSec: 91, seqBefore: 1, seqAfter: 2, ongoing: false },
+    ]);
+  });
+  test("a 12-minute silence between seq 10 and 11", () => {
+    const before = every30(10);
+    const after = every30(5, 11, T + 270 + 720);
+    expect(outageWindows([...before, ...after])).toEqual([
+      { from: T + 270, to: T + 990, durationSec: 720, seqBefore: 10, seqAfter: 11, ongoing: false },
+    ]);
+  });
+  test("an ongoing silence only when nowSec is given and the last report is more than 90 s old", () => {
+    const r = every30(3);
+    expect(outageWindows(r, { nowSec: T + 60 + 90 })).toEqual([]);
+    expect(outageWindows(r, { nowSec: T + 60 + 400 })).toEqual([
+      { from: T + 60, to: null, durationSec: 400, seqBefore: 3, seqAfter: null, ongoing: true },
+    ]);
+  });
+  test("reports out of order throw", () => {
+    expect(() => outageWindows([{ seq: 2, tObs: T }, { seq: 1, tObs: T + 30 }])).toThrow(/out of order/);
+    expect(() => outageWindows([{ seq: 1, tObs: T }, { seq: 2, tObs: T }])).toThrow(/out of order/);
+  });
+});
+```
+
+- [ ] **Step 2: Run it to see it fail**
+
+Run: `cd shared && bun test test/outages.test.ts`
+Expected: FAIL with `SyntaxError: Export named 'OUTAGE_GAP_SEC' not found in module`.
+
+- [ ] **Step 3: Implement the outage windows**
+
+Create `shared/src/outages.ts`:
+
+```ts
+// Outage windows of the live desk, from on-chain truth only: consecutive RiskReportedV2 events (seq, tObs). The desk
+// reports every 30 s, so a gap of more than OUTAGE_GAP_SEC between two reports' tObs is a window in which the desk was
+// silent. Used by the bots' outage recorder (bots/out/outages.json) and by plan 04's app, which shows these windows as
+// they are measured.
+
+/** A gap of more than three report intervals (3 x 30 s) between two reports is an outage. */
+export const OUTAGE_GAP_SEC = 90;
+
+export type ReportPoint = { seq: number; tObs: number };
+
+/** `from` is the tObs of the last report before the silence, `to` the tObs of the first one after it (null while the
+ *  desk is still silent); the desk sent nothing strictly between them. */
+export type OutageWindow = {
+  from: number;
+  to: number | null;
+  durationSec: number;
+  seqBefore: number;
+  seqAfter: number | null;
+  ongoing: boolean;
+};
+
+/** Windows between consecutive reports more than gapSec apart, plus an ongoing one when the last report is more than
+ *  gapSec older than nowSec. Reports must come in seq order with increasing tObs. */
+export function outageWindows(
+  reports: readonly ReportPoint[],
+  opts: { gapSec?: number; nowSec?: number } = {},
+): OutageWindow[] {
+  const gapSec = opts.gapSec ?? OUTAGE_GAP_SEC;
+  const out: OutageWindow[] = [];
+  for (let i = 1; i < reports.length; i++) {
+    const a = reports[i - 1] as ReportPoint;
+    const b = reports[i] as ReportPoint;
+    if (b.seq <= a.seq || b.tObs <= a.tObs) throw new Error(`reports out of order at seq ${a.seq} -> ${b.seq}`);
+    const gap = b.tObs - a.tObs;
+    if (gap > gapSec) out.push({ from: a.tObs, to: b.tObs, durationSec: gap, seqBefore: a.seq, seqAfter: b.seq, ongoing: false });
+  }
+  const last = reports[reports.length - 1];
+  if (last !== undefined && opts.nowSec !== undefined && opts.nowSec - last.tObs > gapSec) {
+    out.push({ from: last.tObs, to: null, durationSec: opts.nowSec - last.tObs, seqBefore: last.seq, seqAfter: null, ongoing: true });
+  }
+  return out;
+}
+```
+
+In `shared/src/index.ts`, add after `export * from "./live";`:
+
+```ts
+export * from "./outages";
+```
+
+In `shared/package.json`, add to `"exports"` after the `"./abis-v2"` line:
+
+```json
+    "./outages": "./src/outages.ts",
+```
+
+- [ ] **Step 4: Run the shared tests and the typecheck**
+
+Run: `cd shared && bun test && bun run typecheck`
+Expected: `0 fail` with 5 more tests than after Task 8 (77 in all), and `tsc` exits 0.
+
+- [ ] **Step 5: Write the failing tests of the bots' outage handling**
+
+Create `bots/test/live/supervise.test.ts`:
+
+```ts
+import { describe, expect, test } from "bun:test";
+import { backoffMs, isDeskBlindError, isStale, LoopGuard, WAKE_GAP_SEC } from "../../src/live/lib/supervise";
+
+const T = 1_800_000_000_000;
+
+describe("wall-clock jumps", () => {
+  test("regular firings are not a jump; more than 60 s between two firings is", () => {
+    expect(WAKE_GAP_SEC).toBe(60);
+    const g = new LoopGuard();
+    expect(g.beat(T)).toBeNull(); // first firing
+    expect(g.beat(T + 2_000)).toBeNull();
+    expect(g.beat(T + 62_000)).toBeNull(); // exactly 60 s
+    expect(g.beat(T + 62_000 + 600_000)).toEqual({ fromMs: T + 62_000, toMs: T + 662_000, gapSec: 600 });
+    expect(g.beat(T + 664_000)).toBeNull();
+  });
+  test("a resume lifts the backoff", () => {
+    const g = new LoopGuard();
+    g.beat(T);
+    g.failure(T);
+    g.failure(T);
+    g.failure(T); // 8 s backoff
+    expect(g.canRun(T + 1_000)).toBe(false);
+    expect(g.beat(T + 300_000)).not.toBeNull();
+    expect(g.canRun(T + 300_000)).toBe(true);
+  });
+});
+
+describe("capped backoff", () => {
+  test("2, 4, 8 ... s, capped at 60 s", () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 20].map((n) => backoffMs(n))).toEqual([0, 2_000, 4_000, 8_000, 16_000, 32_000, 60_000, 60_000, 60_000]);
+  });
+  test("failures delay the next run; a success clears them", () => {
+    const g = new LoopGuard();
+    expect(g.failure(T)).toBe(2_000);
+    expect(g.canRun(T + 1_999)).toBe(false);
+    expect(g.canRun(T + 2_000)).toBe(true);
+    expect(g.failure(T + 2_000)).toBe(4_000);
+    expect(g.consecutiveFailures).toBe(2);
+    expect(g.success(T + 6_000)).toBeNull(); // two failures: not an outage worth recording
+    expect(g.consecutiveFailures).toBe(0);
+    expect(g.canRun(T + 6_000)).toBe(true);
+  });
+  test("a streak of 3 or more failures is returned as an RPC outage when it ends", () => {
+    const g = new LoopGuard();
+    g.failure(T);
+    g.failure(T + 2_000);
+    g.failure(T + 6_000);
+    expect(g.success(T + 14_000)).toEqual({ fromMs: T, toMs: T + 14_000, gapSec: 14 });
+  });
+});
+
+describe("stale actions and the blind desk", () => {
+  test("an action older than its limit is stale", () => {
+    expect(isStale(T, T + 10_000, 10_000)).toBe(false);
+    expect(isStale(T, T + 10_001, 10_000)).toBe(true);
+  });
+  test("DeskBlind, decoded or raw, is recognized", () => {
+    expect(isDeskBlindError("reverted: DeskBlind")).toBe(true);
+    expect(isDeskBlindError('execution reverted: custom error 0x5caf72fd')).toBe(true);
+    expect(isDeskBlindError("reverted: AccessManagedUnauthorized")).toBe(false);
+  });
+});
+```
+
+Create `bots/test/live/outages.test.ts`:
+
+```ts
+import { describe, expect, test } from "bun:test";
+import { advanceOutages, attachLocalReasons, emptyOutageState, parseLocalOutages, summarizeReason, type LocalOutage } from "../../src/live/lib/outages";
+
+const T = 1_800_000_000;
+const reports = (seq0: number, t0: number, n: number) => Array.from({ length: n }, (_, i) => ({ seq: seq0 + i, tObs: t0 + 30 * i }));
+const rec = (process: string, kind: LocalOutage["kind"], fromSec: number, toSec: number): LocalOutage => ({ ts: "2027-01-15T08:00:00.000Z", process, kind, fromSec, toSec, detail: "" });
+
+describe("incremental outage scan", () => {
+  test("windows found across two passes, the ongoing one recomputed", () => {
+    const s0 = emptyOutageState(1_000);
+    expect(s0).toEqual({ scannedToBlock: 999, reportCount: 0, lastReport: null, windows: [] });
+    // pass 1: seq 1-10 every 30 s, then silence: ongoing at T + 270 + 400
+    const p1 = advanceOutages(s0, reports(1, T, 10), 5_000, T + 670);
+    expect(p1.state.reportCount).toBe(10);
+    expect(p1.state.windows).toEqual([]);
+    expect(p1.windows).toEqual([{ from: T + 270, to: null, durationSec: 400, seqBefore: 10, seqAfter: null, ongoing: true }]);
+    // pass 2: the desk is back at T + 990 (seq 11): the window closes at 720 s
+    const p2 = advanceOutages(p1.state, reports(11, T + 990, 3), 9_000, T + 1_060);
+    expect(p2.state.scannedToBlock).toBe(9_000);
+    expect(p2.state.lastReport).toEqual({ seq: 13, tObs: T + 1_050 });
+    expect(p2.windows).toEqual([{ from: T + 270, to: T + 990, durationSec: 720, seqBefore: 10, seqAfter: 11, ongoing: false }]);
+    expect(p2.state.windows).toEqual(p2.windows);
+  });
+  test("a hole in seq throws, so the range is rescanned", () => {
+    const p1 = advanceOutages(emptyOutageState(0), reports(1, T, 3), 100, T + 90);
+    expect(() => advanceOutages(p1.state, reports(5, T + 120, 2), 200, T + 160)).toThrow(/missing reports between seq 3 and 5/);
+  });
+});
+
+describe("local reasons", () => {
+  test("parse skips malformed lines", () => {
+    const text = [JSON.stringify(rec("runner", "wake", T, T + 600)), "not json", JSON.stringify({ ts: "x", process: "arb", kind: "nap", fromSec: 1, toSec: 2 }), ""].join("\n");
+    expect(parseLocalOutages(text)).toEqual([rec("runner", "wake", T, T + 600)]);
+  });
+  test("the most telling kind wins", () => {
+    expect(summarizeReason([rec("runner", "restart", 0, 1), rec("desk", "wake", 0, 1), rec("arb", "wake", 0, 1)])).toBe(
+      "wall-clock gap seen by arb, desk: the Mac was asleep or the processes were suspended",
+    );
+    expect(summarizeReason([rec("noise", "restart", 0, 1), rec("desk", "restart", 0, 1)])).toBe("processes stopped and restarted: desk, noise");
+    expect(summarizeReason([rec("runner", "rpc-errors", 0, 1)])).toBe("RPC or network errors in runner");
+    expect(summarizeReason([])).toMatch(/^unknown/);
+  });
+  test("records overlapping a window (60 s slack) are attached to it", () => {
+    const w = { from: T + 270, to: T + 990, durationSec: 720, seqBefore: 10, seqAfter: 11, ongoing: false };
+    const local = [rec("desk", "wake", T + 280, T + 980), rec("runner", "wake", T - 5_000, T - 4_000), rec("arb", "restart", T + 1_040, T + 1_045)];
+    const [x] = attachLocalReasons([w], local, T + 2_000);
+    expect(x?.local.map((r) => r.process)).toEqual(["desk", "arb"]);
+    expect(x?.reason).toMatch(/^wall-clock gap seen by desk/);
+  });
+});
+```
+
+Create `bots/test/live/launchd.test.ts`:
+
+```ts
+import { describe, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { jobLabel, jobPathVar, LIVE_JOB_NAMES, liveJobSpec, parseLaunchctlPrint, plistFor, type JobPaths } from "../../src/live/lib/launchd";
+
+const P: JobPaths = { bun: "/opt/homebrew/bin/bun", cre: "/Users/me/.cre/bin/cre", botsDir: "/Users/me/clim-fables/bots", home: "/Users/me" };
+
+describe("launchd job specs", () => {
+  test("six jobs, labelled fi.clim-fables.<name>", () => {
+    expect(LIVE_JOB_NAMES).toEqual(["desk", "runner", "keeper", "arb", "noise", "outages"]);
+    expect(jobLabel("runner")).toBe("fi.clim-fables.runner");
+  });
+  test("absolute bun and cre, absolute scripts, logs under bots/out/logs", () => {
+    const desk = liveJobSpec("desk", P);
+    expect(desk.programArguments).toEqual([
+      "/opt/homebrew/bin/bun",
+      "/Users/me/clim-fables/bots/src/live/desk-loop.ts",
+      "--target",
+      "rh-testnet-settings",
+      "--cre-bin",
+      "/Users/me/.cre/bin/cre",
+    ]);
+    expect(desk.workingDirectory).toBe("/Users/me/clim-fables/bots");
+    expect(desk.stdoutPath).toBe("/Users/me/clim-fables/bots/out/logs/desk.log");
+    expect(desk.stderrPath).toBe("/Users/me/clim-fables/bots/out/logs/desk.err.log");
+    expect(liveJobSpec("outages", P).programArguments.slice(1)).toEqual(["/Users/me/clim-fables/bots/src/live/scripts/outages.ts", "--watch"]);
+  });
+  test("PATH: bun's and cre's folders first, no duplicates", () => {
+    expect(jobPathVar(P)).toBe("/opt/homebrew/bin:/Users/me/.cre/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin");
+  });
+});
+
+describe("plist", () => {
+  const plist = plistFor(liveJobSpec("runner", P));
+  test("keep-alive job with a 30 s throttle", () => {
+    expect(plist).toContain("<key>Label</key>\n\t<string>fi.clim-fables.runner</string>");
+    expect(plist).toContain("<key>RunAtLoad</key>\n\t<true/>");
+    expect(plist).toContain("<key>KeepAlive</key>\n\t<true/>");
+    expect(plist).toContain("<key>ThrottleInterval</key>\n\t<integer>30</integer>");
+    expect(plist).toContain("<string>/Users/me/clim-fables/bots/src/live/runner.ts</string>");
+  });
+  test("no secret: only HOME and PATH, and a key-like variable is refused", () => {
+    expect(plist).not.toMatch(/KEY|RPC|SECRET|TOKEN/);
+    const spec = liveJobSpec("runner", P);
+    expect(() => plistFor({ ...spec, env: { ...spec.env, RUNNER_PRIVATE_KEY: "0x00" } })).toThrow(/must not be in a plist/);
+  });
+  test("relative paths are refused; XML is escaped", () => {
+    const spec = liveJobSpec("arb", P);
+    expect(() => plistFor({ ...spec, workingDirectory: "bots" })).toThrow(/absolute/);
+    expect(() => plistFor({ ...spec, programArguments: ["bun", "src/live/arb.ts"] })).toThrow(/absolute/);
+    expect(plistFor({ ...spec, workingDirectory: "/tmp/a&b" })).toContain("<string>/tmp/a&amp;b</string>");
+  });
+  test.skipIf(process.platform !== "darwin")("plutil accepts it", () => {
+    const f = join(mkdtempSync(join(tmpdir(), "clim-plist-")), "job.plist");
+    writeFileSync(f, plist);
+    const r = spawnSync("plutil", ["-lint", f], { encoding: "utf8" });
+    expect(r.stdout).toContain("OK");
+  });
+});
+
+describe("launchctl print", () => {
+  test("state, pid and last exit code of the top-level job", () => {
+    const running = "gui/501/fi.clim-fables.runner = {\n\tactive count = 1\n\tstate = running\n\n\tprogram = /opt/homebrew/bin/bun\n\tpid = 4242\n\tlast exit code = (never exited)\n\tjob state = running\n}\n";
+    expect(parseLaunchctlPrint(running)).toEqual({ state: "running", pid: 4242, lastExitCode: "(never exited)" });
+    const waiting = "gui/501/fi.clim-fables.desk = {\n\tstate = not running\n\tlast exit code = 1\n\tjob state = exited\n}\n";
+    expect(parseLaunchctlPrint(waiting)).toEqual({ state: "not running", pid: null, lastExitCode: "1" });
+  });
+});
+```
+
+- [ ] **Step 6: Run them to see them fail**
+
+Run: `cd bots && bun test test/live/supervise.test.ts test/live/outages.test.ts test/live/launchd.test.ts`
+Expected: FAIL with `Cannot find module '../../src/live/lib/supervise'` (and the same for `outages` and `launchd`).
+
+- [ ] **Step 7: Implement the pure parts**
+
+Create `bots/src/live/lib/supervise.ts`:
+
+```ts
+// Outage handling of the live processes, pure parts. The stack runs on the maintainer's Mac: it may sleep, lose the
+// network, reboot, or a process may crash (launchd restarts it). Each process ticks on a timer; a wall-clock gap of more
+// than WAKE_GAP_SEC between two timer firings means the Mac slept or the process was stopped, and the process then
+// re-syncs its nonce and re-reads the chain before acting. Failed ticks back off (capped) instead of crashing.
+
+/** Timer firings are at most 10 s apart in every process, so a gap of more than 60 s is a sleep or a stop. */
+export const WAKE_GAP_SEC = 60;
+
+export type ClockGap = { fromMs: number; toMs: number; gapSec: number };
+export type LoopGuardOptions = { wakeGapSec: number; baseMs: number; capMs: number; recordAfterFailures: number };
+
+const DEFAULTS: LoopGuardOptions = { wakeGapSec: WAKE_GAP_SEC, baseMs: 2_000, capMs: 60_000, recordAfterFailures: 3 };
+
+/** Delay before the next try after `failures` consecutive failures: base, 2 x base, 4 x base, ... capped. */
+export function backoffMs(failures: number, baseMs = DEFAULTS.baseMs, capMs = DEFAULTS.capMs): number {
+  if (failures <= 0) return 0;
+  return Math.min(capMs, baseMs * 2 ** (failures - 1));
+}
+
+/** True when an action prepared at startedMs is too old to send at nowMs (the Mac may have slept in between). */
+export function isStale(startedMs: number, nowMs: number, maxAgeMs: number): boolean {
+  return nowMs - startedMs > maxAgeMs;
+}
+
+/** ClimPoker's DeskBlind() revert (selector 0x5caf72fd), decoded or raw: a normal skip, not an error. */
+export function isDeskBlindError(text: string): boolean {
+  return /DeskBlind|0x5caf72fd/.test(text);
+}
+
+/** Per-process state machine: wall-clock jumps, consecutive failures and the backoff they impose. */
+export class LoopGuard {
+  private readonly o: LoopGuardOptions;
+  private lastBeatMs: number | null = null;
+  private failures = 0;
+  private firstFailureMs: number | null = null;
+  private notBeforeMs = 0;
+
+  constructor(options: Partial<LoopGuardOptions> = {}) {
+    this.o = { ...DEFAULTS, ...options };
+  }
+
+  /** Call on every timer firing. Returns the gap when this firing follows a wall-clock jump, else null. A resume
+   *  lifts any backoff, so the process acts on fresh state at once. */
+  beat(nowMs: number): ClockGap | null {
+    const prev = this.lastBeatMs;
+    this.lastBeatMs = nowMs;
+    if (prev === null || nowMs - prev <= this.o.wakeGapSec * 1_000) return null;
+    this.notBeforeMs = 0;
+    return { fromMs: prev, toMs: nowMs, gapSec: Math.round((nowMs - prev) / 1_000) };
+  }
+
+  /** False while a backoff is running. */
+  canRun(nowMs: number): boolean {
+    return nowMs >= this.notBeforeMs;
+  }
+
+  /** Records a failed tick; returns the backoff delay before the next try. */
+  failure(nowMs: number): number {
+    this.failures += 1;
+    this.firstFailureMs ??= nowMs;
+    const delay = backoffMs(this.failures, this.o.baseMs, this.o.capMs);
+    this.notBeforeMs = nowMs + delay;
+    return delay;
+  }
+
+  /** Records a good tick; returns the span of the failure streak it ends when the streak had at least
+   *  recordAfterFailures failures (an RPC or network outage worth recording), else null. */
+  success(nowMs: number): ClockGap | null {
+    const failures = this.failures;
+    const first = this.firstFailureMs;
+    this.failures = 0;
+    this.firstFailureMs = null;
+    this.notBeforeMs = 0;
+    if (first === null || failures < this.o.recordAfterFailures) return null;
+    return { fromMs: first, toMs: nowMs, gapSec: Math.round((nowMs - first) / 1_000) };
+  }
+
+  get consecutiveFailures(): number {
+    return this.failures;
+  }
+}
+```
+
+Create `bots/src/live/lib/outages.ts`:
+
+```ts
+// Outage record of the live stack, pure parts. The windows come from the chain (shared/src/outages.ts: consecutive
+// RiskReportedV2 events); the local reasons come from bots/out/outages-local.jsonl, where each process writes what it saw
+// (a wall-clock jump on wake, a restart, a streak of RPC errors). A window keeps every local record that overlaps it.
+import { OUTAGE_GAP_SEC, outageWindows, type OutageWindow, type ReportPoint } from "@clim/shared";
+
+export type LocalOutageKind = "wake" | "restart" | "rpc-errors";
+/** One line of bots/out/outages-local.jsonl: [fromSec, toSec] is when `process` was not acting. */
+export type LocalOutage = { ts: string; process: string; kind: LocalOutageKind; fromSec: number; toSec: number; detail: string };
+export type ExplainedWindow = OutageWindow & { reason: string; local: LocalOutage[] };
+
+/** Scan state kept in bots/out/outages.json between passes: closed windows only, the last report, the scanned range. */
+export type OutageState = { scannedToBlock: number; reportCount: number; lastReport: ReportPoint | null; windows: OutageWindow[] };
+
+const KINDS: readonly LocalOutageKind[] = ["wake", "restart", "rpc-errors"];
+
+export function emptyOutageState(deployBlock: number): OutageState {
+  return { scannedToBlock: deployBlock - 1, reportCount: 0, lastReport: null, windows: [] };
+}
+
+/** Adds the reports of a new block range. Reports must continue the previous ones seq by seq (a hole means a lost
+ *  getLogs page: the pass throws and the next one rescans the same range). Returns the new state and every window,
+ *  the ongoing one (if any) last. */
+export function advanceOutages(
+  prev: OutageState,
+  newReports: readonly ReportPoint[],
+  scannedToBlock: number,
+  nowSec: number,
+  gapSec = OUTAGE_GAP_SEC,
+): { state: OutageState; windows: OutageWindow[] } {
+  const series = prev.lastReport ? [prev.lastReport, ...newReports] : [...newReports];
+  for (let i = 1; i < series.length; i++) {
+    const a = series[i - 1] as ReportPoint;
+    const b = series[i] as ReportPoint;
+    if (b.seq !== a.seq + 1) throw new Error(`missing reports between seq ${a.seq} and ${b.seq}`);
+  }
+  const found = outageWindows(series, { gapSec, nowSec });
+  const closed = [...prev.windows, ...found.filter((w) => !w.ongoing)];
+  const state: OutageState = {
+    scannedToBlock,
+    reportCount: prev.reportCount + newReports.length,
+    lastReport: series[series.length - 1] ?? null,
+    windows: closed,
+  };
+  return { state, windows: [...closed, ...found.filter((w) => w.ongoing)] };
+}
+
+/** Parses outages-local.jsonl; malformed lines are skipped. */
+export function parseLocalOutages(text: string): LocalOutage[] {
+  const out: LocalOutage[] = [];
+  for (const line of text.split("\n")) {
+    if (line.trim() === "") continue;
+    try {
+      const o = JSON.parse(line) as Partial<LocalOutage>;
+      if (
+        typeof o.ts === "string" &&
+        typeof o.process === "string" &&
+        KINDS.includes(o.kind as LocalOutageKind) &&
+        typeof o.fromSec === "number" &&
+        typeof o.toSec === "number"
+      ) {
+        out.push({ ts: o.ts, process: o.process, kind: o.kind as LocalOutageKind, fromSec: o.fromSec, toSec: o.toSec, detail: typeof o.detail === "string" ? o.detail : "" });
+      }
+    } catch {
+      // not JSON: skip
+    }
+  }
+  return out;
+}
+
+/** One sentence for a window from the local records that overlap it; the most telling kind wins. */
+export function summarizeReason(local: readonly LocalOutage[]): string {
+  const who = (k: LocalOutageKind) => [...new Set(local.filter((r) => r.kind === k).map((r) => r.process))].sort().join(", ");
+  if (local.some((r) => r.kind === "wake")) return `wall-clock gap seen by ${who("wake")}: the Mac was asleep or the processes were suspended`;
+  if (local.some((r) => r.kind === "restart")) return `processes stopped and restarted: ${who("restart")}`;
+  if (local.some((r) => r.kind === "rpc-errors")) return `RPC or network errors in ${who("rpc-errors")}`;
+  return "unknown: no local record (the CRE runs failed, or the Mac's records are missing)";
+}
+
+/** Attaches to each window the local records overlapping [from - slackSec, to + slackSec] (to = now when ongoing). */
+export function attachLocalReasons(windows: readonly OutageWindow[], local: readonly LocalOutage[], nowSec: number, slackSec = 60): ExplainedWindow[] {
+  return windows.map((w) => {
+    const end = (w.to ?? nowSec) + slackSec;
+    const mine = local.filter((r) => r.toSec >= w.from - slackSec && r.fromSec <= end);
+    return { ...w, reason: summarizeReason(mine), local: mine };
+  });
+}
+```
+
+Create `bots/src/live/lib/launchd.ts`:
+
+```ts
+// launchd LaunchAgents of the live stack (one per long-running process), on the maintainer's Mac. The plist generator
+// and the `launchctl print` parser are pure; jobState() and guiDomain() are the thin system calls. Plists hold no secret:
+// each process reads bots/.env (Bun, from its WorkingDirectory bots/) or cre/.env (the CRE CLI) as when started by hand.
+// RunAtLoad and KeepAlive bring every job back after a reboot (the plists stay in ~/Library/LaunchAgents) and after a
+// crash (no sooner than ThrottleInterval after its last start). Nothing here keeps the Mac awake: sleep is the
+// maintainer's (his Pauline app), and outages are recorded (scripts/outages.ts), not prevented.
+import { spawnSync } from "node:child_process";
+import { dirname, isAbsolute, join } from "node:path";
+
+export const LABEL_PREFIX = "fi.clim-fables.";
+export const THROTTLE_SEC = 30;
+export const LIVE_JOB_NAMES = ["desk", "runner", "keeper", "arb", "noise", "outages"] as const;
+export type LiveJobName = (typeof LIVE_JOB_NAMES)[number];
+
+/** Absolute paths resolved at install time. */
+export type JobPaths = { bun: string; cre: string; botsDir: string; home: string };
+export type JobSpec = {
+  label: string;
+  programArguments: string[];
+  workingDirectory: string;
+  stdoutPath: string;
+  stderrPath: string;
+  env: Record<string, string>;
+};
+
+/** The only variables a plist may carry; anything else (a key, an RPC URL) stays in the .env files. */
+export const PLIST_ENV_ALLOWED = ["HOME", "PATH"] as const;
+const SYSTEM_PATH = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"];
+
+export function jobLabel(name: LiveJobName): string {
+  return `${LABEL_PREFIX}${name}`;
+}
+
+export function isLiveJobName(s: string): s is LiveJobName {
+  return (LIVE_JOB_NAMES as readonly string[]).includes(s);
+}
+
+/** PATH for the jobs: bun's and cre's folders first (cre workflow build runs bun), then the system folders. */
+export function jobPathVar(p: JobPaths): string {
+  return [...new Set([dirname(p.bun), dirname(p.cre), ...SYSTEM_PATH])].join(":");
+}
+
+export function jobArgs(name: LiveJobName, p: JobPaths): string[] {
+  const src = (f: string) => join(p.botsDir, "src", "live", f);
+  switch (name) {
+    case "desk":
+      return [p.bun, src("desk-loop.ts"), "--target", "rh-testnet-settings", "--cre-bin", p.cre];
+    case "runner":
+      return [p.bun, src("runner.ts")];
+    case "keeper":
+      return [p.bun, src("keeper.ts")];
+    case "arb":
+      return [p.bun, src("arb.ts")];
+    case "noise":
+      return [p.bun, src("noise.ts")];
+    case "outages":
+      return [p.bun, src("scripts/outages.ts"), "--watch"];
+  }
+}
+
+export function logPaths(name: LiveJobName, botsDir: string): { stdout: string; stderr: string } {
+  const dir = join(botsDir, "out", "logs");
+  return { stdout: join(dir, `${name}.log`), stderr: join(dir, `${name}.err.log`) };
+}
+
+export function liveJobSpec(name: LiveJobName, p: JobPaths): JobSpec {
+  const logs = logPaths(name, p.botsDir);
+  return {
+    label: jobLabel(name),
+    programArguments: jobArgs(name, p),
+    workingDirectory: p.botsDir,
+    stdoutPath: logs.stdout,
+    stderrPath: logs.stderr,
+    env: { HOME: p.home, PATH: jobPathVar(p) },
+  };
+}
+
+function xml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/** The plist of one job. Throws on a relative path or an environment variable outside PLIST_ENV_ALLOWED. */
+export function plistFor(spec: JobSpec): string {
+  if (!spec.label.startsWith(LABEL_PREFIX)) throw new Error(`label must start with ${LABEL_PREFIX}: ${spec.label}`);
+  const [program] = spec.programArguments;
+  for (const [what, path] of [
+    ["program", program ?? ""],
+    ["WorkingDirectory", spec.workingDirectory],
+    ["StandardOutPath", spec.stdoutPath],
+    ["StandardErrorPath", spec.stderrPath],
+  ] as const) {
+    if (!isAbsolute(path)) throw new Error(`${what} must be an absolute path, got "${path}"`);
+  }
+  for (const k of Object.keys(spec.env)) {
+    if (!(PLIST_ENV_ALLOWED as readonly string[]).includes(k)) throw new Error(`${k} must not be in a plist (secrets and settings stay in the .env files)`);
+  }
+  const str = (s: string) => `<string>${xml(s)}</string>`;
+  const env = Object.keys(spec.env)
+    .sort()
+    .map((k) => `\t\t<key>${xml(k)}</key>\n\t\t${str(spec.env[k] ?? "")}`)
+    .join("\n");
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    "<dict>",
+    `\t<key>Label</key>\n\t${str(spec.label)}`,
+    `\t<key>ProgramArguments</key>\n\t<array>\n${spec.programArguments.map((a) => `\t\t${str(a)}`).join("\n")}\n\t</array>`,
+    `\t<key>WorkingDirectory</key>\n\t${str(spec.workingDirectory)}`,
+    `\t<key>EnvironmentVariables</key>\n\t<dict>\n${env}\n\t</dict>`,
+    "\t<key>RunAtLoad</key>\n\t<true/>",
+    "\t<key>KeepAlive</key>\n\t<true/>",
+    `\t<key>ThrottleInterval</key>\n\t<integer>${THROTTLE_SEC}</integer>`,
+    `\t<key>StandardOutPath</key>\n\t${str(spec.stdoutPath)}`,
+    `\t<key>StandardErrorPath</key>\n\t${str(spec.stderrPath)}`,
+    "</dict>",
+    "</plist>",
+    "",
+  ].join("\n");
+}
+
+export type JobState = { state: string | null; pid: number | null; lastExitCode: string | null };
+
+/** The top-level state, pid and last exit code from `launchctl print gui/<uid>/<label>`. */
+export function parseLaunchctlPrint(text: string): JobState {
+  // top-level fields are indented by one tab; nested blocks by two ("job state" is another field)
+  const field = (name: string) => new RegExp(`^\\t${name} = (.+)$`, "m").exec(text)?.[1]?.trim() ?? null;
+  const pid = field("pid");
+  return { state: field("state"), pid: pid !== null && /^\d+$/.test(pid) ? Number(pid) : null, lastExitCode: field("last exit code") };
+}
+
+export function guiDomain(): string {
+  const uid = process.getuid?.();
+  if (uid === undefined) throw new Error("launchd jobs need macOS (no uid)");
+  return `gui/${uid}`;
+}
+
+/** The job's state, or null when it is not loaded. */
+export function jobState(name: LiveJobName): JobState | null {
+  const r = spawnSync("launchctl", ["print", `${guiDomain()}/${jobLabel(name)}`], { encoding: "utf8" });
+  return r.status === 0 ? parseLaunchctlPrint(r.stdout) : null;
+}
+```
+
+- [ ] **Step 8: Run the tests**
+
+Run: `cd bots && bun test test/live/supervise.test.ts test/live/outages.test.ts test/live/launchd.test.ts`
+Expected: `20 pass` (supervise 7, outages 5, launchd 8; the `plutil -lint` test runs on macOS only and prints `OK`).
+
+- [ ] **Step 9: Write the supervised loop**
+
+Create `bots/src/live/lib/supervisor.ts`:
+
+```ts
+// Outage handling of the live processes, the side-effect parts: the supervised tick loop, the local outage records
+// (bots/out/outages-local.jsonl) and the nonce re-sync. The decisions are in supervise.ts (pure, tested).
+import { join } from "node:path";
+import { appendJsonl, OUT_DIR, shortError } from "../../lib/jsonl";
+import type { LiveWallet } from "./chain";
+import type { LocalOutageKind } from "./outages";
+import { LoopGuard, type ClockGap } from "./supervise";
+import { lastTs } from "./tail";
+
+export const LOCAL_OUTAGES_FILE = join(OUT_DIR, "outages-local.jsonl");
+
+export function recordLocalOutage(process: string, kind: LocalOutageKind, fromMs: number, toMs: number, detail: string): void {
+  appendJsonl(LOCAL_OUTAGES_FILE, {
+    ts: new Date().toISOString(),
+    process,
+    kind,
+    fromSec: Math.floor(fromMs / 1_000),
+    toSec: Math.floor(toMs / 1_000),
+    detail,
+  });
+}
+
+/** At start: if the process logged before, it was down from its last log line until now (a crash, a reboot, a stop). */
+export function recordStart(process: string, logFile: string): void {
+  const last = lastTs(logFile);
+  const now = Date.now();
+  if (last === null) return;
+  const lastMs = Date.parse(last);
+  if (Number.isFinite(lastMs) && lastMs < now) {
+    recordLocalOutage(process, "restart", lastMs, now, `started; last log line at ${last}`);
+  }
+}
+
+/** Drops the cached nonce, so the next transaction reads it from the chain (pending block). */
+export function resyncNonce(wallet: LiveWallet): void {
+  wallet.account.nonceManager?.reset({ address: wallet.account.address, chainId: wallet.chain.id });
+}
+
+export type SupervisedLoop = {
+  /** Process name in the local records: desk, runner, keeper, arb, noise, outages. */
+  name: string;
+  /** The process's JSON-lines log (its last line dates a restart). */
+  logFile: string;
+  /** Timer period; at most 10 s so that a gap of more than 60 s can only be a sleep or a stop. */
+  everyMs: number;
+  /** One iteration; throwing counts as a failure (capped backoff), never a crash. */
+  tick: () => Promise<void>;
+  /** After a wall-clock jump, before the next tick (the nonce is already re-synced). */
+  onResume?: (gap: ClockGap) => Promise<void> | void;
+  /** The wallet whose nonce is re-synced after a jump and after every failed tick. */
+  wallet?: LiveWallet;
+  /** Run a tick at once instead of after the first period. */
+  immediate?: boolean;
+};
+
+/** Runs `tick` every `everyMs`, one at a time, with wake detection, nonce re-sync and capped backoff. */
+export function runSupervised(l: SupervisedLoop): void {
+  const guard = new LoopGuard();
+  let busy = false;
+  let resume: ClockGap | null = null;
+  recordStart(l.name, l.logFile);
+  const fire = (): void => {
+    const now = Date.now();
+    const gap = guard.beat(now);
+    if (gap) {
+      resume = gap;
+      recordLocalOutage(l.name, "wake", gap.fromMs, gap.toMs, `wall-clock gap of ${gap.gapSec} s between two timer firings`);
+      console.log(`[${l.name}] resumed after a ${gap.gapSec} s wall-clock gap (Mac asleep or process stopped): re-syncing`);
+    }
+    if (busy || !guard.canRun(now)) return;
+    busy = true;
+    const pending = resume;
+    resume = null;
+    (async () => {
+      if (pending) {
+        if (l.wallet) resyncNonce(l.wallet);
+        await l.onResume?.(pending);
+      }
+      await l.tick();
+    })()
+      .then(
+        () => {
+          const streak = guard.success(Date.now());
+          if (streak) {
+            recordLocalOutage(l.name, "rpc-errors", streak.fromMs, streak.toMs, `failing ticks for ${streak.gapSec} s, recovered`);
+            console.log(`[${l.name}] recovered after ${streak.gapSec} s of failing ticks`);
+          }
+        },
+        (e: unknown) => {
+          if (pending) resume = resume ?? pending; // the resume did not complete: redo it on the next tick
+          if (l.wallet) resyncNonce(l.wallet);
+          const delay = guard.failure(Date.now());
+          console.error(`[${l.name}] ${shortError(e)}; failure ${guard.consecutiveFailures}, next try in ${delay / 1_000} s`);
+        },
+      )
+      .finally(() => {
+        busy = false;
+      });
+  };
+  if (l.immediate) fire();
+  setInterval(fire, l.everyMs);
+}
+
+/** Wake detection alone, for the desk loop (its CRE runs are separate processes that read their nonce every run). */
+export function watchClock(name: string, onGap: (gap: ClockGap) => void, everyMs = 5_000): void {
+  const guard = new LoopGuard();
+  guard.beat(Date.now());
+  setInterval(() => {
+    const gap = guard.beat(Date.now());
+    if (!gap) return;
+    recordLocalOutage(name, "wake", gap.fromMs, gap.toMs, `wall-clock gap of ${gap.gapSec} s between two timer firings`);
+    console.log(`[${name}] resumed after a ${gap.gapSec} s wall-clock gap (Mac asleep or process stopped)`);
+    onGap(gap);
+  }, everyMs);
+}
+```
+
+- [ ] **Step 10: Resume handling in the runner, the keeper, the arbitrage and the retail bots**
+
+Each bot keeps its Task 19 to 21 behaviour; the `setInterval` loop becomes `runSupervised`, errors are thrown to it (logged first), receipts wait at most 60 s, and actions prepared before a gap are dropped. The arbitrage bot polls the block number through the same loop instead of `watchBlockNumber` (same 2 s period, same "new block only" rule).
+
+Replace `bots/src/live/runner.ts` with:
+
+```ts
+// clim's runner on Robinhood Chain testnet (CLIM_RUNNER on our AccessManager): after each new desk report, call
+// ClimPoker.poke() so pool D's fee follows clim's policy. The fee comes from the policy, never from this key.
+// Outages (plan 03 Task 23): a blind desk is a normal skip, logged once per blind spell (ClimPoker would revert
+// DeskBlind, and a DeskBlind revert met anyway is logged the same way); after a wall-clock jump the nonce is re-synced and
+// the desk re-read; failed ticks back off (2 s doubling to 60 s). A poke never carries a stale fee: ClimPoker reads the
+// policy when the transaction runs.
+// Usage: bun src/live/runner.ts     Log: bots/out/runner-rh.jsonl     Env: RUNNER_POLL_MS (default 2000)
+import { climFeePolicyAbi, climPokerAbi, FeeMode, riskDeskV2Abi } from "@clim/shared";
+import { join } from "node:path";
+import { parseEventLogs } from "viem";
+import { envNum } from "../lib/env";
+import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
+import { liveClient, liveWallet } from "./lib/chain";
+import { loadLiveDeployments } from "./lib/deployments";
+import { liveKey } from "./lib/env";
+import { pokeDecision } from "./lib/runner";
+import { isDeskBlindError } from "./lib/supervise";
+import { runSupervised } from "./lib/supervisor";
+
+const d = loadLiveDeployments();
+const client = liveClient();
+const wallet = liveWallet(liveKey("runner"));
+const logFile = join(OUT_DIR, "runner-rh.jsonl");
+let lastSeq = 0;
+let blindLogged = false;
+
+async function readDesk() {
+  return client.multicall({
+    allowFailure: false,
+    contracts: [
+      { address: d.riskDesk, abi: riskDeskV2Abi, functionName: "state" },
+      { address: d.policy, abi: climFeePolicyAbi, functionName: "quoteDirectional" },
+    ],
+  });
+}
+
+async function tick(): Promise<void> {
+  const [st, q] = await readDesk();
+  const seq = st[6];
+  const base = { ts: new Date().toISOString(), seq, tObs: st[0], quote0For1: q[0], quote1For0: q[1], mode: q[2] };
+  if (q[2] === FeeMode.Blind) {
+    // No report for more than tauKillSec: no poke. Pool D keeps its last override until it expires, then its flat fee.
+    if (!blindLogged) {
+      appendJsonl(logFile, { ...base, action: "skip", reason: "desk blind", deskAgeSec: Math.floor(Date.now() / 1000) - st[0] });
+      console.log(`[runner] seq ${seq}: desk blind, no poke until the next report`);
+      blindLogged = true;
+    }
+    lastSeq = Math.max(lastSeq, seq);
+    return;
+  }
+  blindLogged = false;
+  if (pokeDecision(seq, lastSeq, q[2]) !== "poke") return;
+  try {
+    const { request } = await client.simulateContract({ account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" });
+    const hash = await wallet.writeContract(request);
+    const r = await client.waitForTransactionReceipt({ hash, timeout: 60_000 });
+    const ev = parseEventLogs({ abi: climPokerAbi, eventName: "Poked", logs: r.logs })[0]?.args;
+    appendJsonl(logFile, {
+      ...base,
+      action: "poke",
+      txHash: hash,
+      status: r.status,
+      block: r.blockNumber,
+      gasUsed: r.gasUsed,
+      effectiveGasPrice: r.effectiveGasPrice,
+      fee0For1: ev?.fee0For1 ?? null,
+      fee1For0: ev?.fee1For0 ?? null,
+      eventApplied: ev?.eventApplied ?? null,
+      expiry: ev?.expiry ?? null,
+    });
+    console.log(`[runner] seq ${seq} poked ${ev?.fee0For1}/${ev?.fee1For0} pips, tx ${hash}, gas ${r.gasUsed}`);
+    lastSeq = seq;
+  } catch (e) {
+    const error = shortError(e);
+    if (isDeskBlindError(error)) {
+      // the desk went blind between the read and the poke: the same skip as above
+      appendJsonl(logFile, { ...base, action: "skip", reason: "desk blind (DeskBlind revert)" });
+      console.log(`[runner] seq ${seq}: DeskBlind, no poke`);
+      blindLogged = true;
+      lastSeq = seq;
+      return;
+    }
+    appendJsonl(logFile, { ...base, action: "error", error });
+    throw e; // the supervisor re-syncs the nonce and backs off
+  }
+}
+
+console.log(`[runner] ${wallet.account.address} pokes ${d.poker} (pool D ${d.pools.D.poolId}) after each report of ${d.riskDesk}`);
+runSupervised({
+  name: "runner",
+  logFile,
+  everyMs: envNum("RUNNER_POLL_MS", 2_000),
+  wallet,
+  immediate: true,
+  tick,
+  onResume: async (gap) => {
+    const [st, q] = await readDesk();
+    const age = Math.floor(Date.now() / 1000) - st[0];
+    appendJsonl(logFile, { ts: new Date().toISOString(), action: "resume", gapSec: gap.gapSec, seq: st[6], deskAgeSec: age, mode: q[2] });
+    console.log(`[runner] after ${gap.gapSec} s: desk seq ${st[6]}, last report ${age} s old, policy mode ${q[2]}`);
+  },
+});
+```
+
+Replace `bots/src/live/keeper.ts` with:
+
+```ts
+// Keeper-style twin for pool K on Robinhood Chain testnet. It imitates the pattern observed on Fables' ETH/USDG pool,
+// not Fables' code: about every 180 s, the fee shared/keeper-map-fables.json gives at the current 5-minute realized
+// volatility (Binance 1 s, 5 s returns), posted with pokeFee(poolK, fee, 7200) on PokeFeeHook (FEE_POKER).
+// Outages (plan 03 Task 23): while this process is stopped or the Mac sleeps, K keeps its last poke until its 7,200 s TTL
+// ends, then its flat fee. After a wall-clock jump the nonce is re-synced and the keeper posts at once from fresh data;
+// a fee computed more than 15 s before it is sent is dropped, never sent late; failed ticks back off (2 s doubling to 60 s).
+// Usage: bun src/live/keeper.ts     Log: bots/out/keeper-rh.jsonl     Env: KEEPER_SEED (jitter, default 7)
+import { pokeFeeHookAbi } from "@clim/shared";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { envNum } from "../lib/env";
+import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
+import { mulberry32 } from "../lib/rng";
+import { liveClient, liveWallet } from "./lib/chain";
+import { loadLiveDeployments, REPO_ROOT } from "./lib/deployments";
+import { liveKey } from "./lib/env";
+import { keeperFeePips, nextPostAt, parseKeeperMap, rv5From1s } from "./lib/keeper";
+import { isStale } from "./lib/supervise";
+import { runSupervised } from "./lib/supervisor";
+
+const BINANCE_1S = "https://data-api.binance.vision/api/v3/klines?symbol=ETHUSDT&interval=1s&limit=400";
+const MAX_FEE_AGE_MS = 15_000;
+const d = loadLiveDeployments();
+const client = liveClient();
+const wallet = liveWallet(liveKey("keeper"));
+const map = parseKeeperMap(JSON.parse(readFileSync(join(REPO_ROOT, "shared", "keeper-map-fables.json"), "utf8")));
+const rand = mulberry32(envNum("KEEPER_SEED", 7));
+const logFile = join(OUT_DIR, "keeper-rh.jsonl");
+let nextAt = 0;
+
+async function tick(): Promise<void> {
+  const startedMs = Date.now();
+  const now = Math.floor(startedMs / 1000);
+  if (now < nextAt) return;
+  const base = { ts: new Date().toISOString(), poolId: d.pools.K.poolId };
+  try {
+    const res = await fetch(BINANCE_1S, { signal: AbortSignal.timeout(5_000) });
+    if (!res.ok) throw new Error(`binance 1s: HTTP ${res.status}`);
+    const sigma = rv5From1s(await res.json(), now);
+    const fee = keeperFeePips(map, sigma);
+    const sigmaPctYr = sigma * Math.sqrt(31_536_000) * 100;
+    const { request } = await client.simulateContract({
+      account: wallet.account,
+      address: d.hook,
+      abi: pokeFeeHookAbi,
+      functionName: "pokeFee",
+      args: [d.pools.K.poolId, fee, map.ttlSec],
+    });
+    if (isStale(startedMs, Date.now(), MAX_FEE_AGE_MS)) {
+      appendJsonl(logFile, { ...base, action: "skip", reason: "stale fee (computed more than 15 s ago)", sigmaPctYr, fee });
+      console.log(`[keeper] fee ${fee} computed ${Math.round((Date.now() - startedMs) / 1000)} s ago: dropped, recomputing`);
+      return; // nextAt unchanged: the next tick recomputes from fresh data
+    }
+    const hash = await wallet.writeContract(request);
+    const r = await client.waitForTransactionReceipt({ hash, timeout: 60_000 });
+    appendJsonl(logFile, { ...base, sigmaPctYr, fee, ttl: map.ttlSec, txHash: hash, status: r.status, block: r.blockNumber, gasUsed: r.gasUsed, effectiveGasPrice: r.effectiveGasPrice });
+    console.log(`[keeper] sigma5 ${sigmaPctYr.toFixed(1)}%/yr -> K fee ${fee} pips (TTL ${map.ttlSec} s), tx ${hash}`);
+    nextAt = nextPostAt(now, map.postEverySec, rand);
+  } catch (e) {
+    appendJsonl(logFile, { ...base, error: shortError(e) });
+    throw e; // the supervisor re-syncs the nonce and backs off
+  }
+}
+
+console.log(`[keeper] ${wallet.account.address} pokes K ${d.pools.K.poolId} on ${d.hook} about every ${map.postEverySec} s (imitation of the observed pattern, not Fables' code)`);
+runSupervised({
+  name: "keeper",
+  logFile,
+  everyMs: 5_000,
+  wallet,
+  immediate: true,
+  tick,
+  onResume: (gap) => {
+    nextAt = 0; // post now, from fresh volatility
+    appendJsonl(logFile, { ts: new Date().toISOString(), action: "resume", gapSec: gap.gapSec });
+  },
+});
+```
+
+Replace `bots/src/live/arb.ts` with:
+
+```ts
+// Arbitrage bot on Robinhood Chain testnet: every poll (2 s; blocks come about every 0.1 s), read pools D, K and F and
+// the venue price (median of four venues' tickers, bots/src/lib/market.ts), and push each pool back to the edge of its
+// no-arbitrage band, with the fee of the direction it trades. It swaps through routers.arb, so the dashboard tells
+// arbitrage by Swap.sender. Outages (plan 03 Task 23): a swap prepared from prices more than 10 s old is dropped, never
+// sent late; after a wall-clock jump the nonce is re-synced and the next poll starts from the chain head; failed polls
+// back off (2 s doubling to 60 s). Usage: bun src/live/arb.ts     Log: bots/out/arb-rh.jsonl
+import { LIVE_POOLS, liveOrientation, poolSwapTestAbi, type LivePoolName } from "@clim/shared";
+import { join } from "node:path";
+import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
+import { aggregate, fetchVenueQuotes } from "../lib/market";
+import { swapArgs } from "../lib/swap";
+import { decideArbDirectional } from "./lib/arb";
+import { liveClient, liveWallet, readLiveBalances, readLiveState } from "./lib/chain";
+import { loadLiveDeployments } from "./lib/deployments";
+import { liveKey } from "./lib/env";
+import { isStale } from "./lib/supervise";
+import { runSupervised } from "./lib/supervisor";
+
+const MAX_QUOTE_AGE_MS = 10_000;
+const d = loadLiveDeployments();
+const client = liveClient();
+const wallet = liveWallet(liveKey("arb"));
+const me = wallet.account.address;
+const router = d.routers.arb;
+const logFile = join(OUT_DIR, "arb-rh.jsonl");
+// A pool with an arbitrage still pending is skipped: trading it again on stale state would revert or overshoot.
+const inflight = new Set<LivePoolName>();
+let lastBlock: bigint | null = null;
+
+async function onBlock(blockNumber: bigint): Promise<void> {
+  const startedMs = Date.now();
+  const [m, s, bal] = await Promise.all([
+    fetchVenueQuotes().then(aggregate),
+    readLiveState(client, d, blockNumber),
+    readLiveBalances(client, d, me, router),
+  ]);
+  if (!m) {
+    appendJsonl(logFile, { ts: new Date().toISOString(), block: blockNumber, action: "skip", reason: "fewer than 3 venues" });
+    return;
+  }
+  for (const name of LIVE_POOLS) {
+    const pool = d.pools[name];
+    const ps = s.pools[name];
+    const dec = decideArbDirectional({
+      sqrtPriceX96: ps.sqrtPriceX96,
+      marketEthUsd: m.price,
+      fee0For1: ps.fee0For1,
+      fee1For0: ps.fee1For0,
+      orientation: liveOrientation(d, pool),
+    });
+    const base = {
+      ts: new Date().toISOString(),
+      block: blockNumber,
+      pool: name,
+      market: m.price,
+      nVenues: m.n,
+      poolEthUsd: dec.poolEthUsd,
+      feePips: dec.feePips,
+      logGapBp: dec.logGap * 1e4,
+      bandBp: dec.bandLog * 1e4,
+    };
+    if (dec.action === "none") {
+      appendJsonl(logFile, { ...base, action: "none" });
+      continue;
+    }
+    if (inflight.has(name)) {
+      appendJsonl(logFile, { ...base, action: "skip", reason: "previous arbitrage pending" });
+      continue;
+    }
+    const amountIn = dec.side === "buyEth" ? bal.tUSDG : bal.tETH;
+    if (amountIn === 0n) {
+      appendJsonl(logFile, { ...base, action: "skip", reason: `no ${dec.side === "buyEth" ? "tUSDG" : "tETH"} balance` });
+      continue;
+    }
+    try {
+      // Spend up to the whole balance: the swap stops at the price limit, so only the needed amount moves.
+      const { request } = await client.simulateContract({
+        account: wallet.account,
+        address: router,
+        abi: poolSwapTestAbi,
+        functionName: "swap",
+        args: swapArgs(pool.key, dec.zeroForOne, amountIn, dec.sqrtPriceLimitX96),
+      });
+      if (isStale(startedMs, Date.now(), MAX_QUOTE_AGE_MS)) {
+        appendJsonl(logFile, { ...base, action: "skip", reason: "stale quotes (read more than 10 s ago)" });
+        return; // the rest of this poll is stale too; the next poll starts over
+      }
+      const hash = await wallet.writeContract(request);
+      inflight.add(name);
+      appendJsonl(logFile, { ...base, action: dec.side, zeroForOne: dec.zeroForOne, targetEthUsd: dec.targetEthUsd, txHash: hash });
+      console.log(`[arb] ${name} pool ${dec.poolEthUsd.toFixed(2)} vs ${m.price.toFixed(2)} (fee ${dec.feePips}) -> ${dec.side} tx ${hash}`);
+      client
+        .waitForTransactionReceipt({ hash, timeout: 60_000 })
+        .then(
+          (r) => appendJsonl(logFile, { ts: new Date().toISOString(), event: "receipt", pool: name, txHash: hash, status: r.status, block: r.blockNumber, gasUsed: r.gasUsed }),
+          (e: unknown) => appendJsonl(logFile, { ts: new Date().toISOString(), event: "receipt-error", pool: name, txHash: hash, error: shortError(e) }),
+        )
+        .finally(() => inflight.delete(name));
+    } catch (e) {
+      const error = shortError(e);
+      const action = /PriceLimitAlreadyExceeded|0x7c9c6e8f/.test(error) ? "stale" : "error";
+      appendJsonl(logFile, { ...base, action, error });
+      if (action === "error") throw e; // the supervisor re-syncs the nonce and backs off
+    }
+  }
+}
+
+console.log(`[arb] ${me} trading D, K, F through ${router}`);
+runSupervised({
+  name: "arb",
+  logFile,
+  everyMs: 2_000,
+  wallet,
+  immediate: true,
+  tick: async () => {
+    const head = await client.getBlockNumber();
+    if (lastBlock !== null && head <= lastBlock) return;
+    lastBlock = head;
+    await onBlock(head);
+  },
+  onResume: (gap) => {
+    appendJsonl(logFile, { ts: new Date().toISOString(), action: "resume", gapSec: gap.gapSec });
+  },
+});
+```
+
+Replace `bots/src/live/noise.ts` with:
+
+```ts
+// Retail (noise) bot on Robinhood Chain testnet: every NOISE_TICK_MS (10 s), a Poisson number of orders
+// (NOISE_ORDERS_PER_TICK, default 0.2) with a random side and a log-normal USD size, each sent to D, K and F through the
+// retail PoolSwapTest. Outages (plan 03 Task 23): orders sized from a pool state more than 15 s old are dropped, never
+// sent late; after a wall-clock jump the nonce is re-synced; failed ticks back off (2 s doubling to 60 s).
+// Usage: bun src/live/noise.ts     Log: bots/out/noise-rh.jsonl
+import { LIVE_POOLS, poolSwapTestAbi } from "@clim/shared";
+import { join } from "node:path";
+import { envNum } from "../lib/env";
+import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
+import { mulberry32 } from "../lib/rng";
+import { inputAmountForUsd, noPriceLimit, swapArgs, zeroForOneFor } from "../lib/swap";
+import { liveClient, liveWallet, readLiveState } from "./lib/chain";
+import { loadLiveDeployments } from "./lib/deployments";
+import { liveKey } from "./lib/env";
+import { planTickOrders, type FlowConfig } from "./lib/flow";
+import { isStale } from "./lib/supervise";
+import { runSupervised } from "./lib/supervisor";
+
+const MAX_STATE_AGE_MS = 15_000;
+const cfg: FlowConfig = {
+  ordersPerTick: envNum("NOISE_ORDERS_PER_TICK", 0.2),
+  medianUsd: envNum("NOISE_MEDIAN_USD", 2_000),
+  sigmaLn: envNum("NOISE_SIGMA_LN", 1),
+};
+const seed = envNum("NOISE_SEED", 42);
+const rand = mulberry32(seed);
+const d = loadLiveDeployments();
+const client = liveClient();
+const wallet = liveWallet(liveKey("noise"));
+const logFile = join(OUT_DIR, "noise-rh.jsonl");
+
+async function tick(): Promise<void> {
+  const orders = planTickOrders(rand, cfg);
+  if (orders.length === 0) return;
+  const startedMs = Date.now();
+  const s = await readLiveState(client, d);
+  let failed: unknown = null;
+  for (const order of orders) {
+    for (const name of LIVE_POOLS) {
+      const pool = d.pools[name];
+      const ps = s.pools[name];
+      const zeroForOne = zeroForOneFor(order.side, pool.token0IsEth);
+      const amountIn = inputAmountForUsd(order.side, order.usd, ps.ethUsd, d.tokens.tETH.decimals, d.tokens.tUSDG.decimals);
+      const base = { ts: new Date().toISOString(), pool: name, side: order.side, usd: order.usd, feePips: zeroForOne ? ps.fee0For1 : ps.fee1For0 };
+      if (isStale(startedMs, Date.now(), MAX_STATE_AGE_MS)) {
+        appendJsonl(logFile, { ...base, action: "skip", reason: "stale pool state (read more than 15 s ago)" });
+        return;
+      }
+      try {
+        const { request } = await client.simulateContract({
+          account: wallet.account,
+          address: d.uniswap.poolSwapTest,
+          abi: poolSwapTestAbi,
+          functionName: "swap",
+          args: swapArgs(pool.key, zeroForOne, amountIn, noPriceLimit(zeroForOne)),
+        });
+        const hash = await wallet.writeContract(request);
+        appendJsonl(logFile, { ...base, amountIn, txHash: hash });
+        console.log(`[noise] ${order.side} $${order.usd.toFixed(0)} on ${name} (fee ${base.feePips} pips) tx ${hash}`);
+      } catch (e) {
+        appendJsonl(logFile, { ...base, error: shortError(e) });
+        console.error(`[noise] ${name} error: ${shortError(e)}`);
+        failed = e;
+      }
+    }
+  }
+  if (failed !== null) throw failed; // the supervisor re-syncs the nonce and backs off
+}
+
+console.log(`[noise] ${wallet.account.address} ${cfg.ordersPerTick} orders per tick, median $${cfg.medianUsd}, seed ${seed}, mirrored to D, K, F`);
+runSupervised({
+  name: "noise",
+  logFile,
+  everyMs: envNum("NOISE_TICK_MS", 10_000),
+  wallet,
+  tick,
+  onResume: (gap) => {
+    appendJsonl(logFile, { ts: new Date().toISOString(), action: "resume", gapSec: gap.gapSec });
+  },
+});
+```
+
+- [ ] **Step 11: The desk loop under launchd**
+
+Under launchd the desk job gets the CRE CLI's absolute path as `--cre-bin`, which the recorder passes to the loop script as `CRE_BIN`.
+
+Replace `cre/scripts/sim-loop.sh` with:
+
+```bash
+#!/usr/bin/env bash
+# Runs the clim risk desk in local CRE simulation every INTERVAL seconds (default 30).
+# Builds the WASM once, then reuses it with --wasm, so runs do not recompile.
+# Usage (from cre/): [ENV_FILE=.env.replay] [CRE_BIN=/absolute/path/to/cre] scripts/sim-loop.sh <target> [--broadcast]
+# ENV_FILE: the .env file holding CRE_ETH_PRIVATE_KEY, passed to the CLI as -e (unset: the CLI's own cre/.env).
+# CRE_BIN: the CRE CLI to run (unset: `cre` from PATH); the launchd desk job passes the absolute path (plan 03 Task 23).
+# The replay desk has its own operator key in cre/.env.replay (plan 01 Task 18).
+# Output: full log in cre/logs/, USER LOG lines echoed to the terminal. Stop with Ctrl+C.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+# The CLI prints local time labeled "Z" (friction row 19): run it in UTC so transcripts match block times.
+export TZ=UTC
+TARGET="${1:?usage: scripts/sim-loop.sh <target> [--broadcast]}"
+BROADCAST="${2:-}"
+INTERVAL="${INTERVAL:-30}"
+ENV_FILE="${ENV_FILE:-}"
+CRE="${CRE_BIN:-cre}"
+# Absolute path: simulate resolves a relative --wasm from the workflow folder (risk-desk/), build -o from here.
+WASM="$PWD/risk-desk/binary.wasm"
+mkdir -p logs
+LOG="logs/sim-$(date -u +%Y%m%dT%H%M%SZ)-${TARGET}${BROADCAST:+-broadcast}.log"
+"$CRE" workflow build ./risk-desk -o "$WASM"
+echo "target=${TARGET} broadcast=${BROADCAST:-no} env=${ENV_FILE:-.env} interval=${INTERVAL}s cre=${CRE} log=${LOG}"
+while true; do
+  START=$(date +%s)
+  echo "=== $(date -u +%FT%TZ)" | tee -a "$LOG"
+  "$CRE" workflow simulate risk-desk --wasm "$WASM" --non-interactive --trigger-index 0 \
+    --target "$TARGET" ${BROADCAST} ${ENV_FILE:+-e "$ENV_FILE"} 2>&1 | tee -a "$LOG" | grep -E "USER LOG|rror|✗" || true
+  ELAPSED=$(( $(date +%s) - START ))
+  if (( ELAPSED < INTERVAL )); then sleep $(( INTERVAL - ELAPSED )); fi
+done
+```
+
+Replace `bots/src/live/desk-loop.ts` with:
+
+```ts
+// The live desk loop with an on-chain record of every run (Robinhood Chain testnet, plan 03).
+// Runs cre/scripts/sim-loop.sh <target> --broadcast (build the WASM once, then `cre workflow simulate` every 30 s) and
+// echoes its output. For each run it writes the transcript to bots/out/desk-sim/<run start>.log and appends one line to
+// bots/out/desk-runs.jsonl: status, tx hash, receipt and gas, the forwarder's ReportProcessed.result and the decoded
+// RiskReportedV2. The receipt decides `applied` (simParse.receiptStatus).
+// Outages (plan 03 Task 23): each `cre workflow simulate` is a fresh process that reads its nonce and the venues itself,
+// so nothing is replayed after a sleep; a run cut by the sleep can only deliver a real observation stamped with its own
+// tObs, which the policy trusts for tauKillSec after tObs and to which ClimPoker anchors its TTL, so a late delivery
+// cannot extend a fee. This recorder writes a local outage record on a wall-clock jump and on restart, and logs the desk
+// state re-read from the chain. If the loop exits (the CRE CLI or the network failing at start), this process exits 1
+// and launchd starts it again 30 s later (ThrottleInterval).
+// Usage: bun src/live/desk-loop.ts [--target rh-testnet-settings] [--cre-bin /absolute/path/to/cre] [--once]
+import { mockForwarderAbi, riskDeskV2Abi } from "@clim/shared";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseEventLogs } from "viem";
+import { argValue, envStr, hasFlag } from "../lib/env";
+import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
+import { loopCommand, receiptStatus, RunTracker, type RunResult } from "../lib/simParse";
+import { liveClient } from "./lib/chain";
+import { loadLiveDeployments, REPO_ROOT } from "./lib/deployments";
+import { recordStart, watchClock } from "./lib/supervisor";
+
+const target = argValue("--target") ?? "rh-testnet-settings";
+const creBin = argValue("--cre-bin");
+const once = hasFlag("--once");
+const creDir = envStr("CRE_PROJECT_DIR", join(REPO_ROOT, "cre"));
+const d = loadLiveDeployments();
+const client = liveClient();
+const runsFile = join(OUT_DIR, "desk-runs.jsonl");
+const transcriptDir = join(OUT_DIR, "desk-sim");
+mkdirSync(transcriptDir, { recursive: true });
+
+async function record(run: RunResult): Promise<void> {
+  const { lines, ...result } = run;
+  const transcript = `${(run.startedAt ?? new Date().toISOString()).replace(/[:.]/g, "-")}.log`;
+  writeFileSync(join(transcriptDir, transcript), `${lines.join("\n")}\n`);
+  const base = { ts: new Date().toISOString(), target, ...result, transcript: `desk-sim/${transcript}` };
+  if (!run.txHash) {
+    appendJsonl(runsFile, base);
+    console.log(`[desk] run ${run.startedAt}: ${run.status}${run.detail ? ` (${run.detail})` : ""}`);
+    return;
+  }
+  try {
+    const r = await client.waitForTransactionReceipt({ hash: run.txHash, timeout: 120_000 });
+    const reported = parseEventLogs({ abi: riskDeskV2Abi, eventName: "RiskReportedV2", logs: r.logs }).filter(
+      (l) => l.address.toLowerCase() === d.riskDesk.toLowerCase(),
+    );
+    const processed = parseEventLogs({ abi: mockForwarderAbi, eventName: "ReportProcessed", logs: r.logs });
+    const ev = reported[0]?.args;
+    const forwarderResult = processed[0]?.args.result ?? null;
+    const status = receiptStatus(run.status, forwarderResult, reported.length > 0);
+    appendJsonl(runsFile, {
+      ...base,
+      status,
+      statusFromReceipt: status !== run.status,
+      txStatus: r.status,
+      blockNumber: r.blockNumber,
+      gasUsed: r.gasUsed,
+      effectiveGasPrice: r.effectiveGasPrice,
+      from: r.from,
+      forwarderResult,
+      seq: ev?.seq ?? null,
+      tObs: ev?.tObs ?? null,
+      sigma5Applied: ev?.sigma5Applied ?? null,
+      sigma15Applied: ev?.sigma15Applied ?? null,
+      sigma5Reported: ev?.sigma5Reported ?? null,
+      devPips: ev?.devPips ?? null,
+      dispBp: ev?.dispBp ?? null,
+      nSources: ev?.nSources ?? null,
+      flags: ev?.flags ?? null,
+    });
+    console.log(`[desk] run ${run.startedAt}: ${status} tx ${run.txHash} seq ${ev?.seq} sigma5 ${ev?.sigma5Applied} dev ${ev?.devPips} gas ${r.gasUsed}`);
+  } catch (e) {
+    appendJsonl(runsFile, { ...base, receiptError: shortError(e) });
+    console.error(`[desk] run ${run.startedAt}: tx ${run.txHash} receipt error: ${shortError(e)}`);
+  }
+}
+
+/** The desk as the chain sees it, printed on start and after a wall-clock jump (desk-runs.jsonl keeps one line per run). */
+async function logDeskState(why: string): Promise<void> {
+  try {
+    const st = await client.readContract({ address: d.riskDesk, abi: riskDeskV2Abi, functionName: "state" });
+    const age = st[6] === 0 ? null : Math.floor(Date.now() / 1000) - st[0];
+    console.log(`[desk] ${why}: desk seq ${st[6]}, last report ${age === null ? "never" : `${age} s ago`}`);
+  } catch (e) {
+    console.error(`[desk] ${why}: desk state unreadable: ${shortError(e)}`);
+  }
+}
+
+recordStart("desk", runsFile);
+await logDeskState("start");
+watchClock("desk", () => {
+  void logDeskState("resume");
+});
+
+const cmd = loopCommand(target);
+console.log(`[desk] ${cmd.join(" ")} (cwd ${creDir}, cre ${creBin ?? "from PATH"}), recording to ${runsFile}`);
+const proc = Bun.spawn(cmd, { cwd: creDir, stdout: "pipe", stderr: "inherit", env: creBin ? { ...process.env, CRE_BIN: creBin } : process.env });
+for (const sig of ["SIGINT", "SIGTERM"] as const) {
+  process.on(sig, () => {
+    proc.kill();
+    process.exit(130);
+  });
+}
+
+const tracker = new RunTracker();
+let pending: Promise<void> = Promise.resolve();
+const handle = (run: RunResult | null): void => {
+  if (!run) return;
+  pending = pending.then(() => record(run));
+  if (once) {
+    pending.then(() => {
+      proc.kill();
+      process.exit(0);
+    });
+  }
+};
+
+const reader = proc.stdout.pipeThrough(new TextDecoderStream()).getReader();
+let buf = "";
+for (;;) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  buf += value;
+  let nl = buf.indexOf("\n");
+  while (nl >= 0) {
+    const line = buf.slice(0, nl);
+    buf = buf.slice(nl + 1);
+    console.log(line);
+    handle(tracker.push(line));
+    nl = buf.indexOf("\n");
+  }
+}
+handle(tracker.flush());
+await pending;
+const code = await proc.exited;
+console.error(`[desk] loop exited with code ${code}`);
+process.exit(code === 0 ? 0 : 1);
+```
+
+- [ ] **Step 12: The outage recorder, the launchd script and the status**
+
+Create `bots/src/live/scripts/outages.ts`:
+
+```ts
+// Outage record of the live desk from on-chain truth: scans RiskReportedV2 from the deployment block (then
+// incrementally) and writes bots/out/outages.json, one window per gap of more than 90 s between consecutive reports'
+// tObs ({from, to, durationSec, seqBefore, seqAfter}), each with the local reason when the Mac's processes recorded one
+// (bots/out/outages-local.jsonl). Plan 04's app derives the same windows from the chain with outageWindows() of
+// @clim/shared and shows them as measured. Usage: bun src/live/scripts/outages.ts [--watch]
+// Env: OUTAGES_EVERY_SEC (pass period with --watch, default 300), OUTAGES_CHUNK_BLOCKS (getLogs range, default 2000)
+import { OUTAGE_GAP_SEC, riskDeskV2Abi, type OutageWindow, type ReportPoint } from "@clim/shared";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { envNum, hasFlag } from "../../lib/env";
+import { appendJsonl, OUT_DIR } from "../../lib/jsonl";
+import { liveClient } from "../lib/chain";
+import { loadLiveDeployments } from "../lib/deployments";
+import { advanceOutages, attachLocalReasons, emptyOutageState, parseLocalOutages, type OutageState } from "../lib/outages";
+import { LOCAL_OUTAGES_FILE, runSupervised } from "../lib/supervisor";
+import { chunkedRanges } from "../lib/tail";
+
+const CONFIRMATIONS = 20n; // about 2 s of blocks: never read a block that could still change
+const OUT_FILE = join(OUT_DIR, "outages.json");
+const LOG_FILE = join(OUT_DIR, "outages-rh.jsonl");
+const d = loadLiveDeployments();
+const client = liveClient();
+const chunk = BigInt(envNum("OUTAGES_CHUNK_BLOCKS", 2_000));
+
+type OutagesFile = OutageState & { chainId: number; riskDesk: string };
+
+/** The previous pass's state, or a fresh one when there is none or it belongs to another desk. */
+function loadState(): OutageState {
+  if (!existsSync(OUT_FILE)) return emptyOutageState(d.deployBlock);
+  try {
+    const f = JSON.parse(readFileSync(OUT_FILE, "utf8")) as Partial<OutagesFile> & { windows?: OutageWindow[] };
+    if (f.chainId !== d.chainId || f.riskDesk?.toLowerCase() !== d.riskDesk.toLowerCase() || typeof f.scannedToBlock !== "number") {
+      return emptyOutageState(d.deployBlock);
+    }
+    return {
+      scannedToBlock: f.scannedToBlock,
+      reportCount: f.reportCount ?? 0,
+      lastReport: f.lastReport ?? null,
+      windows: (f.windows ?? []).filter((w) => !w.ongoing).map(({ from, to, durationSec, seqBefore, seqAfter, ongoing }) => ({ from, to, durationSec, seqBefore, seqAfter, ongoing })),
+    };
+  } catch {
+    return emptyOutageState(d.deployBlock);
+  }
+}
+
+async function pass(): Promise<void> {
+  const head = await client.getBlockNumber();
+  const safe = head > CONFIRMATIONS ? head - CONFIRMATIONS : head;
+  const nowSec = Number((await client.getBlock({ blockNumber: safe })).timestamp);
+  const prev = loadState();
+  const reports: ReportPoint[] = [];
+  for (const [a, b] of chunkedRanges(BigInt(prev.scannedToBlock + 1), safe, chunk)) {
+    const logs = await client.getLogs({ address: d.riskDesk, event: riskDeskV2Abi[1], fromBlock: a, toBlock: b });
+    for (const l of logs) reports.push({ seq: Number(l.args.seq ?? 0), tObs: Number(l.args.tObs ?? 0) });
+  }
+  const { state, windows } = advanceOutages(prev, reports, Number(safe), nowSec);
+  const local = existsSync(LOCAL_OUTAGES_FILE) ? parseLocalOutages(readFileSync(LOCAL_OUTAGES_FILE, "utf8")) : [];
+  const explained = attachLocalReasons(windows, local, nowSec);
+  const file = {
+    generatedAt: new Date().toISOString(),
+    note: `Windows in which clim's desk sent no report for more than ${OUTAGE_GAP_SEC} s, from consecutive RiskReportedV2 events (from = tObs of the last report before, to = tObs of the first after, null while silent). reason and local come from the Mac's own records, when it kept one.`,
+    chainId: d.chainId,
+    riskDesk: d.riskDesk,
+    gapSec: OUTAGE_GAP_SEC,
+    deployBlock: d.deployBlock,
+    scannedToBlock: state.scannedToBlock,
+    chainTimeSec: nowSec,
+    reportCount: state.reportCount,
+    lastReport: state.lastReport,
+    windows: explained,
+  };
+  // write then rename, so a reader (live:status, a second pass) never sees half a file
+  writeFileSync(`${OUT_FILE}.tmp`, `${JSON.stringify(file, null, 2)}\n`);
+  renameSync(`${OUT_FILE}.tmp`, OUT_FILE);
+  const ongoing = explained.find((w) => w.ongoing);
+  appendJsonl(LOG_FILE, { ts: file.generatedAt, scannedToBlock: state.scannedToBlock, newReports: reports.length, windows: explained.length, ongoing: ongoing !== undefined });
+  console.log(
+    `[outages] block ${safe}: ${reports.length} new reports (${state.reportCount} in all), ${explained.length} windows${ongoing ? `, desk silent for ${ongoing.durationSec} s now` : ""} -> bots/out/outages.json`,
+  );
+}
+
+if (hasFlag("--watch")) {
+  const everyMs = envNum("OUTAGES_EVERY_SEC", 300) * 1_000;
+  let nextAt = 0;
+  runSupervised({
+    name: "outages",
+    logFile: LOG_FILE,
+    everyMs: 10_000, // the clock is watched every 10 s; a pass runs every OUTAGES_EVERY_SEC
+    immediate: true,
+    tick: async () => {
+      if (Date.now() < nextAt) return;
+      await pass();
+      nextAt = Date.now() + everyMs;
+    },
+    onResume: () => {
+      nextAt = 0; // a pass right after a wake records the window that just ended
+    },
+  });
+} else {
+  await pass();
+}
+```
+
+Create `bots/src/live/scripts/launchd.ts`:
+
+```ts
+// Installs, removes and tails the live stack's launchd LaunchAgents (fi.clim-fables.<name>) on the maintainer's Mac.
+// install: resolves bun and cre on PATH, writes ~/Library/LaunchAgents/fi.clim-fables.<name>.plist (no secret in it) and
+//          bootstraps it into gui/<uid> (a job already loaded is booted out first, so install also reloads).
+// uninstall: boots the jobs out and removes their plists (they then stay stopped after a reboot).
+// logs: tails bots/out/logs/<name>.log and .err.log. print: prints the plists without writing or loading anything.
+// Health: bun run live:status.
+// Usage: bun src/live/scripts/launchd.ts <install|uninstall|logs|print> [name ...]   (names: desk runner keeper arb noise outages)
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { REPO_ROOT } from "../lib/deployments";
+import { guiDomain, isLiveJobName, jobLabel, jobState, LIVE_JOB_NAMES, liveJobSpec, logPaths, plistFor, type JobPaths, type LiveJobName } from "../lib/launchd";
+
+const BOTS_DIR = join(REPO_ROOT, "bots");
+const AGENTS_DIR = join(homedir(), "Library", "LaunchAgents");
+const [command, ...rest] = process.argv.slice(2);
+const names: LiveJobName[] = rest.length === 0 ? [...LIVE_JOB_NAMES] : rest.map((n) => {
+  if (!isLiveJobName(n)) throw new Error(`unknown job ${n} (one of ${LIVE_JOB_NAMES.join(", ")})`);
+  return n;
+});
+const plistPath = (name: LiveJobName) => join(AGENTS_DIR, `${jobLabel(name)}.plist`);
+
+function launchctl(args: string[], allowFail = false): void {
+  const r = spawnSync("launchctl", args, { encoding: "utf8" });
+  if (r.status !== 0 && !allowFail) throw new Error(`launchctl ${args.join(" ")} failed (${r.status}): ${(r.stderr || r.stdout).trim()}`);
+}
+
+/** bootout returns before launchd has removed the job; bootstrap fails while it is still there. */
+function bootout(name: LiveJobName): void {
+  launchctl(["bootout", `${guiDomain()}/${jobLabel(name)}`], true);
+  for (let i = 0; i < 40 && jobState(name) !== null; i++) Bun.sleepSync(250);
+  if (jobState(name) !== null) throw new Error(`${jobLabel(name)} is still loaded 10 s after bootout`);
+}
+
+/** bun and cre as found on PATH now (stable Homebrew links, not versioned Cellar paths). */
+function resolvePaths(): JobPaths {
+  const bun = Bun.which("bun") ?? process.execPath;
+  const cre = Bun.which("cre");
+  if (!cre) throw new Error("the cre CLI is not on PATH: install it (plan 03 Task 16) and rerun");
+  return { bun, cre, botsDir: BOTS_DIR, home: homedir() };
+}
+
+function install(): void {
+  if (process.platform !== "darwin") throw new Error("launchd jobs need macOS");
+  const paths = resolvePaths();
+  const { bun, cre } = paths;
+  mkdirSync(AGENTS_DIR, { recursive: true });
+  mkdirSync(join(BOTS_DIR, "out", "logs"), { recursive: true });
+  console.log(`bun ${bun}\ncre ${cre}\nrepo ${REPO_ROOT}`);
+  for (const name of names) {
+    const spec = liveJobSpec(name, paths);
+    writeFileSync(plistPath(name), plistFor(spec));
+    bootout(name);
+    launchctl(["enable", `${guiDomain()}/${spec.label}`]);
+    launchctl(["bootstrap", guiDomain(), plistPath(name)]);
+    const st = jobState(name);
+    console.log(`${spec.label}: ${st?.state ?? "not loaded"}${st?.pid ? ` (pid ${st.pid})` : ""}, logs ${spec.stdoutPath}`);
+  }
+}
+
+function uninstall(): void {
+  for (const name of names) {
+    bootout(name);
+    if (existsSync(plistPath(name))) rmSync(plistPath(name));
+    console.log(`${jobLabel(name)}: removed`);
+  }
+}
+
+function logs(): void {
+  const files = names.flatMap((n) => {
+    const p = logPaths(n, BOTS_DIR);
+    return [p.stdout, p.stderr];
+  });
+  const r = spawnSync("tail", ["-n", "20", "-F", ...files], { stdio: "inherit" });
+  process.exit(r.status ?? 0);
+}
+
+function print(): void {
+  const paths = resolvePaths();
+  for (const name of names) process.stdout.write(plistFor(liveJobSpec(name, paths)));
+}
+
+if (command === "install") install();
+else if (command === "uninstall") uninstall();
+else if (command === "logs") logs();
+else if (command === "print") print();
+else throw new Error("usage: bun src/live/scripts/launchd.ts <install|uninstall|logs|print> [name ...]");
+```
+
+The status script keeps Task 22's checks and prints, before its `PROBLEM:` lines, each launchd job's state and the last outage window.
+
+Replace `bots/src/live/scripts/status.ts` with:
+
+```ts
+// Health of the live stack on Robinhood Chain testnet: desk seq and age, the policy's quote and mode, each pool's fee
+// both ways and price against the venues, the last pokes on D (ClimPoker) and K (keeper), every key's balances, the
+// age of each bot's last log line, the launchd jobs (plan 03 Task 23) and the outage record. Exits 1 on a problem;
+// --watch prints a snapshot every 15 s instead.
+// Usage: bun src/live/scripts/status.ts [--watch]
+import { climPokerAbi, FeeMode, LIVE_POOLS, pipsToBp, pokeFeeHookAbi, sigmaE9ToAnnual, stateViewAbi } from "@clim/shared";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { formatEther, formatUnits, type Address } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { hasFlag } from "../../lib/env";
+import { OUT_DIR, shortError } from "../../lib/jsonl";
+import { aggregate, fetchVenueQuotes } from "../../lib/market";
+import { liveClient, readLiveBalances, readLiveState } from "../lib/chain";
+import { loadLiveDeployments } from "../lib/deployments";
+import { liveKey, type LiveRole } from "../lib/env";
+import { jobLabel, jobState, LIVE_JOB_NAMES } from "../lib/launchd";
+import { lastTs } from "../lib/tail";
+
+const d = loadLiveDeployments();
+const client = liveClient();
+const LOOKBACK_BLOCKS = 9_000n; // about 15 minutes at 0.1 s blocks
+const MODE: Record<number, string> = { [FeeMode.Normal]: "normal", [FeeMode.Degraded]: "degraded", [FeeMode.Blind]: "blind" };
+const LOGS: Array<[string, string, number]> = [
+  ["desk", "desk-runs.jsonl", 90],
+  ["runner", "runner-rh.jsonl", 120],
+  ["keeper", "keeper-rh.jsonl", 400],
+  ["arb", "arb-rh.jsonl", 60],
+  ["noise", "noise-rh.jsonl", 600],
+];
+
+async function snapshot(): Promise<string[]> {
+  const problems: string[] = [];
+  const head = await client.getBlockNumber();
+  const [s, block, quotes] = await Promise.all([readLiveState(client, d, head), client.getBlock({ blockNumber: head }), fetchVenueQuotes().catch(() => [])]);
+  const now = Number(block.timestamp);
+  const m = aggregate(quotes);
+  const age = s.desk.seq === 0 ? Number.POSITIVE_INFINITY : now - s.desk.tObs;
+  console.log(
+    `${new Date().toISOString()} block ${head} | desk seq ${s.desk.seq} age ${age}s sigma5 ${(sigmaE9ToAnnual(s.desk.sigma5E9) * 100).toFixed(1)}%/yr sigma15 ${(sigmaE9ToAnnual(s.desk.sigma15E9) * 100).toFixed(1)}%/yr dev ${s.desk.devPips} pips flags ${s.desk.flags} | policy ${s.policy.fee0For1}/${s.policy.fee1For0} (${MODE[s.policy.mode] ?? s.policy.mode}) | market ${m ? `${m.price.toFixed(2)} (${m.n} venues)` : "n/a"}`,
+  );
+  if (age > 90) problems.push(`desk report age ${age} s > 90 s`);
+  if (s.policy.mode === FeeMode.Blind) problems.push("policy mode blind");
+
+  const from = head > LOOKBACK_BLOCKS ? head - LOOKBACK_BLOCKS : 0n;
+  const [poked, kPokes] = await Promise.all([
+    client.getLogs({ address: d.poker, event: climPokerAbi[1], fromBlock: from, toBlock: head }),
+    client.getLogs({ address: d.hook, event: pokeFeeHookAbi[3], args: { poolId: d.pools.K.poolId }, fromBlock: from, toBlock: head }),
+  ]);
+  const lastPoke = poked[poked.length - 1]?.args;
+  const lastK = kPokes[kPokes.length - 1];
+  for (const name of LIVE_POOLS) {
+    const ps = s.pools[name];
+    const liq = await client.readContract({ address: d.uniswap.stateView, abi: stateViewAbi, functionName: "getLiquidity", args: [d.pools[name].poolId] });
+    console.log(
+      `  ${name}: fee ${ps.fee0For1}/${ps.fee1For0} pips (${pipsToBp(ps.fee0For1).toFixed(2)}/${pipsToBp(ps.fee1For0).toFixed(2)} bp) price ${ps.ethUsd.toFixed(2)}${m ? ` gap ${((ps.ethUsd / m.price - 1) * 1e4).toFixed(1)} bp` : ""} L ${Number(liq).toExponential(3)}`,
+    );
+    if (liq * 2n < d.liquidity) problems.push(`${name} liquidity ${liq} below half the seed ${d.liquidity}`);
+  }
+  const flat = d.hookConfig.flatPips;
+  if (s.pools.F.fee0For1 !== flat || s.pools.F.fee1For0 !== flat) problems.push(`F fee ${s.pools.F.fee0For1}/${s.pools.F.fee1For0} != flat ${flat}`);
+  if (lastPoke && lastPoke.expiry !== undefined && lastPoke.expiry > now) {
+    if (s.pools.D.fee0For1 !== lastPoke.fee0For1 || s.pools.D.fee1For0 !== lastPoke.fee1For0) {
+      problems.push(`D fee ${s.pools.D.fee0For1}/${s.pools.D.fee1For0} != last poke ${lastPoke.fee0For1}/${lastPoke.fee1For0}`);
+    }
+  }
+  console.log(`  last D poke: ${lastPoke ? `seq ${lastPoke.seq} ${lastPoke.fee0For1}/${lastPoke.fee1For0} pips, ${poked.length} in ${LOOKBACK_BLOCKS} blocks` : "none in the lookback"}`);
+  console.log(`  last K poke: ${lastK ? `${lastK.args.fee} pips at block ${lastK.blockNumber}, ${kPokes.length} in ${LOOKBACK_BLOCKS} blocks` : "none in the lookback"}`);
+  if (poked.length === 0) problems.push("no ClimPoker poke in the lookback");
+  if (kPokes.length === 0) problems.push("no keeper poke on K in the lookback");
+
+  const keys: Array<[string, Address, Address | null]> = [["CRE operator", d.cre.simOperator, null]];
+  for (const [name, role, router] of [
+    ["runner", "runner", null],
+    ["keeper", "keeper", null],
+    ["arbitrage", "arb", d.routers.arb],
+    ["retail", "noise", d.uniswap.poolSwapTest],
+  ] as Array<[string, LiveRole, Address | null]>) {
+    try {
+      keys.push([name, privateKeyToAccount(liveKey(role)).address, router]);
+    } catch {
+      problems.push(`${name}: key not set in bots/.env`);
+    }
+  }
+  for (const [name, addr, router] of keys) {
+    const b = await readLiveBalances(client, d, addr, router ?? addr);
+    const tokens = router ? `, ${formatUnits(b.tETH, 18)} tETH, ${formatUnits(b.tUSDG, 6)} tUSDG` : "";
+    console.log(`  ${name} ${addr}: ${formatEther(b.native)} ETH${tokens}`);
+    if (b.native < 10n ** 16n) problems.push(`${name} has under 0.01 ETH (bun run live:fund)`);
+  }
+  for (const [name, file, maxAge] of LOGS) {
+    const ts = lastTs(join(OUT_DIR, file));
+    const a = ts === null ? null : Math.round((Date.now() - Date.parse(ts)) / 1000);
+    console.log(`  bot ${name}: last log ${a === null ? "never" : `${a} s ago`}`);
+    if (a === null || a > maxAge) problems.push(`bot ${name} silent (${a === null ? "no log" : `${a} s`} > ${maxAge} s)`);
+  }
+  const jobs = LIVE_JOB_NAMES.map((name) => ({ name, st: jobState(name) }));
+  if (jobs.every((j) => j.st === null)) {
+    console.log("  launchd: no fi.clim-fables.* job loaded (bun run live:install starts them)");
+  } else {
+    for (const { name, st } of jobs) {
+      console.log(`  job ${jobLabel(name)}: ${st === null ? "not loaded" : `${st.state ?? "?"}${st.pid ? ` pid ${st.pid}` : ""}, last exit ${st.lastExitCode ?? "?"}`}`);
+      if (st === null) problems.push(`job ${name} not loaded (bun run live:install ${name})`);
+      else if (st.state !== "running") problems.push(`job ${name} ${st.state ?? "in an unknown state"} (last exit ${st.lastExitCode ?? "?"}; bun run live:logs ${name})`);
+    }
+  }
+  const outagesFile = join(OUT_DIR, "outages.json");
+  if (existsSync(outagesFile)) {
+    try {
+      const o = JSON.parse(readFileSync(outagesFile, "utf8")) as { generatedAt: string; windows: Array<{ from: number; durationSec: number; ongoing: boolean; reason: string }> };
+      const last = o.windows[o.windows.length - 1];
+      const at = (t: number) => new Date(t * 1000).toISOString().slice(0, 19);
+      console.log(
+        `  outages: ${o.windows.length} recorded (as of ${o.generatedAt})${last ? `, last from ${at(last.from)} UTC, ${last.durationSec} s${last.ongoing ? " and ongoing" : ""}: ${last.reason}` : ""}`,
+      );
+    } catch {
+      console.log("  outages: bots/out/outages.json unreadable");
+    }
+  } else {
+    console.log("  outages: no record yet (bun run live:outages)");
+  }
+  for (const p of problems) console.log(`  PROBLEM: ${p}`);
+  return problems;
+}
+
+if (hasFlag("--watch")) {
+  const loop = (): void => {
+    snapshot().catch((e: unknown) => console.error(shortError(e)));
+  };
+  loop();
+  setInterval(loop, 15_000);
+} else {
+  const problems = await snapshot();
+  process.exit(problems.length === 0 ? 0 : 1);
+}
+```
+
+In `bots/package.json`, add after `"live:verify"` (`live:status` stays Task 22's script, which now also prints each job's launchd state next to the desk's last report age on chain):
+
+```json
+    "live:outages": "bun src/live/scripts/outages.ts",
+    "live:install": "bun src/live/scripts/launchd.ts install",
+    "live:uninstall": "bun src/live/scripts/launchd.ts uninstall",
+    "live:logs": "bun src/live/scripts/launchd.ts logs",
+```
+
+- [ ] **Step 13: Run the whole suites, the typecheck and the plists**
+
+Run: `cd bots && bun test && bun run typecheck && cd ../shared && bun test && cd ../cre && bash -n scripts/sim-loop.sh && echo "sim-loop ok"`
+Expected: bots `0 fail` with 20 more tests than after Task 22 (111 in all), `tsc` exits 0, shared `0 fail` (77), then `sim-loop ok`.
+
+Then print the six plists without installing anything, and lint them:
+
+Run: `cd bots && for j in desk runner keeper arb noise outages; do bun src/live/scripts/launchd.ts print $j | plutil -lint - ; done && bun src/live/scripts/launchd.ts print desk | grep -A7 ProgramArguments`
+Expected: six `<stdin>: OK` lines, then the desk job's arguments: the absolute paths of `bun` and of `bots/src/live/desk-loop.ts`, `--target`, `rh-testnet-settings`, `--cre-bin` and the absolute path of `cre`. Then `cd bots && bun src/live/scripts/launchd.ts print | grep -c -E "KEY|RPC"` prints `0` (no key or RPC URL in any plist).
+
+Run once against the testnet, read-only: `cd bots && bun run live:outages`
+Expected: `[outages] block <n>: <k> new reports (<k> in all), <w> windows, desk silent for <s> s now -> bots/out/outages.json`. The first pass scans from the deployment block in ranges of 2,000 blocks (about 3 minutes of chain each), so it can take a few minutes; `<w>` counts the gaps between Task 17's first reports and Task 19's recorded run, plus the ongoing silence (the desk loop has not run continuously yet; these windows are real and stay in the record). A second run is incremental and prints `0 new reports`.
+
+- [ ] **Step 14: The pools during an outage, on the contracts**
+
+Create `contracts/test/v2/Outage.t.sol`:
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.26;
+
+import {Vm} from "forge-std/Vm.sol";
+import {Deployers} from "@uniswap/v4-core/test/utils/Deployers.sol";
+import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+import {AccessManager} from "@openzeppelin/contracts/access/manager/AccessManager.sol";
+
+import {RiskDeskV2} from "../../src/v2/RiskDeskV2.sol";
+import {ClimFeePolicy} from "../../src/v2/ClimFeePolicy.sol";
+import {ClimPoker} from "../../src/v2/ClimPoker.sol";
+import {PokeFeeHook} from "../../src/v2/PokeFeeHook.sol";
+
+/// @notice What the live reference pools do while the maintainer's Mac is asleep or offline (plan 03 Task 23): the
+///         stack of the testnet (desk, policy, directional poker on D, keeper pokes on K, F flat, hook config 100 / 700 /
+///         6,000) with no report, no poke and no keeper post from the last ones until the desk is back.
+contract OutageTest is Deployers {
+    uint64 internal constant FEE_POKER = 1;
+    uint64 internal constant CLIM_RUNNER = 7;
+    uint40 internal constant T0 = 1_760_000_000;
+    uint32 internal constant SIGMA_48 = 85_475; // 48 %/yr per sqrt-second, x 1e9
+    uint32 internal constant SIGMA_300 = 534_217; // 300 %/yr
+    uint24 internal constant FLAT = 700;
+    uint24 internal constant KEEPER_FEE = 1_480;
+    uint40 internal constant KEEPER_TTL = 7_200;
+    uint40 internal constant POKE_TTL = 600;
+    address internal constant HOOK_ADDRESS =
+        address(uint160(Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG) ^ (0x7777 << 144));
+
+    AccessManager internal am;
+    PokeFeeHook internal hook;
+    RiskDeskV2 internal desk;
+    ClimFeePolicy internal policy;
+    ClimPoker internal poker;
+    PoolKey internal keyD;
+    PoolKey internal keyK;
+    PoolKey internal keyF;
+    address internal forwarder = makeAddr("mockForwarder");
+    address internal operator = makeAddr("creOperator");
+    address internal runner = makeAddr("runner");
+    address internal keeper = makeAddr("keeper");
+
+    function setUp() public {
+        vm.warp(T0);
+        deployFreshManagerAndRouters();
+        deployMintAndApprove2Currencies();
+        am = new AccessManager(address(this));
+        deployCodeTo("PokeFeeHook.sol:PokeFeeHook", abi.encode(manager, address(am)), HOOK_ADDRESS);
+        hook = PokeFeeHook(HOOK_ADDRESS);
+        keyD = _pool(10);
+        keyK = _pool(11);
+        keyF = _pool(12);
+
+        desk = new RiskDeskV2(forwarder, operator);
+        policy = new ClimFeePolicy(
+            desk,
+            ClimFeePolicy.Params({
+                etaE4: 175_198,
+                sqrtHalfDtE6: 850_890,
+                floorPips: 700,
+                capPips: 6_000,
+                safePips: 3_000,
+                tauKillSec: 180,
+                shortWindow: true,
+                dirSlopeE4: 2_753,
+                dirMaxPremiumPips: 567,
+                ethIsToken0: true
+            })
+        );
+        poker = new ClimPoker(policy, address(hook), _id(keyD), true, POKE_TTL, address(am));
+
+        bytes4[] memory hookSel = new bytes4[](3);
+        hookSel[0] = bytes4(keccak256("pokeFee(bytes32,uint24,uint40)"));
+        hookSel[1] = bytes4(keccak256("pokeFee(bytes32,uint24,uint24,uint40)"));
+        hookSel[2] = PokeFeeHook.clearPoke.selector;
+        am.setTargetFunctionRole(address(hook), hookSel, FEE_POKER);
+        bytes4[] memory pokeSel = new bytes4[](1);
+        pokeSel[0] = ClimPoker.poke.selector;
+        am.setTargetFunctionRole(address(poker), pokeSel, CLIM_RUNNER);
+        am.grantRole(FEE_POKER, address(poker), 0);
+        am.grantRole(FEE_POKER, keeper, 0);
+        am.grantRole(CLIM_RUNNER, runner, 0);
+    }
+
+    function _pool(int24 spacing) internal returns (PoolKey memory k) {
+        (k,) = initPool(
+            currency0, currency1, IHooks(address(hook)), LPFeeLibrary.DYNAMIC_FEE_FLAG, spacing, SQRT_PRICE_1_1
+        );
+        hook.setPoolConfig(k, 100, FLAT, 6_000);
+        modifyLiquidityRouter.modifyLiquidity(
+            k,
+            ModifyLiquidityParams({
+                tickLower: TickMath.minUsableTick(spacing),
+                tickUpper: TickMath.maxUsableTick(spacing),
+                liquidityDelta: 1e21,
+                salt: 0
+            }),
+            ZERO_BYTES
+        );
+    }
+
+    function _id(PoolKey memory k) internal pure returns (bytes32) {
+        return PoolId.unwrap(k.toId());
+    }
+
+    function _report(uint40 tObs, uint32 sigmaE9) internal {
+        vm.prank(forwarder, operator);
+        desk.onReport("", abi.encode(tObs, sigmaE9, sigmaE9, int32(0), uint16(3), uint8(4), uint16(10_000)));
+    }
+
+    /// @dev The fee a small swap pays, read from PoolManager's Swap event.
+    function _swapFee(PoolKey memory k, bool zeroForOne) internal returns (uint24 fee) {
+        vm.recordLogs();
+        swap(k, zeroForOne, -1e15, ZERO_BYTES);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i; i < logs.length; i++) {
+            if (logs[i].emitter == address(manager) && logs[i].topics[0] == IPoolManager.Swap.selector) {
+                (,,,,, fee) = abi.decode(logs[i].data, (int128, int128, uint160, uint128, int24, uint24));
+                return fee;
+            }
+        }
+        revert("no Swap event");
+    }
+
+    function _fees(PoolKey memory k) internal view returns (uint24 f01, uint24 f10) {
+        return (hook.currentFee(_id(k), true), hook.currentFee(_id(k), false));
+    }
+
+    /// @dev Last report at T0, D poked from it, K poked by the keeper, then the Mac sleeps.
+    function _lastActionsBeforeTheOutage() internal returns (uint24 d01, uint24 d10) {
+        _report(T0, SIGMA_48);
+        vm.prank(runner);
+        (d01, d10) = poker.poke();
+        vm.prank(keeper);
+        hook.pokeFee(_id(keyK), KEEPER_FEE, KEEPER_TTL);
+    }
+
+    function test_BeforeTheOutageEachPoolChargesItsDriversFee() public {
+        (uint24 d01, uint24 d10) = _lastActionsBeforeTheOutage();
+        (uint24 a, uint24 b) = _fees(keyD);
+        assertEq(a, d01);
+        assertEq(b, d10);
+        assertGt(d01, FLAT); // 48 %/yr is above the floor: D is not at its flat fee
+        (a, b) = _fees(keyK);
+        assertEq(a, KEEPER_FEE);
+        assertEq(b, KEEPER_FEE);
+        (a, b) = _fees(keyF);
+        assertEq(a, FLAT);
+        assertEq(b, FLAT);
+    }
+
+    function test_DeskGoesBlindAfterTauKillAndThePokerStops() public {
+        _lastActionsBeforeTheOutage();
+        vm.warp(T0 + 180);
+        (,, uint8 mode) = policy.quoteDirectional();
+        assertEq(mode, policy.MODE_NORMAL()); // still fresh at exactly tauKillSec
+        vm.warp(T0 + 181);
+        (,, mode) = policy.quoteDirectional();
+        assertEq(mode, policy.MODE_BLIND());
+        vm.prank(runner);
+        vm.expectRevert(ClimPoker.DeskBlind.selector);
+        poker.poke(); // the runner logs this as a skip, never as an error
+    }
+
+    function test_PoolDKeepsItsLastOverrideUntilItsTtlThenFallsBackToFlat() public {
+        (uint24 d01, uint24 d10) = _lastActionsBeforeTheOutage();
+        vm.warp(T0 + POKE_TTL - 1);
+        (uint24 a, uint24 b) = _fees(keyD);
+        assertEq(a, d01);
+        assertEq(b, d10);
+        vm.warp(T0 + POKE_TTL); // the override ends at tObs + 600
+        (a, b) = _fees(keyD);
+        assertEq(a, FLAT);
+        assertEq(b, FLAT);
+        assertEq(_swapFee(keyD, true), FLAT); // Fables' flat 7 bp, what a trader pays
+        assertEq(_swapFee(keyD, false), FLAT);
+    }
+
+    function test_PoolKKeepsTheKeepersLastPokeForItsTtl() public {
+        _lastActionsBeforeTheOutage();
+        vm.warp(T0 + KEEPER_TTL - 1);
+        (uint24 a,) = _fees(keyK);
+        assertEq(a, KEEPER_FEE);
+        assertEq(_swapFee(keyK, true), KEEPER_FEE);
+        vm.warp(T0 + KEEPER_TTL);
+        (a,) = _fees(keyK);
+        assertEq(a, FLAT);
+    }
+
+    function test_PoolFStaysFlatThroughout() public {
+        _lastActionsBeforeTheOutage();
+        uint40[4] memory at = [T0 + 1, T0 + 181, T0 + POKE_TTL, T0 + KEEPER_TTL];
+        for (uint256 i; i < at.length; i++) {
+            vm.warp(at[i]);
+            assertEq(_swapFee(keyF, i % 2 == 0), FLAT);
+        }
+    }
+
+    function test_FirstReportAfterTheOutageIsTakenAsIsAndPokesAgain() public {
+        _lastActionsBeforeTheOutage();
+        uint40 back = T0 + 900; // 15 minutes later, more than RESET_GAP (180 s)
+        vm.warp(back);
+        _report(back, SIGMA_300);
+        (, uint32 s15, uint32 s5,,,, uint32 seq) = desk.state();
+        assertEq(seq, 2);
+        assertEq(s5, SIGMA_300); // not ramped from 48 %/yr (x2 per report would give 96 %/yr)
+        assertEq(s15, SIGMA_300);
+        (uint24 q01, uint24 q10, uint8 mode) = policy.quoteDirectional();
+        assertEq(mode, policy.MODE_NORMAL());
+        vm.prank(runner);
+        poker.poke();
+        (uint24 a, uint24 b) = _fees(keyD);
+        assertEq(a, q01);
+        assertEq(b, q10);
+    }
+}
+```
+
+Run: `cd contracts && forge test --match-path test/v2/Outage.t.sol -vv`
+Expected: `6 passed`. The contracts exist since plan 02, so these tests pass at once: they pin the outage behaviour the runbook and plan 04 describe, and a change of TTL, `tauKillSec` or `RESET_GAP` that breaks the table above fails them.
+
+Run: `cd contracts && RH_MAINNET_RPC_URL= SEPOLIA_RPC_URL= forge test && forge fmt --check`
+Expected: 0 failed, 6 more passed than at Task 7 (162 passed, 3 skipped), and `forge fmt --check` prints nothing.
+
+- [ ] **Step 15: Commit**
+
+```bash
+git add shared/src/outages.ts shared/src/index.ts shared/package.json shared/test/outages.test.ts \
+  bots/src/live/lib/supervise.ts bots/src/live/lib/outages.ts bots/src/live/lib/launchd.ts bots/src/live/lib/supervisor.ts \
+  bots/src/live/runner.ts bots/src/live/keeper.ts bots/src/live/arb.ts bots/src/live/noise.ts bots/src/live/desk-loop.ts \
+  bots/src/live/scripts/outages.ts bots/src/live/scripts/launchd.ts bots/src/live/scripts/status.ts bots/package.json \
+  bots/test/live/supervise.test.ts bots/test/live/outages.test.ts bots/test/live/launchd.test.ts \
+  cre/scripts/sim-loop.sh contracts/test/v2/Outage.t.sol
+git commit -m "feat(bots): launchd supervision, resume after sleep and an on-chain outage record" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
+```
+
 ## Part E: operations
 
-### Task 23: Runbook
+### Task 24: Runbook
 
 **Files:**
 - Modify: `docs/runbook.md` (title line, intro paragraph, and a new section 8 at the end)
@@ -6700,7 +8704,7 @@ git commit -m "feat(bots): live funding, status, gas evidence and final on-chain
 Replace the runbook's first paragraph (the line under `# clim run-book`) with:
 
 ```markdown
-Sections 0 to 7: clim v1 on Ethereum Sepolia (the TOKEN2049 Origins stack; its processes ran from the hackathon checkout and were stopped by plan 03 Task 25). Section 8: clim × Fables' live stack on Robinhood Chain testnet. Commands run from the repository root unless a `cd` is shown. Expected output follows each command; addresses, prices and hashes will differ.
+Sections 0 to 7: clim v1 on Ethereum Sepolia (the TOKEN2049 Origins stack; its processes ran from the hackathon checkout and were stopped by plan 03 Task 26). Section 8: clim × Fables' live stack on Robinhood Chain testnet. Commands run from the repository root unless a `cd` is shown. Expected output follows each command; addresses, prices and hashes will differ.
 ```
 
 - [ ] **Step 2: Append section 8**
@@ -6731,44 +8735,83 @@ cd bots && bun run live:keys   # creates the missing keys in bots/.env and cre/.
 
 At the measured testnet base fee of 0.01 gwei the stack costs about 0.03 ETH a day (plan 03 Task 11; measured figures in `docs/evidence/gas-robinhood-testnet.json`). Testnet ETH comes from Sepolia through the Robinhood Chain bridge: `cast send 0xF2939afA86F6f933A3CE17fCAB007907B6b0B7a4 "depositEth()" --value 0.5ether --private-key "$PRIVATE_KEY" --rpc-url "$SEPOLIA_RPC_URL"` (the Delayed Inbox on Sepolia; credited to the same address on L2 in about 10 minutes), or the faucet https://faucet.testnet.chain.robinhood.com in a browser. Then `cd bots && bun run live:fund` tops up every key (idempotent).
 
-### 8.3 Start
+### 8.3 Start (launchd)
 
-Six processes, all in `bots/` (tmux, or `run_in_background` from an agent):
+The six long-running processes run on the maintainer's Mac as launchd LaunchAgents of the logged-in user, one job per process: launchd starts them at login (so after a reboot), restarts a job that exits 30 s after its last start, and the processes resume by themselves when the Mac wakes (8.6).
 
-| Process | Command | Expected output |
-|---|---|---|
-| Desk (CRE loop + recorder) | `bun run live:desk` | the loop's `=== <time>` and `[USER LOG]` lines, then `[desk] run <time>: applied tx 0x... seq <n> sigma5 <x> dev <y> gas <g>` every 30 s |
-| Runner | `bun run live:runner` | `[runner] seq <n> poked <f01>/<f10> pips, tx 0x..., gas <g>` after each report |
-| Keeper (K) | `bun run live:keeper` | `[keeper] sigma5 <x>%/yr -> K fee <f> pips (TTL 7200 s), tx 0x...` about every 180 s |
-| Arbitrage | `bun run live:arb` | `[arb] <pool> pool <p> vs <m> (fee <f>) -> buyEth tx 0x...` when a pool leaves its band |
-| Retail | `bun run live:noise` | `[noise] buyEth $<usd> on D (fee <f> pips) tx 0x...`, the same order on K and F |
-| Monitor | `bun run live:status --watch` | a snapshot every 15 s; `PROBLEM:` lines name anything wrong |
+| Job | What it runs (from `bots/`, absolute paths in the plist) | Log in `bots/out/logs/` | Expected output |
+|---|---|---|---|
+| `fi.clim-fables.desk` | `bun src/live/desk-loop.ts --target rh-testnet-settings --cre-bin <cre>` (CRE loop + recorder) | `desk.log` | the loop's `=== <time>` and `[USER LOG]` lines, then `[desk] run <time>: applied tx 0x... seq <n> sigma5 <x> dev <y> gas <g>` every 30 s |
+| `fi.clim-fables.runner` | `bun src/live/runner.ts` | `runner.log` | `[runner] seq <n> poked <f01>/<f10> pips, tx 0x..., gas <g>` after each report |
+| `fi.clim-fables.keeper` | `bun src/live/keeper.ts` | `keeper.log` | `[keeper] sigma5 <x>%/yr -> K fee <f> pips (TTL 7200 s), tx 0x...` about every 180 s |
+| `fi.clim-fables.arb` | `bun src/live/arb.ts` | `arb.log` | `[arb] <pool> pool <p> vs <m> (fee <f>) -> buyEth tx 0x...` when a pool leaves its band |
+| `fi.clim-fables.noise` | `bun src/live/noise.ts` | `noise.log` | `[noise] buyEth $<usd> on D (fee <f> pips) tx 0x...`, the same order on K and F |
+| `fi.clim-fables.outages` | `bun src/live/scripts/outages.ts --watch` | `outages.log` | `[outages] block <n>: <k> new reports (<total> in all), <w> windows -> bots/out/outages.json` every 5 minutes |
 
 ```bash
-cd bots && tmux new-session -d -s clim-rh 'bun run live:desk' \; split-window 'bun run live:runner' \; split-window 'bun run live:keeper' \; split-window 'bun run live:arb' \; split-window 'bun run live:noise' \; split-window 'bun run live:status --watch' \; select-layout tiled
+cd bots && bun run live:install            # writes ~/Library/LaunchAgents/fi.clim-fables.*.plist and starts the six jobs
+cd bots && bun run live:logs desk          # follow one job's log (Ctrl+C stops the tail, not the job); no name: all six
+cd bots && bun run live:status --watch     # a snapshot every 15 s, with each job's launchd state; PROBLEM lines name anything wrong
 ```
 
-Start the desk first and the others once its first `applied` line shows. The Mac must stay awake for the stack to run: the maintainer's Pauline app owns that switch.
+`live:install` resolves `bun` and `cre` on PATH and writes their absolute paths into the plists; rerun it after moving the repository or reinstalling either tool (it reloads the jobs). `bun run live:install <name>` (re)installs one job. The plists carry only `HOME` and `PATH`: the keys stay in `bots/.env` and `cre/.env`, read by the processes as when started by hand. The desk job runs the CRE CLI as this user, so `cre whoami` must show a logged-in account.
+
+Nothing in this stack keeps the Mac awake: sleep is the maintainer's (his Pauline app owns `pmset disablesleep`). While the Mac sleeps the stack pauses and the pools fall back as 8.6 describes; the outage is recorded, and every job resumes on wake.
 
 ### 8.4 Check and stop
 
 ```bash
-cd bots && bun run live:status          # exit 0: healthy; exit 1 lists each PROBLEM
+cd bots && bun run live:status          # exit 0: healthy; exit 1 lists each PROBLEM (a job not running included)
 cd bots && bun run live:gas             # docs/evidence/gas-robinhood-testnet.json
 cd bots && bun run live:verify          # docs/evidence/live-check-<date>.json, PASS/FAIL per check
-tmux kill-session -t clim-rh            # stop everything started with tmux
-pkill -f "live:(desk|runner|keeper|arb|noise|status)"; pkill -f "src/live/"; pkill -f "sim-loop.sh rh-testnet-settings"   # without tmux
+cd bots && bun run live:outages         # one pass of the outage record now (the outages job runs one every 5 minutes)
+launchctl kickstart -k gui/$(id -u)/fi.clim-fables.runner   # restart one job now
+cd bots && bun run live:uninstall       # stop every job and remove the plists (nothing comes back at login)
 ```
 
-None of these patterns matches the Sepolia v1 processes (`--pair live`, `staging-settings`), and the v1 shutdown patterns of section 3 match none of these.
+`pkill` does not stop a job: launchd starts it again 30 s later (`KeepAlive`). Stop with `bun run live:uninstall` (every job) or `bun run live:uninstall <name>` (one). The jobs' command lines contain `src/live/` (and the desk's child `sim-loop.sh rh-testnet-settings`); none of them matches the Sepolia v1 processes (`--pair live`, `staging-settings`), and the v1 shutdown patterns of section 3 match none of them.
 
 ### 8.5 Troubleshooting
 
-- `desk report age > 90 s`: the CRE loop is down or failing; read `bots/out/desk-sim/*.log`. Credential checks against the CRE API fail now and then (friction log row 24); the loop recovers by itself. After `tauKillSec` (180 s) without a report the policy is blind: the runner stops poking and pool D returns to its flat 7 bp when its last 600 s override ends.
+- `desk report age > 90 s`: the CRE loop is down or failing; `bun run live:logs desk` and `bots/out/desk-sim/*.log` show why. Credential checks against the CRE API fail now and then (friction log row 24); the loop recovers by itself. After `tauKillSec` (180 s) without a report the policy is blind: the runner stops poking and pool D returns to its flat 7 bp when its last 600 s override ends (8.6).
 - `D fee != last poke`: another FEE_POKER key poked D, or a poke reverted; `bots/out/runner-rh.jsonl` has the error.
-- `bot <name> silent`: restart that process; logs are append-only under `bots/out/`.
-- The public RPC answers 429: set `RH_TESTNET_RPC_URL` in `bots/.env` to a keyed endpoint (never commit it).
-- Contracts re-deployed: rerun `cd cre/risk-desk && bun scripts/sync-config.ts` and restart the desk loop (it rebuilds the WASM).
+- `job <name> not running` or `bot <name> silent`: `bun run live:logs <name>` shows the last error; launchd restarts an exited job 30 s after its last start; `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>` restarts it now. `job <name> not loaded`: `bun run live:install <name>`.
+- A job exits again at once (`last exit 1` in `live:status`): a key missing from `bots/.env`, the CRE CLI logged out (`cre login`), or a moved repository or tool (`bun run live:install`).
+- The public RPC answers 429: set `RH_TESTNET_RPC_URL` in `bots/.env` to a keyed endpoint (never commit it), then restart the jobs so they read it: `for j in desk runner keeper arb noise outages; do launchctl kickstart -k gui/$(id -u)/fi.clim-fables.$j; done`.
+- Contracts re-deployed: rerun `cd cre/risk-desk && bun scripts/sync-config.ts`, then `cd bots && bun run live:install` (reloads every job; the desk job rebuilds the WASM). `bots/out/outages.json` starts over from the new desk's deployment block by itself.
+
+### 8.6 Outages
+
+The stack runs on a laptop: the Mac sleeps when the maintainer lets it, can be offline or reboot, and a process can crash. An outage is handled and recorded, never prevented with a keep-awake.
+
+**What happens.** When the whole Mac stops (asleep, offline, rebooting), from the last report's `tObs` (asserted by `contracts/test/v2/Outage.t.sol`); if only the desk fails while the Mac runs, the keeper bot keeps posting on K:
+
+| Time | Desk and policy | Pool D (ClimPoker) | Pool K (keeper-style bot) | Pool F |
+|---|---|---|---|---|
+| 0 to 180 s | fresh (`tauKillSec` 180) | the last poke's fees | the last keeper poke | flat 700 pips |
+| from 181 s | blind: `poke()` reverts `DeskBlind`; the runner logs a skip, not an error | the last poke's fees until `tObs + 600` | the last keeper poke (the keeper bot is down too; its poke lives up to 7,200 s) | flat |
+| from 600 s | blind | flat 700 pips (Fables' flat 7 bp) | the last keeper poke until 7,200 s after it, then flat | flat |
+| first report after the gap | a gap above `RESET_GAP` (180 s) is taken as is, no ramp from the stale sigma | poked again after that report | posted again at once, from fresh data | flat |
+
+Each process ticks every 10 s or less. After a wall-clock gap of more than 60 s (the Mac slept, or the process was stopped) it writes a `wake` line to `bots/out/outages-local.jsonl`, re-syncs its nonce from the chain, re-reads the desk, and drops anything it prepared before the gap (a keeper fee, an arbitrage or retail order) instead of sending it late. At start it writes a `restart` line dated from its last log line; after three or more failed ticks in a row it writes an `rpc-errors` line when it recovers. Failed ticks back off from 2 s, doubling up to 60 s; a process never crashes on an RPC error. Each CRE run is a fresh process reading its own nonce, and a report delivered late carries its own `tObs`, to which the policy's freshness and D's TTL are anchored.
+
+**How to check.**
+
+```bash
+cd bots && bun run live:status                                   # desk age, policy mode, each job, the last outage
+cd bots && bun run live:outages && jq '.windows[-3:]' out/outages.json   # the last three windows
+tail -n 20 bots/out/outages-local.jsonl                          # what the Mac's processes saw
+```
+
+A window has `from` (the `tObs` of the last report before the silence), `to` (that of the first report after it; `null` while it lasts), `durationSec`, `seqBefore` and `seqAfter` (consecutive: no report is missing), `reason` and `local` (the overlapping local records: `wall-clock gap seen by ...: the Mac was asleep or the processes were suspended`, `processes stopped and restarted: ...`, `RPC or network errors in ...`, or `unknown`). Pool D's fee at a moment of a window, on chain: `cast call <hook> 'currentFee(bytes32,bool)(uint24)' <pool D id> true --block $(cast find-block <unix time> --rpc-url https://rpc.testnet.chain.robinhood.com) --rpc-url https://rpc.testnet.chain.robinhood.com`. Plan 04's app shows the same windows, derived from the chain with `outageWindows()` of `@clim/shared`; the local reasons stay on the Mac (`bots/out/` is not committed).
+
+**How to restart.**
+
+- After a sleep: nothing to do. The jobs resume on wake; the desk reports within about 30 s, the runner pokes D after that report, the keeper posts on K at once.
+- After a reboot: nothing to do once the maintainer logs in (LaunchAgents start with his session; with nobody logged in, nothing runs and the outage lasts until login).
+- After a crash: launchd restarts the job 30 s after its last start. A job that keeps exiting shows its `last exit` code in `live:status`: read `bun run live:logs <name>`, fix the cause, then `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>`.
+- Offline: the processes back off and retry; the desk's failed CRE runs are recorded in `bots/out/desk-runs.jsonl`; everything resumes with the network.
+- Never add `caffeinate` or change `pmset`: the Mac's sleep is the maintainer's (Pauline).
 ````
 
 - [ ] **Step 3: Commit**
@@ -6778,24 +8821,30 @@ git add docs/runbook.md
 git commit -m "docs(runbook): clim x Fables live stack on Robinhood Chain testnet" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
 ```
 
-### Task 24: Go live and measure the gas
+### Task 25: Go live and measure the gas
 
-This task runs the stack on Robinhood Chain testnet with testnet keys.
+This task runs the stack on Robinhood Chain testnet with testnet keys, as launchd jobs on the maintainer's Mac (Task 23). The Mac's sleep stays his (his Pauline app): do not run `caffeinate` or `pmset`, and do not ask him to keep the Mac awake. If it sleeps during this task, the outage is recorded (runbook 8.6) and the 30-minute check below waits for 30 minutes without one.
 
-- [ ] **Step 1: Ask the maintainer to keep the Mac awake**
+- [ ] **Step 1: Preflight**
 
-The stack runs on this Mac (the CRE simulator, the bots). Ask the maintainer to confirm that Pauline keeps the Mac awake while the live stack runs. Do not run `caffeinate` or `pmset` yourself.
+Run: `cd bots && bun run live:fund && cre whoami && bun src/live/scripts/launchd.ts print desk | plutil -lint - && (pgrep -fl "src/live/|sim-loop.sh rh-testnet-settings" || echo "no live process running")`
+Expected: one `[fund] ... ready` line per key, the CRE account `cre whoami` shows (no secret), `<stdin>: OK`, then `no live process running` (the hand-started runs of Tasks 17 and 19 have ended). If `cre whoami` says you are logged out, ask the maintainer to run `cre login` (a browser login).
 
-- [ ] **Step 2: Start the desk, then the rest**
+- [ ] **Step 2: Install the launchd agents**
 
-Start `bun run live:desk` from `bots/` (tmux line of runbook 8.3, or Bash `run_in_background` with output to `bots/out/live-desk.out`). Wait for the first `[desk] run ...: applied` line, then start `live:runner`, `live:keeper`, `live:arb`, `live:noise` the same way (outputs to `bots/out/live-<name>.out`).
+Run: `cd bots && bun run live:install`
+Expected: the resolved `bun`, `cre` and repository paths, then six lines `fi.clim-fables.<name>: running (pid <n>), logs <repo>/bots/out/logs/<name>.log` (desk, runner, keeper, arb, noise, outages).
 
-Expected within two minutes: `applied` lines every 30 s; one `[runner] seq ... poked` per report; one `[keeper]` line; `[arb]` lines (the first arbitrage moves each pool to the venue price if it drifted since deployment); `[noise]` lines in threes (D, K, F).
+Run: `cd bots && perl -e 'alarm shift; exec @ARGV' 150 bun run live:logs desk` (the alarm ends the tail after 150 s, exit code 142; the job keeps running)
+Expected: `[desk] start: desk seq <n>, last report <age> s ago`, the WASM build, then `[desk] run <time>: applied tx 0x... seq <n+1> ...` and an `applied` line every 30 s.
+
+Run: `cd bots && perl -e 'alarm shift; exec @ARGV' 90 bun run live:logs runner keeper arb noise`
+Expected: one `[runner] seq ... poked` per report (a first `desk blind, no poke until the next report` line is normal when the jobs started before the desk's first report: the last report was Task 19's); one `[keeper]` line; `[arb]` lines (the first arbitrage moves each pool to the venue price if it drifted since deployment); `[noise]` lines in threes (D, K, F).
 
 - [ ] **Step 3: Check after 30 minutes**
 
 Run: `cd bots && bun run live:status`
-Expected: exit code 0 and no `PROBLEM:` line: desk age under 90 s, policy `normal`, D's fee equal to the last poke, K's fee from the keeper's last poke, F at 700/700, every key above 0.01 ETH, every bot logging. Fix any problem with runbook 8.5 before going on.
+Expected: exit code 0 and no `PROBLEM:` line: desk age under 90 s, policy `normal`, D's fee equal to the last poke, K's fee from the keeper's last poke, F at 700/700, every key above 0.01 ETH, every bot logging, six `job fi.clim-fables.<name>: running pid <n>` lines, and the outages line (windows from before the go-live, if any). Fix any problem with runbook 8.5 before going on.
 
 - [ ] **Step 4: Measure the gas**
 
@@ -6804,18 +8853,18 @@ Expected: five lines (`deskReport`, `poke`, `keeperPoke`, `arbSwap`, `retailSwap
 
 - [ ] **Step 5: Record and commit**
 
-Append to the session log, from `docs/evidence/gas-robinhood-testnet.json`: `(ops) Live stack on Robinhood testnet since <UTC time>. Gas per transaction (median, p90, L1 part, cost at the median price): desk report <g>/<p90>/<l1>, <eth> ETH; poke <...>; keeper poke <...>; arbitrage swap <...>; retail swap <...>. At 2,880 reports and pokes a day, the desk and its poker cost <x> ETH/day on testnet.` Update the budget table of runbook 8.2 if the measured total differs from 0.03 ETH/day by more than half. Then:
+Append to the session log, from `docs/evidence/gas-robinhood-testnet.json`: `(ops) Live stack on Robinhood testnet since <UTC time>, six launchd jobs (fi.clim-fables.*) on the maintainer's Mac. Gas per transaction (median, p90, L1 part, cost at the median price): desk report <g>/<p90>/<l1>, <eth> ETH; poke <...>; keeper poke <...>; arbitrage swap <...>; retail swap <...>. At 2,880 reports and pokes a day, the desk and its poker cost <x> ETH/day on testnet.` Update the budget table of runbook 8.2 if the measured total differs from 0.03 ETH/day by more than half. Then:
 
 ```bash
 git add docs/evidence/gas-robinhood-testnet.json docs/sessions/ docs/runbook.md
 git commit -m "feat: clim x Fables live on Robinhood Chain testnet, gas per report and per poke measured" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
 ```
 
-### Task 25: Final verification, then stop the Sepolia v1 stack
+### Task 26: Final verification, then stop the Sepolia v1 stack
 
 - [ ] **Step 1: Run the on-chain checks**
 
-After the stack has run for at least 35 minutes, run: `cd bots && bun run live:verify`
+After the stack has run for at least 35 minutes with no outage in the last 30 (`bun run live:status` shows the last window), run: `cd bots && bun run live:verify`
 Expected:
 
 ```text
@@ -6827,13 +8876,56 @@ PASS swapsLand {"D":{"arb":<n>,"retail":<n>,"meanFeePips":<x>},"K":{...},"F":{..
 wrote docs/evidence/live-check-<date>.json
 ```
 
-and exit code 0. A FAIL names its check and the numbers behind it: fix the cause (runbook 8.5), wait 35 minutes, run it again. Do not loosen a threshold to make a check pass; if a threshold is wrong for a reason that is not a fault (for example no arbitrage at all because the venues did not move), write the reason in the session log and ask the maintainer.
+and exit code 0. A FAIL names its check and the numbers behind it: fix the cause (runbook 8.5), wait 35 minutes, run it again. Do not loosen a threshold to make a check pass; if a threshold is wrong for a reason that is not a fault (for example no arbitrage at all because the venues did not move), write the reason in the session log and ask the maintainer. Run this step before Step 3: the simulated outage puts a gap of more than 90 s in the window `deskReports` reads.
 
 - [ ] **Step 2: Record**
 
 Append to the session log: the five check lines (numbers included), the explorer links of the desk, the poker, the hook and the three pools (`https://explorer.testnet.chain.robinhood.com/address/<address>`), and: `Gate of plan 03: CRE desk reporting on Robinhood testnet, pools D, K, F live with bots, contracts verified on Sourcify and Blockscout (Task 12).`
 
-- [ ] **Step 3: Stop the Sepolia v1 stack**
+- [ ] **Step 3: Simulate an outage and check its record**
+
+Stop every job for 12 minutes, then reinstall them, and check that the outage is on the record and that pool D charged Fables' flat fee during it. Twelve minutes, not five: D's last override lives until its report's `tObs + 600`, so a stop shorter than about 11 minutes ends before D falls back to flat (the desk is blind from 181 s).
+
+Run: `cd bots && date -u +%FT%TZ && bun run live:uninstall && (pgrep -fl "src/live/|sim-loop.sh rh-testnet-settings" || echo "stack stopped")`
+Expected: the UTC time, six `fi.clim-fables.<name>: removed` lines, then `stack stopped`.
+
+Wait 12 minutes (a background `sleep 720` or a Monitor; nothing runs meanwhile). Then:
+
+Run: `cd bots && date -u +%FT%TZ && bun run live:install && perl -e 'alarm shift; exec @ARGV' 120 bun run live:logs desk runner`
+Expected: six `running` lines, `[desk] start: desk seq <n>, last report <about 730> s ago`, an `applied` line with seq `<n+1>` within about a minute, then `[runner] seq <n+1> poked ...`.
+
+Run: `cd bots && bun run live:outages && jq '.windows[-1] | del(.local)' out/outages.json`
+Expected (times and numbers from the run):
+
+```json
+{
+  "from": <tObs of seq n>,
+  "to": <tObs of seq n+1>,
+  "durationSec": <about 760>,
+  "seqBefore": <n>,
+  "seqAfter": <n+1>,
+  "ongoing": false,
+  "reason": "processes stopped and restarted: arb, desk, keeper, noise, outages, runner"
+}
+```
+
+If the reason starts with `wall-clock gap seen by` instead, the Mac slept during the stop as well; that is a true record, note it in the session log.
+
+Then read D, K and F and the policy at a block 660 s after `from` (D's last override ended at `from + 600`):
+
+```bash
+cd bots && RPC=https://rpc.testnet.chain.robinhood.com && DEP=../shared/deployments/robinhood-testnet.json \
+  && T=$(( $(jq '.windows[-1].from' out/outages.json) + 660 )) && B=$(cast find-block $T --rpc-url $RPC) && echo "block $B (t $T)" \
+  && for p in D K F; do echo "$p $(cast call $(jq -r .hook $DEP) 'currentFee(bytes32,bool)(uint24)' $(jq -r .pools.$p.poolId $DEP) true --block $B --rpc-url $RPC) $(cast call $(jq -r .hook $DEP) 'currentFee(bytes32,bool)(uint24)' $(jq -r .pools.$p.poolId $DEP) false --block $B --rpc-url $RPC)"; done \
+  && cast call $(jq -r .policy $DEP) 'quoteDirectional()(uint24,uint24,uint8)' --block $B --rpc-url $RPC
+```
+
+Expected: `D 700 700` (Fables' flat 7 bp), `K <f> <f>` with `<f>` the keeper's last fee before the stop (its 7,200 s poke still lived), `F 700 700`, then the policy's quote whose last value is `2` (blind). Check that `T` is before `to` (`durationSec` above 660); if not, the stop was too short: repeat this step with a longer wait.
+
+Run: `cd bots && bun run live:status`
+Expected: exit code 0 a few minutes after the reinstall, and `outages: <w> recorded ..., last from <from> UTC, <about 760> s: processes stopped and restarted: ...`.
+
+- [ ] **Step 4: Stop the Sepolia v1 stack**
 
 The v1 processes run from `/Users/fianso/Development/hackathons/clim/bots`. Run the master plan's patterns, plus the two that match the children `bun run` leaves behind:
 
@@ -6844,19 +8936,17 @@ sleep 2; pgrep -fl "pair live|staging-settings" || echo "no Sepolia v1 process l
 pgrep -fl "live:(desk|runner|keeper|arb|noise)|src/live/|rh-testnet-settings"
 ```
 
-Expected: `no Sepolia v1 process left`, then the testnet processes still listed (desk loop, runner, keeper, arbitrage, retail). If a v1 process survives, `kill` its PID from the `pgrep` line. If a testnet process is missing, restart it (runbook 8.3).
+Expected: `no Sepolia v1 process left`, then the testnet processes still listed (desk loop, runner, keeper, arbitrage, retail, outages, all under launchd). If a v1 process survives, `kill` its PID from the `pgrep` line. If a testnet process is missing, `bun run live:status` names its job; restart it (runbook 8.5).
 
-- [ ] **Step 4: Sleep setting: ask the maintainer**
-
-The spec says the Mac's sleep is restored once the Sepolia bots stop, with `sudo pmset -a disablesleep 0`, a switch the maintainer owns through his Pauline app. The testnet stack now runs on this Mac too, and it stops whenever the Mac sleeps. Ask the maintainer, in one message, whether to restore sleep now (the testnet desk then pauses while the Mac sleeps, and the pool fees fall back to flat after their TTL) or to keep the Mac awake while the live stack should run. Do not run `pmset` yourself.
+The master plan's note on restoring the Mac's sleep with `pmset` once the Sepolia bots stop is superseded by the maintainer's decision of 2026-10-14: his Pauline app owns that switch and the live stack handles sleep as an outage. Leave `pmset` alone and do not ask about it.
 
 - [ ] **Step 5: Record, tick the master plan, commit and push**
 
-Append to the session log: `(ops) Sepolia v1 stack stopped at <UTC time> (cre-loop, arb, noise, status of the hackathon checkout); the maintainer chose <restore sleep now | keep the Mac awake via Pauline>.` In `docs/superpowers/plans/2026-10-13-clim-fables-00-master.md`, tick the two checkboxes of Task 4. Then:
+Append to the session log: `(ops) Sepolia v1 stack stopped at <UTC time> (cre-loop, arb, noise, status of the hackathon checkout). The live stack runs as six launchd jobs on the maintainer's Mac; its sleep stays his (Pauline), pmset untouched. Simulated outage: jobs stopped <UTC> to <UTC>; outages.json window <from> to <to> UTC, <durationSec> s, seq <n> to <n+1>, reason "<reason>"; at block <B> (from + 660 s) D 700/700, K <f>/<f>, F 700/700, policy mode 2 (blind).` In `docs/superpowers/plans/2026-10-13-clim-fables-00-master.md`, tick the two checkboxes of Task 4. Then:
 
 ```bash
 git add docs/evidence/live-check-*.json docs/sessions/ docs/superpowers/plans/2026-10-13-clim-fables-00-master.md
-git commit -m "docs: plan 03 gate, live checks on Robinhood testnet, Sepolia v1 stopped" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
+git commit -m "docs: plan 03 gate, live checks on Robinhood testnet, outage drill, Sepolia v1 stopped" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
 git push
 ```
 
@@ -6867,4 +8957,6 @@ git push
 - Every number published from this plan comes from a script output (`lab/out/fables-estimator.json`, `shared/keeper-map-fables.json`, `docs/evidence/gas-robinhood-testnet.json`, `docs/evidence/live-check-*.json`) or a chain read recorded in the session log.
 - The K pool's bot is an imitation of an observed pattern; every place that shows it (the deployments file's `driver`, the bot's header and log line, the runbook) says so. Never describe it as Fables' keeper.
 - Nothing in this plan writes to Robinhood Chain mainnet: the only mainnet access is the shadow target's `eth_call` (read) and plan 01's lab reads. `LiveScript._guard()` and `deploy-live.sh` refuse chain 4663.
-- No secret is printed: keys are created by `live:keys` (addresses only), `contracts/.env` is sourced, never echoed, and every RPC used in a command is public.
+- No secret is printed: keys are created by `live:keys` (addresses only), `contracts/.env` is sourced, never echoed, and every RPC used in a command is public. The launchd plists carry only `HOME` and `PATH` (`plistFor` refuses anything else).
+- Nothing in this plan keeps the Mac awake: no `caffeinate`, no `pmset`, no request to the maintainer to keep it awake. His Pauline app owns sleep; the stack treats a sleep as an outage, recovers from it, and records it (Task 23, runbook 8.6).
+- Outage windows come from the chain (consecutive `RiskReportedV2`, gap above 90 s) and are published as measured; plan 04's app shows them, it does not hide the gaps of a laptop-hosted showcase.
