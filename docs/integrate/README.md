@@ -191,8 +191,8 @@ At that cadence and the median costs, the desk and its poker cost 0.0044 ETH a d
 <!-- clim:cost:end -->
 
 CRE execution on a DON is priced by Chainlink; the desk runs in the simulator today, so no DON cost is measured here.
-Every receipt above had `gasUsedForL1` 0 on Robinhood Chain testnet; on mainnet the L1 component depends on the L1
-base fee and is not measured here.
+The median `gasUsedForL1` of every row above is 0 on Robinhood Chain testnet; on mainnet the L1 component depends on
+the L1 base fee and is not measured here.
 
 ## Files
 
