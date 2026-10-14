@@ -45,3 +45,24 @@ def test_calibrate_eta_rejects_targets_the_sigma_cannot_reach():
 
 def test_pstar_from_eta():
     assert policy.pstar_from_eta(1.0, c=1.0) == pytest.approx(0.5)
+
+
+def _est(arb, pearson):
+    return {"arbVsKeeperPct": arb, "corrKeeper": {"pearson": pearson}}
+
+
+def test_choose_estimator_prefers_the_better_multi_venue_estimator():
+    r = {"median-close": _est(-1.0, 0.70), "venue-range": _est(-3.0, 0.60), "binance-1s": _est(-3.5, 0.83)}
+    assert policy.choose_estimator(r) == "venue-range"
+
+
+def test_choose_estimator_breaks_close_calls_on_correlation():
+    r = {"median-close": _est(-2.6, 0.75), "venue-range": _est(-3.0, 0.60), "binance-1s": _est(-3.5, 0.83)}
+    assert policy.choose_estimator(r) == "median-close"
+
+
+def test_choose_estimator_takes_binance_1s_only_when_it_wins_by_more_than_a_point():
+    r = {"median-close": _est(2.0, 0.70), "venue-range": _est(1.5, 0.60), "binance-1s": _est(-4.4, 0.83)}
+    assert policy.choose_estimator(r) == "binance-1s"
+    r["binance-1s"] = _est(1.2, 0.83)  # beats median-close (the multi-venue pick, by correlation) by 0.8 point only
+    assert policy.choose_estimator(r) == "median-close"
