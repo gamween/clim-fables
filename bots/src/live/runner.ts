@@ -5,6 +5,8 @@
 // the desk re-read; failed ticks back off (2 s doubling to 60 s). A poke never carries a stale fee: ClimPoker reads the
 // policy when the transaction runs. A DeskBlind revert right after a fresh read is first taken as a lagging node of the
 // load-balanced public RPC: the simulation is retried 3 times, 2 s apart, before the skip is logged.
+// A restarted runner first reads the last poked seq from ClimPoker's Poked events, so it never pokes that report again;
+// each poke's gas limit is its estimate plus 20 %, so a poke mined after the next report changed the fees still has gas.
 // Usage: bun src/live/runner.ts     Log: bots/out/runner-rh.jsonl     Env: RUNNER_POLL_MS (default 2000)
 import { climFeePolicyAbi, climPokerAbi, FeeMode, riskDeskV2Abi } from "@clim/shared";
 import { join } from "node:path";
@@ -14,7 +16,7 @@ import { appendJsonl, OUT_DIR, shortError } from "../lib/jsonl";
 import { liveClient, liveWallet } from "./lib/chain";
 import { loadLiveDeployments } from "./lib/deployments";
 import { liveKey } from "./lib/env";
-import { POKE_LAG_DELAY_MS, POKE_LAG_RETRIES, pokeDecision, simulatePoke } from "./lib/runner";
+import { POKE_LAG_DELAY_MS, POKE_LAG_RETRIES, POKED_LOOKBACK_BLOCKS, pokeDecision, readLastPokedSeq, simulatePoke, withGasMargin } from "./lib/runner";
 import { isDeskBlindError } from "./lib/supervise";
 import { runSupervised } from "./lib/supervisor";
 
@@ -23,6 +25,7 @@ const client = liveClient();
 const wallet = liveWallet(liveKey("runner"));
 const logFile = join(OUT_DIR, "runner-rh.jsonl");
 let lastSeq = 0;
+let lastSeqRead = false;
 let blindLogged = false;
 
 async function readDesk() {
@@ -36,6 +39,12 @@ async function readDesk() {
 }
 
 async function tick(): Promise<void> {
+  if (!lastSeqRead) {
+    // once per process, before any poke: the seq this runner (or a previous instance) last poked
+    lastSeq = Math.max(lastSeq, await readLastPokedSeq(client, d.poker));
+    lastSeqRead = true;
+    console.log(`[runner] last poked seq on chain: ${lastSeq} (Poked events of the last ${POKED_LOOKBACK_BLOCKS} blocks)`);
+  }
   const [st, q] = await readDesk();
   const seq = st[6];
   const base = { ts: new Date().toISOString(), seq, tObs: st[0], quote0For1: q[0], quote1For0: q[1], mode: q[2] };
@@ -52,10 +61,14 @@ async function tick(): Promise<void> {
   blindLogged = false;
   if (pokeDecision(seq, lastSeq, q[2]) !== "poke") return;
   try {
-    const { request } = await simulatePoke(() => client.simulateContract({ account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" }), {
-      onRetry: (_e, n) => console.log(`[runner] seq ${seq}: DeskBlind after a fresh read (a lagging RPC node), retry ${n}/${POKE_LAG_RETRIES} in ${POKE_LAG_DELAY_MS / 1_000} s`),
-    });
-    const hash = await wallet.writeContract(request);
+    const call = { account: wallet.account, address: d.poker, abi: climPokerAbi, functionName: "poke" } as const;
+    const { request, gas } = await simulatePoke(
+      async () => ({ request: (await client.simulateContract(call)).request, gas: withGasMargin(await client.estimateContractGas(call)) }),
+      {
+        onRetry: (_e, n) => console.log(`[runner] seq ${seq}: DeskBlind after a fresh read (a lagging RPC node), retry ${n}/${POKE_LAG_RETRIES} in ${POKE_LAG_DELAY_MS / 1_000} s`),
+      },
+    );
+    const hash = await wallet.writeContract({ ...request, gas });
     const r = await client.waitForTransactionReceipt({ hash, timeout: 60_000 });
     const ev = parseEventLogs({ abi: climPokerAbi, eventName: "Poked", logs: r.logs })[0]?.args;
     appendJsonl(logFile, {
@@ -65,6 +78,7 @@ async function tick(): Promise<void> {
       status: r.status,
       block: r.blockNumber,
       gasUsed: r.gasUsed,
+      gasLimit: gas,
       effectiveGasPrice: r.effectiveGasPrice,
       fee0For1: ev?.fee0For1 ?? null,
       fee1For0: ev?.fee1For0 ?? null,
