@@ -1,0 +1,188 @@
+/* Fables' docs layout (inventory §2.10): a 220 px sidebar and a 718 px main column, Inter 16/24 body. */
+.docs {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 48px;
+  max-width: 1040px;
+  margin: 8px auto 0;
+  width: 100%;
+}
+.sidebar {
+  position: sticky;
+  top: calc(var(--nav-h) + var(--banner-h) + 24px);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.group {
+  display: flex;
+  flex-direction: column;
+}
+.groupLabel {
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+.leaf {
+  padding: 8px 0;
+  font-size: 14px;
+  line-height: 22px;
+  letter-spacing: -0.09px;
+  color: var(--ink-muted);
+  transition: color 0.18s;
+}
+.leaf:hover {
+  color: var(--ink-secondary);
+}
+.leafActive {
+  color: var(--ink);
+}
+.main {
+  max-width: 718px;
+  font-size: 16px;
+  line-height: 24px;
+  letter-spacing: -0.09px;
+  color: var(--ink-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.main h1 {
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 600;
+  letter-spacing: -0.24px;
+  color: var(--ink);
+}
+.main h2 {
+  font-size: 20px;
+  line-height: 22.67px;
+  font-weight: 600;
+  letter-spacing: -0.33px;
+  color: var(--ink);
+  margin-top: 32px;
+  scroll-margin-top: calc(var(--nav-h) + var(--banner-h) + 24px);
+}
+.main h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-top: 8px;
+}
+.main a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.main a:hover {
+  opacity: 0.7;
+}
+.main strong {
+  color: var(--ink);
+  font-weight: 500;
+}
+.main code {
+  color: var(--ink);
+  background: var(--chip-fill);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 0.92em;
+}
+.lead {
+  margin-top: 2px;
+}
+.ruleBig {
+  height: 1px;
+  background: var(--line);
+  border: 0;
+  margin: 24px 0 32px;
+}
+.tableWrap {
+  border-radius: var(--radius);
+  overflow-x: auto;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 20px;
+}
+.table th {
+  background: var(--canvas);
+  color: var(--ink);
+  font-weight: 500;
+  text-align: left;
+  padding: 16px;
+  vertical-align: bottom;
+}
+.table td {
+  padding: 16px;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+}
+.table tr:nth-child(even) td {
+  background: var(--card);
+}
+.caption {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+.callout {
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 21px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.calloutGood {
+  background: color-mix(in srgb, var(--positive) 12%, transparent);
+  color: var(--positive);
+}
+.calloutWarn {
+  background: color-mix(in srgb, var(--session) 15%, transparent);
+  color: var(--session);
+}
+.code {
+  margin: 0;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 0 0 0 1px var(--line-light);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 13px;
+  line-height: 20px;
+  overflow-x: auto;
+  white-space: pre;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.details summary {
+  cursor: pointer;
+  color: var(--ink);
+}
+.quote {
+  margin: 0;
+  padding: 12px 16px;
+  border-left: 2px solid var(--brand);
+  background: var(--card);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--ink);
+}
+.pass {
+  color: var(--positive);
+  font-weight: 500;
+}
+.fail {
+  color: var(--negative);
+  font-weight: 500;
+}
+@media (max-width: 900px) {
+  .docs {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    position: static;
+  }
+}
