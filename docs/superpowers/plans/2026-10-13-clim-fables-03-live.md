@@ -97,6 +97,7 @@ The running Sepolia v1 stack lives in another checkout, `/Users/fianso/Developme
 | `lab/scripts/fables_fetch.py` (modify) | Add `binance1m`, `coinbase1m`, `kraken1m` fetches |
 | `lab/scripts/study_estimator.py` (create) | The estimator measurement (Task 2) → `lab/out/fables-estimator.json` |
 | `lab/scripts/decide_fables_params.py` (modify) | `etaE4` and `sigmaEstimator` from the estimator study |
+| `lab/scripts/export_fork_reports.py`, `contracts/script/v2/{ForkRun.s.sol,fork-run.sh}` (modify) | The recorded fork run's reports from the live estimator; the evidence records `sigmaEstimator` and `etaE4` |
 | `lab/scripts/export_keeper_map.py` (create) | Keeper fee by 5-minute volatility → `shared/keeper-map-fables.json` |
 | `lab/tests/test_venue.py`, `test_policy.py`, `test_fables_outputs.py` (modify) | Tests of the above |
 | `contracts/src/test-tokens/TestTokenDecimals.sol` (create) | TestToken with chosen decimals (tUSDG 6) |
@@ -440,7 +441,8 @@ git commit -m "feat(lab): desk-feasible volatility estimators and the rule that 
 - Create: `lab/scripts/study_estimator.py`
 - Modify: `lab/scripts/decide_fables_params.py`
 - Modify: `lab/tests/test_fables_outputs.py`
-- Output: `lab/out/fables-estimator.json`, `shared/params-fables.json`
+- Modify (Step 12): `lab/scripts/export_fork_reports.py`, `contracts/script/v2/ForkRun.s.sol`, `contracts/script/v2/fork-run.sh` (code in plan 02 Tasks 7 and 8)
+- Output: `lab/out/fables-estimator.json`, `shared/params-fables.json`, `docs/evidence/fork-reports-2026-10-07.json`, `docs/evidence/fork-run-2026-10-07.json`
 
 - [ ] **Step 1: Confirm which venues serve sub-minute data (option c of the brief)**
 
@@ -875,6 +877,23 @@ Append to `docs/sessions/<today>.md` (create the file with the heading `# Sessio
 ```bash
 git add lab/scripts/fables_fetch.py lab/scripts/study_estimator.py lab/scripts/decide_fables_params.py lab/tests/test_fables_outputs.py lab/out/fables-estimator.json shared/params-fables.json docs/sessions/
 git commit -m "feat(lab): live desk estimator measured on Fables' five weeks, etaE4 re-decided for it" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
+```
+
+- [ ] **Step 12: Regenerate the fork run with the live estimator**
+
+The recorded fork run (plan 02 Tasks 7 and 8) must use what the live desk computes: `export_fork_reports.py` takes `sigma5E9` and `sigma15E9` from `sigmaEstimator` in `shared/params-fables.json` (reusing `study_estimator.minute_venues` and `desk_sigma`), and `ForkRun.s.sol` reads `etaE4` from the same file, refuses reports exported for another estimator, and records both in the evidence. The revised code of the three files is in plan 02 Tasks 7 and 8. Run (simulation on an anvil fork only, never `--broadcast`; `contracts/.env` is loaded by the wrapper, never print it; on an Alchemy 429, wait and rerun):
+
+```bash
+cd lab && uv run python scripts/export_fork_reports.py && cd ..
+npm run demo:fork
+jq -e '[.pokedPips, .currentFee0For1Pips] | transpose | all(.[0] == .[1])' docs/evidence/fork-run-2026-10-07.json
+```
+
+Expected: the export prints `180 reports, fork block …, sigma from <sigmaEstimator>, peak sigma5 …`; the run prints `pokes: 180`, `swaps: 36`, `swapReverts: 0`, `etaE4` and `sigmaEstimator` as in the parameters; the `jq` check prints `true`. Append a bullet to `docs/sessions/<today>.md` with the pokes, the minimum and maximum posted fee, the swaps, the reverts and the window at the 6,000 pip cap in UTC, all read from the evidence, then commit:
+
+```bash
+git add lab/scripts/export_fork_reports.py contracts/script/v2/ForkRun.s.sol contracts/script/v2/fork-run.sh docs/evidence/fork-reports-2026-10-07.json docs/evidence/fork-run-2026-10-07.json docs/sessions/ docs/superpowers/plans/
+git commit -m "feat: fork run regenerated with the live desk estimator" -m "Claude-Session: https://claude.ai/code/session_01Q1bBQaY1nVKYS7LpCGsXFB"
 ```
 
 ### Task 3: Lab, the keeper-style map for pool K

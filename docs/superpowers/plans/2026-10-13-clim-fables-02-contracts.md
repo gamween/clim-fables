@@ -2185,19 +2185,26 @@ git commit -m "test(contracts): ClimPoker drives Fables' real ETH/USDG hook on a
 
 The run replays the 7 October 2026 storm, 01:40 to 03:10 UTC (`1791337200` to `1791342600`), the window `lab/out/fables-storm-2026-10-07.json` already studies.
 
+Revised 2026-10-14 (plan 03 Task 2 Step 12): the reports' `sigma15E9` and `sigma5E9` come from the live desk's estimator, `sigmaEstimator` in `shared/params-fables.json` (venue-range since then), through `scripts/study_estimator.py`'s `minute_venues` and `desk_sigma`, so this export needs plan 03 Task 2's 1-minute candles of Binance, Coinbase and Kraken. The first version used Binance 1 s alone; the code below is the revised one.
+
 - [ ] **Step 1: Write the export**
 
 ```python
-"""Desk reports for the fork run (offline): what clim's desk would have published every 30 s on 2026-10-07,
-01:40-03:10 UTC, from the lab's Binance 1 s (USD) data and Fables' pool prices.
+"""Desk reports for the fork run (offline): what clim's live desk would have published every 30 s on 2026-10-07,
+01:40-03:10 UTC, with the volatility estimator it computes (sigmaEstimator in shared/params-fables.json) and Fables'
+pool prices.
 
     uv run python scripts/export_fork_reports.py     # docs/evidence/fork-reports-2026-10-07.json
 
-Fields are parallel arrays so Foundry reads them with parseJsonUintArray / parseJsonIntArray. One venue
-(Binance, converted to USD) stands in for the live desk's four; the run script (ForkRun.s.sol) fixes dispBp 3,
-nSources 4 and kE4 10000 in every report so the desk accepts it, and the file says so.
+Fields are parallel arrays so Foundry reads them with parseJsonUintArray / parseJsonIntArray. sigma15E9 and sigma5E9
+come from the live estimator through scripts/study_estimator.py's loaders: venue-range and median-close on the
+1-minute candles of Binance (USDT converted to USD), Coinbase and Kraken (Hyperliquid has no history), binance-1s on
+Binance 1 s. devPips is Binance 1 s (USD) against the pool; the run's symmetric poker uses no directional premium, so
+it does not move the fee. Three venues stand in for the live desk's four; the run script (ForkRun.s.sol) fixes dispBp
+3, nSources 4 and kE4 10000 in every report so the desk accepts it, and the file says so.
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -2206,13 +2213,13 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fables_load import RAW, load_window  # noqa: E402
+from study_estimator import desk_sigma, minute_venues  # noqa: E402
 
 from clim_lab import markout as mk  # noqa: E402
 from clim_lab import robin  # noqa: E402
-from clim_lab.data import LAB_DIR  # noqa: E402
+from clim_lab.data import LAB_DIR, SHARED_DIR  # noqa: E402
 from clim_lab.report import now_iso, write_json  # noqa: E402
 from clim_lab.units import sigma_e9_from_per_sqrt_s  # noqa: E402
-from clim_lab.venue import rv_window  # noqa: E402
 
 START = 1_791_337_200  # 2026-10-07 01:40:00 UTC
 END = 1_791_342_600  # 2026-10-07 03:10:00 UTC
@@ -2220,10 +2227,12 @@ OUT = LAB_DIR.parent / "docs" / "evidence" / "fork-reports-2026-10-07.json"
 
 
 def main() -> None:
+    estimator = json.loads((SHARED_DIR / "params-fables.json").read_text())["sigmaEstimator"]
     w = load_window()
+    venues = minute_venues()
     t_obs = np.arange(START, END, 30, dtype=np.int64)
-    s15 = rv_window(w.venue, t_obs, 900, 5)
-    s5 = rv_window(w.venue, t_obs, 300, 5)
+    s15 = desk_sigma(estimator, w, venues, t_obs, 900)
+    s5 = desk_sigma(estimator, w, venues, t_obs, 300)
     pool = mk.pool_price_at(t_obs, w.t, w.swaps.log_price)
     dev = (np.exp(w.venue.at(t_obs - 1) - pool) - 1.0) * 1e6
     clock = robin.BlockClock.from_json(RAW / "blocks.json")
@@ -2231,9 +2240,13 @@ def main() -> None:
         "generatedAt": now_iso(),
         "window": {"start": int(START), "end": int(END)},
         "forkBlock": clock.block_at(START - 120),  # last sampled block at or before 2 minutes ahead of the first report, so the run only warps forward
+        "sigmaEstimator": estimator,
         "note": (
-            "lab replay: Binance ETHUSDT 1 s converted to USD stands in for the live desk's four venues; because one "
-            "venue stands in for four, the run fixes dispBp 3, nSources 4 and kE4 10000 in every report"
+            f"lab replay: sigma15E9 and sigma5E9 from the live desk's estimator ({estimator}, sigmaEstimator in "
+            "shared/params-fables.json), on the 1-minute candles of Binance (ETHUSDT converted to USD), Coinbase and "
+            "Kraken for the multi-venue estimators; devPips from Binance 1 s (USD) against the pool (no effect on "
+            "this symmetric run); because three replayed venues stand in for the live desk's four, the run fixes "
+            "dispBp 3, nSources 4 and kE4 10000 in every report"
         ),
         "tObs": [int(t) for t in t_obs],
         "sigma15E9": [sigma_e9_from_per_sqrt_s(float(x)) for x in s15],
@@ -2241,7 +2254,10 @@ def main() -> None:
         "devPips": [int(round(float(x))) for x in dev],
     }
     write_json(OUT, out)
-    print(f"{len(t_obs)} reports, fork block {out['forkBlock']}, peak sigma5 {max(out['sigma5E9'])}")
+    print(
+        f"{len(t_obs)} reports, fork block {out['forkBlock']}, sigma from {estimator}, "
+        f"peak sigma5 {max(out['sigma5E9'])}"
+    )
 
 
 if __name__ == "__main__":
@@ -2251,7 +2267,7 @@ if __name__ == "__main__":
 - [ ] **Step 2: Run it**
 
 Run (from `lab/`): `uv run python scripts/export_fork_reports.py`
-Expected: `180 reports, fork block …, peak sigma5 …`.
+Expected: `180 reports, fork block …, sigma from <sigmaEstimator>, peak sigma5 …`.
 
 - [ ] **Step 3: Commit**
 
@@ -2413,8 +2429,18 @@ contract ForkRun is Script {
         }
     }
 
+    /// @dev The reports must come from the estimator the parameters name (lab/scripts/export_fork_reports.py).
+    function _checkEstimator(string memory r) internal view returns (string memory estimator) {
+        estimator = vm.readFile(PARAMS).readString(".sigmaEstimator");
+        require(
+            keccak256(bytes(r.readString(".sigmaEstimator"))) == keccak256(bytes(estimator)),
+            "reports and params name different estimators: rerun lab/scripts/export_fork_reports.py"
+        );
+    }
+
     function run() external {
         string memory r = vm.readFile(REPORTS);
+        string memory estimator = _checkEstimator(r);
         uint256[] memory tObs = r.readUintArray(".tObs");
         uint256[] memory s15 = r.readUintArray(".sigma15E9");
         uint256[] memory s5 = r.readUintArray(".sigma5E9");
@@ -2465,6 +2491,8 @@ contract ForkRun is Script {
         vm.serializeAddress(o, "hook", HOOK);
         vm.serializeBytes32(o, "poolId", POOL_ID);
         vm.serializeAddress(o, "climPoker", address(poker));
+        vm.serializeString(o, "sigmaEstimator", estimator);
+        vm.serializeUint(o, "etaE4", vm.readFile(PARAMS).readUint(".etaE4"));
         vm.serializeUint(o, "t", tArr);
         vm.serializeUint(o, "pokedPips", pokedArr);
         vm.serializeUint(o, "currentFee0For1Pips", fee01Arr);
@@ -2489,7 +2517,7 @@ set -a; source .env; set +a
 : "${RH_MAINNET_RPC_URL:?set RH_MAINNET_RPC_URL (archive RPC) in contracts/.env}"
 BLOCK=$(jq -r .forkBlock ../docs/evidence/fork-reports-2026-10-07.json)
 forge script script/v2/ForkRun.s.sol:ForkRun --fork-url "$RH_MAINNET_RPC_URL" --fork-block-number "$BLOCK" -vv
-jq '{pokes: (.pokedPips | length), maxPokedPips: (.pokedPips | max), swaps: (.swapFeePips | length), swapReverts}' \
+jq '{sigmaEstimator, etaE4, pokes: (.pokedPips | length), minPokedPips: (.pokedPips | min), maxPokedPips: (.pokedPips | max), swaps: (.swapFeePips | length), swapReverts}' \
   ../docs/evidence/fork-run-2026-10-07.json
 ```
 
@@ -2506,7 +2534,7 @@ In the root `package.json`, add to `scripts`:
 - [ ] **Step 4: Run it**
 
 Run (from the repository root): `npm run demo:fork`
-Expected: the forge script completes and the summary prints `pokes: 180`, a `maxPokedPips` above 700, `swaps: 36` and `swapReverts: 0`. If `swapReverts` is 36, Fables gates direct swaps (see Task 6 Step 3): the run's evidence is then the `currentFee` series, and the session log and the app say so.
+Expected: the forge script completes and the summary prints `sigmaEstimator` and `etaE4` as in `shared/params-fables.json`, `pokes: 180`, a `minPokedPips` of 700 and a `maxPokedPips` above 700, `swaps: 36` and `swapReverts: 0`. The script stops with "reports and params name different estimators" if the reports were exported for another estimator. If `swapReverts` is 36, Fables gates direct swaps (see Task 6 Step 3): the run's evidence is then the `currentFee` series, and the session log and the app say so.
 
 - [ ] **Step 5: Check the evidence against the hook's rule**
 

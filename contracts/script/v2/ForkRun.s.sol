@@ -141,8 +141,18 @@ contract ForkRun is Script {
         }
     }
 
+    /// @dev The reports must come from the estimator the parameters name (lab/scripts/export_fork_reports.py).
+    function _checkEstimator(string memory r) internal view returns (string memory estimator) {
+        estimator = vm.readFile(PARAMS).readString(".sigmaEstimator");
+        require(
+            keccak256(bytes(r.readString(".sigmaEstimator"))) == keccak256(bytes(estimator)),
+            "reports and params name different estimators: rerun lab/scripts/export_fork_reports.py"
+        );
+    }
+
     function run() external {
         string memory r = vm.readFile(REPORTS);
+        string memory estimator = _checkEstimator(r);
         uint256[] memory tObs = r.readUintArray(".tObs");
         uint256[] memory s15 = r.readUintArray(".sigma15E9");
         uint256[] memory s5 = r.readUintArray(".sigma5E9");
@@ -193,6 +203,8 @@ contract ForkRun is Script {
         vm.serializeAddress(o, "hook", HOOK);
         vm.serializeBytes32(o, "poolId", POOL_ID);
         vm.serializeAddress(o, "climPoker", address(poker));
+        vm.serializeString(o, "sigmaEstimator", estimator);
+        vm.serializeUint(o, "etaE4", vm.readFile(PARAMS).readUint(".etaE4"));
         vm.serializeUint(o, "t", tArr);
         vm.serializeUint(o, "pokedPips", pokedArr);
         vm.serializeUint(o, "currentFee0For1Pips", fee01Arr);
