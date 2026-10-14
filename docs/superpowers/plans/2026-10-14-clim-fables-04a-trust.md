@@ -2514,12 +2514,14 @@ Expected: the push succeeds.
 
 - [ ] **Step 3: Watch the run**
 
-Run: `gh run list --workflow ci.yml --limit 1 && gh run watch $(gh run list --workflow ci.yml --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status`
-Expected: the three jobs `contracts (forge)`, `lab (pytest)`, `shared, bots, integrate, cre (bun)` end `success`, and the command exits 0. Read the counts with `gh run view --log | grep -E "tests passed|passed,| pass$| skip$"`: contracts `163 tests passed, 0 failed, 4 skipped`, lab `157 passed, 8 skipped`, bots `133 pass` and `1 skip`, CRE `59 pass`. If a job fails only on Linux, fix it test first, commit, push, and watch again.
+The clone has two remotes (`origin` is `gamween/clim-fables`, `upstream` is `DVB-ANS/clim`) and `gh` picks `upstream` by default, so every `gh` command names the repository.
+
+Run: `gh run list -R gamween/clim-fables --workflow ci.yml --limit 1 && gh run watch -R gamween/clim-fables $(gh run list -R gamween/clim-fables --workflow ci.yml --limit 1 --json databaseId --jq '.[0].databaseId') --exit-status`
+Expected: the three jobs `contracts (forge)`, `lab (pytest)`, `shared, bots, integrate, cre (bun)` end `success`, and the command exits 0. Read the counts with `gh run view -R gamween/clim-fables <run id> --log | grep -E "tests passed|passed,| pass$| skip$"`: contracts `163 tests passed, 0 failed, 4 skipped`, lab `157 passed, 8 skipped`, bots `133 pass` and `1 skip`, CRE `59 pass`. If a job fails only on Linux, fix it test first, commit, push, and watch again.
 
 - [ ] **Step 4: Close the gate**
 
-In the master plan Task 5, tick `- [x] Execute 04a.`, add to the session log `- (ci) First GitHub Actions run on main: <run URL>, all three jobs green.` with the URL `gh run list --workflow ci.yml --limit 1 --json url --jq '.[0].url'` prints, then:
+In the master plan Task 5, tick `- [x] Execute 04a.`, add to the session log `- (ci) First GitHub Actions run on main: <run URL>, all three jobs green.` with the URL `gh run list -R gamween/clim-fables --workflow ci.yml --limit 1 --json url --jq '.[0].url'` prints, then:
 
 ```bash
 git add docs/superpowers/plans/2026-10-13-clim-fables-00-master.md "docs/sessions/$(date -u +%F).md"

@@ -123,7 +123,7 @@ git push
 ### Task 5: Write and execute plan 04 (trust, then the app)
 
 - [x] Write `docs/superpowers/plans/2026-10-14-clim-fables-04a-trust.md` (Part A, everything except the app). It owns, for the CTO checklist (spec §5.8): `docs/security.md` (threat model of `RiskDeskV2`, `ClimFeePolicy`, `ClimPoker`, `PokeFeeHook` and the CRE path, each failure mode with the fee that results and the test that proves it), `docs/integrate/` (level 1 `keeper-read.ts`; level 2 `level2-batch.ts` and its JSON, sent to Fables' AccessManager on the fork by `contracts/test/fork/Level2Batch.t.sol`), gas per poke and per report with the desk's cadence, generated from `docs/evidence/gas-robinhood-testnet.json` by `live:cost-doc`, the GitHub Actions CI (forge, lab, shared, bots, integrate and CRE tests, typecheck, format), and the README rewrite with "Verify in 10 minutes".
-- [ ] Execute 04a. Gate: every task's checks pass, and the CI run on `main` is green on GitHub.
+- [x] Execute 04a. Gate: every task's checks pass, and the CI run on `main` is green on GitHub.
 - [ ] Write plan 04b (the showcase app) once the maintainer has provided captures of Fables' app. Its Task 1 is the Fables UI inventory (every page, component, state, motion and copy pattern of fables.fi and its app, from the maintainer's captures and the browser, screenshots kept in `.local/`, no wallet connected), written to `docs/research/fables-ui-inventory.md`. Inputs: spec §2 (Fables look), §5.5, §5.8, the brand files in `.local/research-2026-10-13/fables-brand/`, the captures. It adds the app's tests and lint to CI and the app's row to the README.
 - [ ] Execute 04b. Gate as in the table above.
 
