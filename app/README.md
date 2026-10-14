@@ -6,9 +6,9 @@ Routes: `/` (landing), `/markets` (with a Fee source column), `/markets/eth` (Fa
 
 ## Data
 
-- **Live, read only.** Robinhood Chain mainnet (Fables' pool: `currentFee`, `StateView`, `FeePoked` and `Swap` logs) and testnet (clim's `ClimFeePolicy` through `docs/integrate/keeper-read.ts`, `RiskDeskV2`, `ClimPoker` and the pools' hook), over the public RPCs, three blocks behind the head, with retries and batches of at most 50 calls. Log windows start at the exact block of their first second (the RPCs return logs without timestamps). Every number read from a chain carries `data-live`; `npm run check:live` re-reads each one at its block.
+- **Live, read only.** Robinhood Chain mainnet (Fables' pool: `currentFee`, `StateView`, `FeePoked` and `Swap` logs) and testnet (clim's `ClimFeePolicy` through `docs/integrate/keeper-read.ts`, `RiskDeskV2`, `ClimPoker` and the pools' hook), over the public RPCs, three blocks behind the head, with retries and batches of at most 50 calls. Log windows start at the exact block of their first second (the RPCs return logs without timestamps). Every number read from a chain carries `data-live`; `npm run check:live` re-reads each one at its block. Log histories (the 24-hour windows of overrides, reports and swaps) are read by the server too: `/api/history/<series>` keeps each in memory, tops it up in the background once older than 20 s and lets the CDN serve it for 30 s, stale while it refreshes; the browser shows it at once and tops it up from the chain with the newer blocks (`src/lib/chain/series.ts`, `seed.ts`). The 7-day keeper series stays a browser read.
 - **Synced at build time.** `npm run sync` copies `shared/` into `src/vendor/shared/` (imported as `@clim/shared`), `docs/integrate/keeper-read.ts` into `src/vendor/integrate/`, and the evidence, lab framing strings, integration tables, failure modes and outage snapshot into `src/generated/`. Commit the result: Vercel uploads `app/` only. `npm run sync:check` (CI) fails when a copy is stale.
-- **Fables' brand files** (logo, art, Louize, Inter) are not in git: `npm run fables-assets` copies them from the maintainer's local kit into `public/fables/` before a local run or a deploy. Without them the app builds and runs with fallback fonts and no logo.
+- **Fables' brand files** (logo, art, favicon, Louize, Inter) are not in git: `npm run fables-assets` copies them from the maintainer's local kit into `public/fables/` before a local run or a deploy. Without them the app builds and runs with fallback fonts and no logo.
 
 ## Run
 
@@ -23,9 +23,10 @@ Routes: `/` (landing), `/markets` (with a Fee source column), `/markets/eth` (Fa
     npm run typecheck
     npm run lint
     npm run build && npm run check:bundle
-    npm run e2e:guardrails  # every route: banner, identity, no wallet, read-only RPC methods
+    npm run e2e:guardrails  # every route at 1470 and 390 px: banner, identity, title, noindex, no wallet, read-only RPC methods
     npm run check:live      # every live number against the chain (BASE_URL=... for a deployment)
-    npm run qa:visual       # screenshots next to Fables' in ../.local/app-qa/, token checklist
+    npm run qa:visual       # screenshots next to Fables' in ../.local/app-qa/, token checklist, 390 px overflow check
+    npm run perf            # load time per route on a cold browser (budget 2.5 s on /markets/eth, 3 s elsewhere)
 
 ## RPC limits
 

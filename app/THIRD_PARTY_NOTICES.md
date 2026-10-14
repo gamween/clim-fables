@@ -18,7 +18,8 @@ with Fables" banner, with no wallet connection and no transaction.
   this repository, and the app reads Fables' contracts through their published interface only.
 - **Name, logo and art.** The Fables name, the fox-and-star logo and mark, the landing landscape, the unicorn
   illustration and the USDG token mark come from Fables' public brand kit at
-  [fables.fi/brand](https://www.fables.fi/brand) (downloaded 2026-10-13). They belong to Fables. They are served by the
+  [fables.fi/brand](https://www.fables.fi/brand) (downloaded 2026-10-13); the favicon (`favicon.ico`) and
+  `apple-touch-icon.png` are the files fables.fi serves. They belong to Fables. They are served by the
   deployed showcase only, from `public/fables/`, which is not committed to the repository
   (`npm run fables-assets` copies them from the maintainer's local copy of the kit).
 - **Louize.** The display face is Louize Display Medium by 205TF, a commercial typeface, in the subset Fables serves
