@@ -1,0 +1,123 @@
+/* Fables' chart plot: 249 tall, dot grid, top and bottom fade; crosshair, dot and a 200 px tooltip on hover. */
+.plot {
+  position: relative;
+  height: var(--plot-h, 249px);
+  margin: 8px 0 0;
+  background-image: var(--dot-grid);
+  background-size: var(--dot-grid-size);
+  touch-action: pan-y;
+}
+.svg {
+  position: absolute;
+  inset: 0 0 22px 0;
+  width: 100%;
+  height: calc(100% - 22px);
+  overflow: visible;
+}
+.svg path {
+  vector-effect: non-scaling-stroke;
+}
+.reveal {
+  animation: reveal 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+}
+@keyframes reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+}
+.tick {
+  position: absolute;
+  bottom: 4px;
+  translate: -50% 0;
+  color: var(--ink-secondary);
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+.crosshair {
+  position: absolute;
+  top: 0;
+  bottom: 22px;
+  width: 1px;
+  background: var(--line-interactive);
+  pointer-events: none;
+}
+.dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  border: 2px solid var(--card);
+  pointer-events: none;
+}
+.tooltip {
+  position: absolute;
+  top: 8px;
+  min-width: 200px;
+  padding: 6px 8px 4px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+  pointer-events: none;
+  z-index: 5;
+  font-size: 12px;
+  line-height: 16px;
+}
+.tooltipHead {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.tooltipRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.tooltipLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-secondary);
+}
+.tooltipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.tooltipValue {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.loadingMark {
+  width: 56px;
+  height: 37px;
+  background: var(--ink);
+  mask: url("/fables/logo.svg") center / contain no-repeat;
+  animation: breathe 1.5s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.12;
+  }
+}
