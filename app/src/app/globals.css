@@ -1,0 +1,190 @@
+/* Fables' tokens, from the measured inventory (docs/research/fables-ui-inventory.md §4). The names follow Fables' own
+   CSS variable names; the values are re-typed from the measurements, no Fables stylesheet is copied. */
+
+@font-face {
+  font-family: "Louize";
+  src: url("/fables/fonts/louize-display-medium.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter";
+  src: url("/fables/fonts/inter.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Inter Fallback";
+  src: local("Arial");
+  size-adjust: 107.89%;
+}
+
+:root {
+  color-scheme: dark;
+  --canvas: #100f0f;
+  --card: #1a1919;
+  --surface: #1f1e1e;
+  --raised: #2a2828;
+  --raised-hover: #373434;
+  --ink: #ffffff;
+  --ink-secondary: #bcbbbb;
+  --ink-muted: #8f8e8e;
+  --ink-faint: #636161;
+  --line-light: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-interactive: rgba(255, 255, 255, 0.12);
+  --hover: rgba(255, 255, 255, 0.06);
+  --chip-fill: rgba(255, 255, 255, 0.09);
+  --skeleton: rgba(255, 255, 255, 0.12);
+  --brand: #ccff00;
+  --brand-fg: #201d1d;
+  --positive: #66c399;
+  --negative: #ff773d;
+  --accent: #55a7fb;
+  --focus-ring: rgba(85, 167, 251, 0.3);
+  --session: #d2a022;
+  --control-primary: #ffffff;
+  --control-primary-hover: #ebe9e9;
+  --claim-ground: #1e1e1b;
+
+  --shadow-table: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-pill: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-button: 0 2px 6px rgba(0, 0, 0, 0.45);
+  --shadow-menu: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 6px 32px rgba(0, 0, 0, 0.35);
+  --shadow-menu-flat: 0 6px 32px rgba(0, 0, 0, 0.35);
+  --shadow-control: 0 2px 4px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1);
+
+  --font-display: "Louize", serif;
+  --font-text: "Inter", "Inter Fallback", system-ui, sans-serif;
+
+  --s0: 2px;
+  --s1: 4px;
+  --s1-5: 6px;
+  --s2: 8px;
+  --s2-5: 10px;
+  --s3: 12px;
+  --s4: 16px;
+  --s4-5: 20px;
+  --s5: 24px;
+  --s5-5: 28px;
+  --s6: 32px;
+  --s7: 40px;
+  --s8: 64px;
+
+  --radius: 12px;
+  --radius-compact: 4px;
+  --radius-full: 9999px;
+  --radius-highlight: 9px;
+
+  --nav-h: 80px;
+  --banner-h: 40px;
+  --max-width: 1200px;
+  --gutter: 80px;
+  --row-gap: 8px;
+
+  --dot-grid: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  --dot-grid-size: 20px 20px;
+
+  --dur: 0.2s;
+  --dur-fast: 0.15s;
+  --dur-press: 0.1s;
+  --ease-std: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (max-width: 991px) {
+  :root {
+    --gutter: 32px;
+  }
+}
+@media (max-width: 575px) {
+  :root {
+    --nav-h: 60px;
+    --banner-h: 56px;
+    --gutter: 16px;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  overflow-x: clip;
+}
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-text);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: -0.22px;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "calt" off;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+button {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+a,
+button {
+  transition: scale var(--dur-press) var(--ease-std);
+}
+a:active,
+button:active {
+  scale: 0.99;
+}
+:focus-visible {
+  outline: 1px solid var(--accent);
+  box-shadow: 0 0 0 2px var(--focus-ring);
+  outline-offset: 0;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+code {
+  font-family: var(--font-text);
+}
+.tabular {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  a:active,
+  button:active {
+    scale: none;
+  }
+}
