@@ -280,4 +280,23 @@ contract ClimPokerTest is Test {
         vm.expectRevert(ClimPoker.InvalidConfig.selector);
         new ClimPoker(policy, address(hook), POOL, false, 600, address(0));
     }
+
+    /// @dev While the desk is blind, postEventAndPoke reverts with the poke (DeskBlind), but postEvent alone still
+    ///      records the event: the keeper pokes the hook directly meanwhile, and the first poke after the desk is back
+    ///      sends max(clim's fee, the event).
+    function test_WhileBlindTheKeeperCanStillPostAnEvent() public {
+        ClimPoker p = _poker(false);
+        vm.warp(T0 + 181);
+        vm.startPrank(keeper);
+        vm.expectRevert(ClimPoker.DeskBlind.selector);
+        p.postEventAndPoke(4_000, 4_000, T0 + 900);
+        p.postEvent(4_000, 4_000, T0 + 900);
+        vm.stopPrank();
+        desk.set(T0 + 200, SIGMA_48, SIGMA_48, 1_000, 0);
+        vm.warp(T0 + 200);
+        vm.prank(runner);
+        p.poke();
+        assertEq(hook.last0For1(), 4_000);
+        assertEq(hook.last1For0(), 4_000);
+    }
 }
