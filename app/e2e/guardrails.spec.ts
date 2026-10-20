@@ -3,7 +3,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { BANNER_TEXT, NO_WALLET_TEXT, ROUTES, SITE_NAME, SITE_TITLE } from "../src/lib/site";
+import { BANNER_TEXT, NO_WALLET_TEXT, OG_IMAGE, ROUTES, SITE_NAME, SITE_TITLE } from "../src/lib/site";
 
 /** JSON-RPC methods the app may send: reads only. */
 const READ_METHODS = new Set(["eth_call", "eth_getLogs", "eth_blockNumber", "eth_getBlockByNumber", "eth_chainId"]);
@@ -31,6 +31,11 @@ for (const route of [...ROUTES, "/no-such-page"]) {
     for (const sel of ['meta[property="og:title"]', 'meta[name="twitter:title"]', 'meta[property="og:site_name"]']) {
       expect((await page.locator(sel).getAttribute("content"))?.startsWith(SITE_NAME), sel).toBe(true);
     }
+    for (const sel of ['meta[property="og:image"]', 'meta[name="twitter:image"]']) {
+      expect(await page.locator(sel).first().getAttribute("content"), sel).toMatch(/\/fables\/og\.jpg$/);
+    }
+    // The repository is one click away on every route.
+    await expect(page.locator('[data-qa="repo-link"]')).toHaveAttribute("href", "https://github.com/gamween/clim-fables");
 
     const banner = page.locator('[data-guard="banner"]');
     await expect(banner).toBeVisible();
@@ -63,13 +68,13 @@ test("pool pages label their network", async ({ page }) => {
   }
 });
 
-test("robots.txt and Fables' favicon files are served", async ({ request }) => {
+test("robots.txt, Fables' favicon files and the social card are served", async ({ request }) => {
   // Fables' brand files are not in git (CI builds without them); a local build after `npm run fables-assets` and the
   // deployment have them.
   test.skip(!process.env.BASE_URL && !existsSync(join(__dirname, "../public/fables/favicon.ico")), "Fables' brand files are not in git");
   const robots = await request.get("/robots.txt");
   expect(await robots.text()).toBe("User-agent: *\nDisallow: /\n");
-  for (const path of ["/favicon.ico", "/apple-touch-icon.png"]) {
+  for (const path of ["/favicon.ico", "/apple-touch-icon.png", OG_IMAGE.url]) {
     const res = await request.get(path);
     expect(res.status(), path).toBe(200);
     expect(res.headers()["content-type"], path).toMatch(/image\//);

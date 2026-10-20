@@ -5,16 +5,19 @@ import { defineConfig } from "@playwright/test";
 // ("desktop"), and a 390 x 844 phone ("mobile", touch, for the guardrail and visual specs only).
 const external = process.env.BASE_URL;
 const PORT = 3311;
+const baseURL = external ?? `http://localhost:${PORT}`;
+// Every check starts with the entry notice acknowledged (it is modal); e2e/notice.spec.ts clears it to test the notice.
+const acknowledged = { cookies: [], origins: [{ origin: new URL(baseURL).origin, localStorage: [{ name: "clim-fables:notice-v1-acknowledged-at", value: String(Date.now()) }] }] };
 
 export default defineConfig({
   testDir: "e2e",
   timeout: 180_000,
   workers: 1,
   reporter: [["list"]],
-  use: { baseURL: external ?? `http://localhost:${PORT}`, browserName: "chromium" },
+  use: { baseURL, browserName: "chromium", storageState: acknowledged },
   projects: [
     { name: "desktop", use: { viewport: { width: 1470, height: 956 } } },
-    { name: "mobile", testMatch: /(guardrails|visual)\.spec\.ts$/, use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 } },
+    { name: "mobile", testMatch: /(guardrails|visual|notice)\.spec\.ts$/, use: { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 } },
   ],
   webServer: external ? undefined : { command: `npx next start -p ${PORT}`, url: `http://localhost:${PORT}/markets`, reuseExistingServer: !process.env.CI, timeout: 120_000 },
 });

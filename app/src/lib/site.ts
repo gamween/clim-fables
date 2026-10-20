@@ -1,14 +1,15 @@
 // The showcase's identity and guardrails (CLAUDE.md, spec §5.5). Tests import these strings: the banner, the nav
 // identity and the inert wallet pill are checked on every route.
 export const SITE_NAME = "clim × Fables";
-/** Fables' title, the same on every route of fables.fi (its bundle sets no per-route title), and its description. */
-export const FABLES_TITLE = "Fables - Dynamic fee ve(3,3) exchange on Uniswap v4";
-export const FABLES_DESCRIPTION = "Dynamic fee ve(3,3) exchange on Uniswap v4, building pair-specific markets. Live on Robinhood Chain.";
-/** The showcase's: Fables' with "clim × Fables" in place of "Fables", and the non-affiliation at the end. */
-export const SITE_TITLE = FABLES_TITLE.replace(/^Fables/, SITE_NAME);
-export const SITE_DESCRIPTION = `${FABLES_DESCRIPTION} Showcase by clim, not affiliated with Fables.`;
+/** One title on every route, as fables.fi does (its bundle sets no per-route title), but saying what clim is: a shared
+ *  link must not read as Fables' own product. The description ends with the non-affiliation. */
+export const SITE_TITLE = `${SITE_NAME} - A verifiable volatility desk for Fables' dynamic fees`;
+export const SITE_DESCRIPTION =
+  "A Chainlink CRE desk reads ETH on four exchanges every 30 s and posts a fee for Fables' pools on Robinhood Chain that anyone can recompute. Open source. Showcase by clim, not affiliated with Fables.";
+/** The social card, drawn by scripts/og-image.mjs from Fables' brand files (served from public/fables/, not committed). */
+export const OG_IMAGE = { url: "/fables/og.jpg", width: 2400, height: 1260, alt: "clim × Fables: Fables' keeper sets the fee, clim checks it in public. Showcase by clim, not affiliated with Fables." } as const;
 export const BANNER_TEXT = "Showcase by clim, not affiliated with Fables";
-export const BANNER_DETAIL = "Live data, read only. No wallet, no transaction.";
+export const BANNER_DETAIL = "Live data, read only. No wallet, no transaction. Not financial advice.";
 export const NO_WALLET_TEXT = "Showcase: no wallet";
 export const SITE_URL = "https://clim-fables.vercel.app";
 export const REPO_URL = "https://github.com/gamween/clim-fables";

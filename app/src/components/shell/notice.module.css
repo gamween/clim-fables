@@ -1,0 +1,197 @@
+/* Fables' dialog (the deposit flow's token picker): min(400 px), 16 px radius, surface, 1 px line, dimmed backdrop; its
+   bottom sheet's entrance (0.15 s, 8 px rise). The notice is wider (440 px) to keep its lines short. */
+.dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-menu-flat);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: enter var(--dur-fast) var(--ease-entrance);
+}
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+@keyframes enter {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open] {
+    animation: none;
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 16px 12px;
+}
+.mark {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line-light);
+  position: relative;
+}
+.mark::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 22px;
+  height: 15px;
+  background: var(--brand);
+  mask: url("/fables/logo.svg") center / contain no-repeat;
+}
+.title {
+  margin: 0;
+  font-family: var(--font-text);
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 500;
+}
+.intro {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 8px;
+  padding: 4px;
+  list-style: none;
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px;
+}
+.chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line-light);
+  color: var(--ink-secondary);
+}
+.itemTitle {
+  display: block;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+.itemBody {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+/* Fables' callout, "warn" tone (the session amber at 15 %). */
+.callout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--session) 15%, transparent);
+  color: var(--session);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.callout svg {
+  flex: none;
+  --icon-1: color-mix(in srgb, var(--session) 45%, transparent);
+  --icon-2: var(--session);
+}
+.callout a {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.foot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px 16px;
+}
+.accept {
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--control-primary);
+  color: var(--canvas);
+  box-shadow: var(--shadow-button);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease-std),
+    scale var(--dur-press) var(--ease-std);
+}
+.accept:hover {
+  background: var(--control-primary-hover);
+}
+.accept:active {
+  scale: 0.99;
+}
+.links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
+}
+.links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+.links a:hover {
+  color: var(--ink);
+}
+@media (max-width: 575px) {
+  .item {
+    padding: 8px 6px;
+  }
+}

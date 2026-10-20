@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { Banner } from "@/components/shell/Banner";
 import { Brand, NoWalletPill } from "@/components/shell/Header";
 import { metadata } from "@/app/layout";
-import { BANNER_TEXT, FABLES_TITLE, NO_WALLET_TEXT, ROUTES, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/site";
+import { BANNER_TEXT, NO_WALLET_TEXT, OG_IMAGE, ROUTES, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/site";
 import { RPC_URLS } from "@/lib/rpc";
 
 const APP = join(__dirname, "..");
@@ -89,15 +89,25 @@ describe("identity", () => {
 });
 
 describe("titles, indexing and icons", () => {
-  it("mirrors Fables' title with clim × Fables in place of Fables, everywhere a title is published", () => {
-    expect(FABLES_TITLE).toBe("Fables - Dynamic fee ve(3,3) exchange on Uniswap v4");
-    expect(SITE_TITLE).toBe(`${SITE_NAME} - Dynamic fee ve(3,3) exchange on Uniswap v4`);
+  it("publishes clim's own title, starting with clim × Fables, everywhere a title is published", () => {
+    expect(SITE_TITLE).toBe(`${SITE_NAME} - A verifiable volatility desk for Fables' dynamic fees`);
+    expect(SITE_TITLE).not.toMatch(/ve\(3,3\) exchange/);
     expect(metadata.title).toBe(SITE_TITLE);
     const og = metadata.openGraph as { title?: string; siteName?: string; description?: string };
     const tw = metadata.twitter as { title?: string; description?: string };
     for (const t of [og.title, og.siteName, tw.title]) expect(String(t).startsWith(SITE_NAME)).toBe(true);
     expect(SITE_DESCRIPTION.endsWith(" Showcase by clim, not affiliated with Fables.")).toBe(true);
     for (const d of [metadata.description, og.description, tw.description]) expect(d).toBe(SITE_DESCRIPTION);
+  });
+  it("shares as a large card whose image says it is a showcase", () => {
+    const og = metadata.openGraph as { images?: unknown[] };
+    const tw = metadata.twitter as { card?: string; images?: unknown[] };
+    expect(tw.card).toBe("summary_large_image");
+    expect(og.images).toEqual([OG_IMAGE]);
+    expect(tw.images).toEqual([OG_IMAGE]);
+    expect(OG_IMAGE.width / OG_IMAGE.height).toBeCloseTo(1200 / 630, 3);
+    expect(OG_IMAGE.alt).toContain("not affiliated with Fables");
+    expect(readFileSync(join(APP, "scripts/og-image.mjs"), "utf8")).toContain("Showcase by clim, not affiliated with Fables");
   });
   it("sets no page title of its own, so every route carries the site title as on Fables", () => {
     const pages = sourceFiles(join(APP, "src/app")).filter((f) => /page\.tsx$/.test(f) && readFileSync(f, "utf8").match(/\btitle\s*:/));
