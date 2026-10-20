@@ -36,6 +36,8 @@ with Fables" banner, with no wallet connection and no transaction.
 - [viem](https://viem.sh) (MIT, © weth, LLC), the only chain library in the app: public clients and ABI encoding.
   No wallet library is a dependency.
 - [Next.js](https://nextjs.org) and [React](https://react.dev) (MIT).
+- GitHub's mark, from [Primer Octicons](https://github.com/primer/octicons) (`mark-github`, MIT, © GitHub, Inc.), for the
+  links to the repository; the mark itself is GitHub's.
 - [react-markdown](https://github.com/remarkjs/react-markdown) and [remark-gfm](https://github.com/remarkjs/remark-gfm)
   (MIT, © Espen Hovlandsdal and Titus Wormer), for this page.
 

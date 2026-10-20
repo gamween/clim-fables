@@ -354,6 +354,7 @@
   margin-top: 96px;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 24px;
   color: var(--ink-muted);
   font-size: 12px;
@@ -483,4 +484,32 @@
   .menuPromo {
     display: none;
   }
+}
+
+/* The repository button sits in the slot of Fables' rewards chest. Under 390 px the header has no room for it; the
+   menu, the hero and the footer still link the repository there. */
+.repoButton {
+  flex: none;
+}
+@media (max-width: 575px) {
+  .repoButton {
+    width: 32px;
+    height: 32px;
+  }
+}
+@media (max-width: 389px) {
+  .repoButton {
+    display: none;
+  }
+}
+
+/* Fables' footer social icons (20 px, muted, white on hover). */
+.footerSocial {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-muted);
+  transition: color 0.15s;
+}
+.footerSocial:hover {
+  color: var(--ink);
 }

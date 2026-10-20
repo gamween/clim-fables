@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { EvidenceIcon, ExternalIcon, IntegrateIcon, MarketsIcon, MenuIcon, RunIcon } from "@/components/ui/icons";
+import { EvidenceIcon, ExternalIcon, GitHubIcon, IntegrateIcon, MarketsIcon, MenuIcon, RunIcon } from "@/components/ui/icons";
 import uiStyles from "@/components/ui/ui.module.css";
 import { FABLES_APP_URL, NAV, NO_WALLET_TEXT, REPO_URL, repoFile } from "@/lib/site";
 import { PromoMenuCard } from "./PromoToast";
@@ -34,6 +34,15 @@ export function NoWalletPill() {
       <span className={s.noWalletDot} aria-hidden />
       {NO_WALLET_TEXT}
     </span>
+  );
+}
+
+/** The slot of Fables' rewards chest (a 36 px icon button left of the menu): the repository, on every route. */
+export function RepoButton() {
+  return (
+    <a className={`${uiStyles.iconButton} ${s.repoButton}`} href={REPO_URL} target="_blank" rel="noreferrer" aria-label="Source code on GitHub" title="Source code on GitHub" data-qa="repo-link">
+      <GitHubIcon size={18} />
+    </a>
   );
 }
 
@@ -132,6 +141,7 @@ export function Header() {
         <NavPill pathname={pathname} />
         <div className={s.right}>
           <NoWalletPill />
+          <RepoButton />
           <Menu />
         </div>
       </div>

@@ -42,6 +42,15 @@ export const MenuIcon = (p: P) => (
     <path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
   </svg>
 );
+/** GitHub's mark (Primer Octicons `mark-github`, MIT), for the links to the repository. */
+export const GitHubIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path
+      fill="currentColor"
+      d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+    />
+  </svg>
+);
 export const MarketsIcon = (p: P) => (
   <svg {...base(p)}>
     <rect x="2" y="6" width="3" height="8" rx="1" fill="var(--icon-1, #636161)" />
@@ -67,11 +76,12 @@ export const RunIcon = (p: P) => (
     <path d="M6.5 5.5v5l4-2.5-4-2.5Z" fill="var(--icon-2, #8f8e8e)" />
   </svg>
 );
-export const EthMark = ({ size = 16 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden>
-    <circle cx="16" cy="16" r="16" fill="#2a2828" />
-    <path d="M16 5.5 9.5 16.3 16 20.1l6.5-3.8L16 5.5Z" fill="#bcbbbb" />
-    <path d="M16 21.4 9.5 17.6 16 26.5l6.5-8.9-6.5 3.8Z" fill="#8f8e8e" />
+/** ETH: white on Ethereum blue, as Fables draws it; grey for clim's test token (tETH); `bare` drops the disc (badges). */
+export const EthMark = ({ size = 16, test = false, bare = false }: { size?: number; test?: boolean; bare?: boolean }) => (
+  <svg width={size} height={size} viewBox={bare ? "8 4 16 24" : "0 0 32 32"} aria-hidden>
+    {bare ? null : <circle cx="16" cy="16" r="16" fill={test ? "#2a2828" : "#627eea"} />}
+    <path d="M16 5.5 9.5 16.3 16 20.1l6.5-3.8L16 5.5Z" fill={test ? "#bcbbbb" : "#ffffff"} />
+    <path d="M16 21.4 9.5 17.6 16 26.5l6.5-8.9-6.5 3.8Z" fill={test ? "#8f8e8e" : "#ffffff"} fillOpacity={test ? 1 : 0.8} />
   </svg>
 );
 

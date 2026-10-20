@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GitHubIcon } from "@/components/ui/icons";
 import { FABLES_APP_URL, REPO_URL, repoFile } from "@/lib/site";
 import s from "./shell.module.css";
 
@@ -44,8 +45,12 @@ export function Footer() {
         </div>
       </div>
       <div className={s.footerBottom}>
+        <span>Not financial advice</span>
         <span>MIT for clim&apos;s code</span>
         <span>Live data read from Robinhood Chain mainnet (Fables) and testnet (clim)</span>
+        <a className={s.footerSocial} href={REPO_URL} target="_blank" rel="noreferrer" aria-label="Source code on GitHub" title="Source code on GitHub">
+          <GitHubIcon size={20} />
+        </a>
       </div>
     </footer>
   );

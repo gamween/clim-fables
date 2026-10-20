@@ -52,6 +52,7 @@
 .subline {
   color: var(--ink-muted);
   font-weight: 500;
+  text-wrap: balance;
 }
 .subline a {
   color: var(--ink-secondary);

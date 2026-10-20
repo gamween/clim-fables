@@ -8,7 +8,7 @@ import { ArrowRightIcon, ExternalIcon, PulseIcon } from "@/components/ui/icons";
 import { useClimNow, useFablesNow } from "@/hooks/live";
 import { FABLES } from "@/lib/chain/fables";
 import { formatFeePct, formatInt } from "@/lib/format";
-import { repoFile } from "@/lib/site";
+import { REPO_URL } from "@/lib/site";
 import { deskBadge, MODE_NUMBER } from "@/lib/tiers";
 import s from "./landing.module.css";
 
@@ -38,9 +38,9 @@ export function Landing() {
             Fables&apos; keeper sets the fee. <span className={s.turn}>clim checks it in public.</span>
           </h1>
           <p className={s.subline}>
-            A Chainlink CRE desk reads ETH on four exchanges every 30 s and publishes a fee anyone can recompute.{" "}
-            <a href={repoFile("docs/integrate/README.md")} target="_blank" rel="noreferrer">
-              Read the integration guide <ExternalIcon size={14} />
+            A Chainlink CRE desk reads four exchanges every 30 s and posts a fee anyone can check.{" "}
+            <a href={REPO_URL} target="_blank" rel="noreferrer" data-qa="hero-repo-link">
+              Open source on GitHub <ExternalIcon size={14} />
             </a>
           </p>
         </div>
