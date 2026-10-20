@@ -1,16 +1,16 @@
 {
   "source": "bots/out/outages.json",
-  "generatedAt": "2026-10-14T16:59:12.741Z",
+  "generatedAt": "2026-10-20T20:21:17.789Z",
   "chainId": 46630,
   "riskDesk": "0x63f543430982685387C83e4ec55E5a26fd1371Ef",
   "gapSec": 90,
   "deployBlock": 134885665,
-  "scannedToBlock": 135191933,
-  "chainTimeSec": 1791997149,
-  "reportCount": 953,
+  "scannedToBlock": 139632994,
+  "chainTimeSec": 1792527672,
+  "reportCount": 13849,
   "lastReport": {
-    "seq": 953,
-    "tObs": 1791997120
+    "seq": 13849,
+    "tObs": 1792527650
   },
   "windows": [
     {
@@ -75,6 +75,852 @@
       "seqAfter": 283,
       "ongoing": false,
       "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792002162,
+      "to": 1792006392,
+      "durationSec": 4230,
+      "seqBefore": 1117,
+      "seqAfter": 1118,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, noise, outages, runner"
+    },
+    {
+      "from": 1792013477,
+      "to": 1792014443,
+      "durationSec": 966,
+      "seqBefore": 1351,
+      "seqAfter": 1352,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792014505,
+      "to": 1792015467,
+      "durationSec": 962,
+      "seqBefore": 1354,
+      "seqAfter": 1355,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792015526,
+      "to": 1792016540,
+      "durationSec": 1014,
+      "seqBefore": 1357,
+      "seqAfter": 1358,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792016540,
+      "to": 1792016822,
+      "durationSec": 282,
+      "seqBefore": 1358,
+      "seqAfter": 1359,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792016852,
+      "to": 1792017132,
+      "durationSec": 280,
+      "seqBefore": 1360,
+      "seqAfter": 1361,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792017162,
+      "to": 1792017427,
+      "durationSec": 265,
+      "seqBefore": 1362,
+      "seqAfter": 1363,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792017516,
+      "to": 1792017737,
+      "durationSec": 221,
+      "seqBefore": 1366,
+      "seqAfter": 1367,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792017737,
+      "to": 1792018020,
+      "durationSec": 283,
+      "seqBefore": 1367,
+      "seqAfter": 1368,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792018050,
+      "to": 1792018334,
+      "durationSec": 284,
+      "seqBefore": 1369,
+      "seqAfter": 1370,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792018334,
+      "to": 1792018616,
+      "durationSec": 282,
+      "seqBefore": 1370,
+      "seqAfter": 1371,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792018647,
+      "to": 1792018929,
+      "durationSec": 282,
+      "seqBefore": 1372,
+      "seqAfter": 1373,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792018959,
+      "to": 1792019237,
+      "durationSec": 278,
+      "seqBefore": 1374,
+      "seqAfter": 1375,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792019237,
+      "to": 1792019583,
+      "durationSec": 346,
+      "seqBefore": 1375,
+      "seqAfter": 1376,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792019612,
+      "to": 1792020129,
+      "durationSec": 517,
+      "seqBefore": 1377,
+      "seqAfter": 1378,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792020159,
+      "to": 1792020683,
+      "durationSec": 524,
+      "seqBefore": 1379,
+      "seqAfter": 1380,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792020713,
+      "to": 1792021654,
+      "durationSec": 941,
+      "seqBefore": 1381,
+      "seqAfter": 1382,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792021744,
+      "to": 1792022786,
+      "durationSec": 1042,
+      "seqBefore": 1385,
+      "seqAfter": 1386,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792022786,
+      "to": 1792023750,
+      "durationSec": 964,
+      "seqBefore": 1386,
+      "seqAfter": 1387,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792023779,
+      "to": 1792024334,
+      "durationSec": 555,
+      "seqBefore": 1388,
+      "seqAfter": 1389,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792024364,
+      "to": 1792025411,
+      "durationSec": 1047,
+      "seqBefore": 1390,
+      "seqAfter": 1391,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792025470,
+      "to": 1792026512,
+      "durationSec": 1042,
+      "seqBefore": 1393,
+      "seqAfter": 1394,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792026512,
+      "to": 1792027483,
+      "durationSec": 971,
+      "seqBefore": 1394,
+      "seqAfter": 1395,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792027513,
+      "to": 1792028009,
+      "durationSec": 496,
+      "seqBefore": 1396,
+      "seqAfter": 1397,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792028038,
+      "to": 1792029029,
+      "durationSec": 991,
+      "seqBefore": 1398,
+      "seqAfter": 1399,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792029088,
+      "to": 1792030024,
+      "durationSec": 936,
+      "seqBefore": 1401,
+      "seqAfter": 1402,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792037753,
+      "to": 1792038691,
+      "durationSec": 938,
+      "seqBefore": 1656,
+      "seqAfter": 1657,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792038691,
+      "to": 1792038858,
+      "durationSec": 167,
+      "seqBefore": 1657,
+      "seqAfter": 1658,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792038889,
+      "to": 1792039849,
+      "durationSec": 960,
+      "seqBefore": 1659,
+      "seqAfter": 1660,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792039979,
+      "to": 1792040947,
+      "durationSec": 968,
+      "seqBefore": 1664,
+      "seqAfter": 1665,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792040977,
+      "to": 1792041084,
+      "durationSec": 107,
+      "seqBefore": 1666,
+      "seqAfter": 1667,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792041084,
+      "to": 1792042027,
+      "durationSec": 943,
+      "seqBefore": 1667,
+      "seqAfter": 1668,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792042057,
+      "to": 1792046706,
+      "durationSec": 4649,
+      "seqBefore": 1669,
+      "seqAfter": 1670,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792058242,
+      "to": 1792058366,
+      "durationSec": 124,
+      "seqBefore": 2047,
+      "seqAfter": 2048,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, runner"
+    },
+    {
+      "from": 1792062509,
+      "to": 1792080399,
+      "durationSec": 17890,
+      "seqBefore": 2185,
+      "seqAfter": 2186,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, noise, outages, runner"
+    },
+    {
+      "from": 1792084755,
+      "to": 1792084847,
+      "durationSec": 92,
+      "seqBefore": 2330,
+      "seqAfter": 2331,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792092986,
+      "to": 1792102117,
+      "durationSec": 9131,
+      "seqBefore": 2595,
+      "seqAfter": 2596,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792123736,
+      "to": 1792123827,
+      "durationSec": 91,
+      "seqBefore": 3310,
+      "seqAfter": 3311,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792146550,
+      "to": 1792146913,
+      "durationSec": 363,
+      "seqBefore": 4058,
+      "seqAfter": 4059,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, outages, runner"
+    },
+    {
+      "from": 1792147669,
+      "to": 1792147791,
+      "durationSec": 122,
+      "seqBefore": 4084,
+      "seqAfter": 4085,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792150121,
+      "to": 1792150277,
+      "durationSec": 156,
+      "seqBefore": 4160,
+      "seqAfter": 4161,
+      "ongoing": false,
+      "reason": "RPC or network errors in keeper"
+    },
+    {
+      "from": 1792174684,
+      "to": 1792179447,
+      "durationSec": 4763,
+      "seqBefore": 4967,
+      "seqAfter": 4968,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792179447,
+      "to": 1792181973,
+      "durationSec": 2526,
+      "seqBefore": 4968,
+      "seqAfter": 4969,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792181973,
+      "to": 1792182584,
+      "durationSec": 611,
+      "seqBefore": 4969,
+      "seqAfter": 4970,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792182584,
+      "to": 1792182686,
+      "durationSec": 102,
+      "seqBefore": 4970,
+      "seqAfter": 4971,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792182801,
+      "to": 1792185054,
+      "durationSec": 2253,
+      "seqBefore": 4974,
+      "seqAfter": 4975,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792185054,
+      "to": 1792189845,
+      "durationSec": 4791,
+      "seqBefore": 4975,
+      "seqAfter": 4976,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792189932,
+      "to": 1792190985,
+      "durationSec": 1053,
+      "seqBefore": 4978,
+      "seqAfter": 4979,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792191044,
+      "to": 1792192028,
+      "durationSec": 984,
+      "seqBefore": 4981,
+      "seqAfter": 4982,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792192028,
+      "to": 1792192961,
+      "durationSec": 933,
+      "seqBefore": 4982,
+      "seqAfter": 4983,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792193084,
+      "to": 1792194122,
+      "durationSec": 1038,
+      "seqBefore": 4987,
+      "seqAfter": 4988,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792194181,
+      "to": 1792195192,
+      "durationSec": 1011,
+      "seqBefore": 4990,
+      "seqAfter": 4991,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792195222,
+      "to": 1792196340,
+      "durationSec": 1118,
+      "seqBefore": 4992,
+      "seqAfter": 4993,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792196340,
+      "to": 1792196624,
+      "durationSec": 284,
+      "seqBefore": 4993,
+      "seqAfter": 4994,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792196653,
+      "to": 1792196911,
+      "durationSec": 258,
+      "seqBefore": 4995,
+      "seqAfter": 4996,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792196941,
+      "to": 1792197117,
+      "durationSec": 176,
+      "seqBefore": 4997,
+      "seqAfter": 4998,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792197268,
+      "to": 1792198213,
+      "durationSec": 945,
+      "seqBefore": 5003,
+      "seqAfter": 5004,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792198273,
+      "to": 1792199203,
+      "durationSec": 930,
+      "seqBefore": 5006,
+      "seqAfter": 5007,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792199293,
+      "to": 1792200272,
+      "durationSec": 979,
+      "seqBefore": 5010,
+      "seqAfter": 5011,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792200301,
+      "to": 1792201310,
+      "durationSec": 1009,
+      "seqBefore": 5012,
+      "seqAfter": 5013,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792201340,
+      "to": 1792202314,
+      "durationSec": 974,
+      "seqBefore": 5014,
+      "seqAfter": 5015,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792205914,
+      "to": 1792206866,
+      "durationSec": 952,
+      "seqBefore": 5133,
+      "seqAfter": 5134,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792206897,
+      "to": 1792207855,
+      "durationSec": 958,
+      "seqBefore": 5135,
+      "seqAfter": 5136,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792207855,
+      "to": 1792208888,
+      "durationSec": 1033,
+      "seqBefore": 5136,
+      "seqAfter": 5137,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792208977,
+      "to": 1792209911,
+      "durationSec": 934,
+      "seqBefore": 5140,
+      "seqAfter": 5141,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792209911,
+      "to": 1792210942,
+      "durationSec": 1031,
+      "seqBefore": 5141,
+      "seqAfter": 5142,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792214532,
+      "to": 1792215498,
+      "durationSec": 966,
+      "seqBefore": 5260,
+      "seqAfter": 5261,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792215590,
+      "to": 1792216529,
+      "durationSec": 939,
+      "seqBefore": 5264,
+      "seqAfter": 5265,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792216529,
+      "to": 1792217563,
+      "durationSec": 1034,
+      "seqBefore": 5265,
+      "seqAfter": 5266,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792217713,
+      "to": 1792218580,
+      "durationSec": 867,
+      "seqBefore": 5271,
+      "seqAfter": 5272,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792222278,
+      "to": 1792222408,
+      "durationSec": 130,
+      "seqBefore": 5394,
+      "seqAfter": 5395,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792222438,
+      "to": 1792223028,
+      "durationSec": 590,
+      "seqBefore": 5396,
+      "seqAfter": 5397,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792223058,
+      "to": 1792224104,
+      "durationSec": 1046,
+      "seqBefore": 5398,
+      "seqAfter": 5399,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792224104,
+      "to": 1792225084,
+      "durationSec": 980,
+      "seqBefore": 5399,
+      "seqAfter": 5400,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792225114,
+      "to": 1792226105,
+      "durationSec": 991,
+      "seqBefore": 5401,
+      "seqAfter": 5402,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792226166,
+      "to": 1792227099,
+      "durationSec": 933,
+      "seqBefore": 5404,
+      "seqAfter": 5405,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792228011,
+      "to": 1792228535,
+      "durationSec": 524,
+      "seqBefore": 5435,
+      "seqAfter": 5436,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792228535,
+      "to": 1792231899,
+      "durationSec": 3364,
+      "seqBefore": 5436,
+      "seqAfter": 5437,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792237451,
+      "to": 1792237542,
+      "durationSec": 91,
+      "seqBefore": 5618,
+      "seqAfter": 5619,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792244343,
+      "to": 1792244434,
+      "durationSec": 91,
+      "seqBefore": 5841,
+      "seqAfter": 5842,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792300624,
+      "to": 1792300717,
+      "durationSec": 93,
+      "seqBefore": 7694,
+      "seqAfter": 7695,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792301081,
+      "to": 1792301172,
+      "durationSec": 91,
+      "seqBefore": 7707,
+      "seqAfter": 7708,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792392606,
+      "to": 1792401927,
+      "durationSec": 9321,
+      "seqBefore": 10716,
+      "seqAfter": 10717,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792403611,
+      "to": 1792408131,
+      "durationSec": 4520,
+      "seqBefore": 10773,
+      "seqAfter": 10774,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792410594,
+      "to": 1792418924,
+      "durationSec": 8330,
+      "seqBefore": 10853,
+      "seqAfter": 10854,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, noise, outages, runner"
+    },
+    {
+      "from": 1792424768,
+      "to": 1792425091,
+      "durationSec": 323,
+      "seqBefore": 11044,
+      "seqAfter": 11045,
+      "ongoing": false,
+      "reason": "processes stopped and restarted: arb, desk, keeper, noise, outages, runner"
+    },
+    {
+      "from": 1792433721,
+      "to": 1792446669,
+      "durationSec": 12948,
+      "seqBefore": 11321,
+      "seqAfter": 11322,
+      "ongoing": false,
+      "reason": "wall-clock gap seen by arb, desk, keeper, noise, outages, runner: the Mac was asleep or the processes were suspended"
+    },
+    {
+      "from": 1792497773,
+      "to": 1792500008,
+      "durationSec": 2235,
+      "seqBefore": 13010,
+      "seqAfter": 13011,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, noise, outages, runner"
+    },
+    {
+      "from": 1792500970,
+      "to": 1792501090,
+      "durationSec": 120,
+      "seqBefore": 13041,
+      "seqAfter": 13042,
+      "ongoing": false,
+      "reason": "RPC or network errors in keeper"
+    },
+    {
+      "from": 1792501190,
+      "to": 1792501363,
+      "durationSec": 173,
+      "seqBefore": 13045,
+      "seqAfter": 13046,
+      "ongoing": false,
+      "reason": "unknown: no local record (the CRE runs failed, or the Mac's records are missing)"
+    },
+    {
+      "from": 1792501956,
+      "to": 1792502047,
+      "durationSec": 91,
+      "seqBefore": 13066,
+      "seqAfter": 13067,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, runner"
+    },
+    {
+      "from": 1792502047,
+      "to": 1792502147,
+      "durationSec": 100,
+      "seqBefore": 13067,
+      "seqAfter": 13068,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, runner"
+    },
+    {
+      "from": 1792502703,
+      "to": 1792502818,
+      "durationSec": 115,
+      "seqBefore": 13085,
+      "seqAfter": 13086,
+      "ongoing": false,
+      "reason": "RPC or network errors in keeper"
+    },
+    {
+      "from": 1792503417,
+      "to": 1792504689,
+      "durationSec": 1272,
+      "seqBefore": 13100,
+      "seqAfter": 13101,
+      "ongoing": false,
+      "reason": "RPC or network errors in arb, keeper, outages, runner"
     }
   ]
 }
