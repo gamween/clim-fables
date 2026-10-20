@@ -118,7 +118,7 @@ git push
 ### Task 4: Write and execute plan 03 (desk and live pools)
 
 - [x] Write `docs/superpowers/plans/2026-10-13-clim-fables-03-live.md` with superpowers:writing-plans. Inputs: spec §5.2 and §5.7, `shared/params-fables.json`, the v2 ABIs exported by plan 02, the Robinhood facts in spec §2 (testnet 46630, forwarders, Uniswap v4 addresses, `ArbSys` block number caveat), the v1 CRE workflow in `cre/` and the v1 bots in `bots/`.
-- [x] Execute it. Gate as in the table above. Stopping the Sepolia bots: `pkill -f "cre-loop --pair live"; pkill -f "arb --pair live"; pkill -f "noise --pair live"; pkill -f "status --pair live"`. The live stack runs on the maintainer's Mac (his decision, 2026-10-14) as launchd LaunchAgents with outage handling and an outage record (plan 03 Task 23). The Mac's sleep stays managed by his own app (Pauline): nothing in this project restores or changes `pmset`.
+- [x] Execute it. Gate as in the table above. Stopping the Sepolia bots: `pkill -f "cre-loop --pair live"; pkill -f "arb --pair live"; pkill -f "noise --pair live"; pkill -f "status --pair live"`. The live stack runs on the maintainer's Mac (his decision, 2026-10-14) as launchd LaunchAgents with outage handling and an outage record (plan 03 Task 23). The Mac's sleep stays managed by his own app: nothing in this project restores or changes `pmset`.
 
 ### Task 5: Write and execute plan 04 (trust, then the app)
 

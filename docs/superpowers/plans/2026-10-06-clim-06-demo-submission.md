@@ -8,7 +8,7 @@
 
 **Tech Stack:** Node.js 22 (ES modules, `node:test`), pptxgenjs 4.0.1, viem 2.57.3, Python 3 via uv (matplotlib, Pillow, pytest), Figma (the slides, 3840 x 2160 frames exported at 1x), ffmpeg/ffprobe (video checks and re-encoding), Foundry `cast` (the live report count), LibreOffice run from its disk image (slide render), Microsoft PowerPoint for Mac (installed) for the final playback check, the `anthropic-skills:pptx` skill for deck QA, Google Drive (browser), Builderbase (submission platform), `gh`.
 
-All commands below use absolute paths because subagent shells reset their working directory. `CLIM` means `/Users/fianso/Development/hackathons/clim`.
+All commands below use absolute paths because subagent shells reset their working directory. `CLIM` means `~/Development/hackathons/clim`.
 
 ---
 
@@ -135,7 +135,7 @@ The test fixtures contain the numbers known on 2026-10-06 (P* = 10% runs; the pe
 
 Run:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && grep -n -E "^out/$|^app/out/$|^bots/out/\*$|^docs/submission/out/$" .gitignore
+cd ~/Development/hackathons/clim && grep -n -E "^out/$|^app/out/$|^bots/out/\*$|^docs/submission/out/$" .gitignore
 ```
 - If the output contains `out/` alone: plan 04 Task 1 has not run. Apply plan 04 Task 1 Step 4 exactly now (replace `out/` with `app/out/` in the `# Node / Next / Bun` block, and insert before `# OS` the block `# Bots: run logs stay local, except the CRE run log and the security demo records (submission evidence)` / `bots/out/*` / `!bots/out/cre-runs.jsonl` / `!bots/out/security-demos.jsonl`), and log it as plan 04 asks.
 - If it already shows `app/out/` and `bots/out/*`: go on.
@@ -148,7 +148,7 @@ In the `# Node / Next / Bun` block, add the line `docs/submission/out/` right af
 
 Run:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git check-ignore -v lab/out/backtest-summary.json; echo "exit=$?"; git check-ignore -v docs/submission/out/clim.pptx bots/out/cre-sim/x.log; git check-ignore bots/out/cre-runs.jsonl; echo "exit=$?"
+cd ~/Development/hackathons/clim && git check-ignore -v lab/out/backtest-summary.json; echo "exit=$?"; git check-ignore -v docs/submission/out/clim.pptx bots/out/cre-sim/x.log; git check-ignore bots/out/cre-runs.jsonl; echo "exit=$?"
 ```
 Expected:
 ```
@@ -211,14 +211,14 @@ exit=1
 
 Then install (this is a standalone npm package, outside the root Bun workspace, like `app/`):
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && npm install
+cd ~/Development/hackathons/clim/docs/submission && npm install
 ```
 Expected: `added <n> packages` and no error. `node_modules/` is already ignored by the root `.gitignore`.
 
 - [x] **Step 5: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add .gitignore docs/submission/package.json docs/submission/package-lock.json docs/submission/links.json docs/submission/team.json && git commit -m "chore(submission): scaffold submission tooling, ignore its build output"
+cd ~/Development/hackathons/clim && git add .gitignore docs/submission/package.json docs/submission/package-lock.json docs/submission/links.json docs/submission/team.json && git commit -m "chore(submission): scaffold submission tooling, ignore its build output"
 ```
 
 ---
@@ -552,7 +552,7 @@ test("mainScenarioGainPct reads the year attribution at the deployed P*, in % of
 
 - [x] **Step 2: Run them, expect FAIL**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/inputs.test.mjs test/lab.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/inputs.test.mjs test/lab.test.mjs`
 Expected: FAIL with `Cannot find module '.../docs/submission/src/inputs.mjs'` (`ERR_MODULE_NOT_FOUND`).
 
 - [x] **Step 3: Implement**
@@ -854,7 +854,7 @@ export function mainScenarioGainPct(backtest) {
 
 - [x] **Step 4: Run, expect PASS**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/inputs.test.mjs test/lab.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/inputs.test.mjs test/lab.test.mjs`
 Expected: `# pass 14`, `# fail 0`.
 
 - [x] **Step 5: Ask plan 03 for the three extra fields, then commit**
@@ -864,7 +864,7 @@ Append to today's session log:
 - **Interface (plan 06 -> plan 03):** `lab/out/backtest-summary.json` also carries `lpGainPctPerYear.volatileAssetHigh`, `lpGainPctPerYear.top5WeeksSharePct`, `inPoolVolGainSharePct {low, high}`, `replayWindowsMedianPct` and `replayWindowsBetterCount` (README, deck); the README and the deck also read `lab/out/validation.json`. Schemas otherwise as plan 03's "Output contracts".
 ```
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/src/paths.mjs docs/submission/src/inputs.mjs docs/submission/src/lab.mjs docs/submission/test docs/sessions && git commit -m "feat(submission): input loaders, lab schemas, address walker"
+cd ~/Development/hackathons/clim && git add docs/submission/src/paths.mjs docs/submission/src/inputs.mjs docs/submission/src/lab.mjs docs/submission/test docs/sessions && git commit -m "feat(submission): input loaders, lab schemas, address walker"
 ```
 
 ---
@@ -922,7 +922,7 @@ test("pipsToBp and floor crossover", () => {
 
 - [x] **Step 2: Run it, expect FAIL**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/fee.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/fee.test.mjs`
 Expected: FAIL with `Cannot find module '.../docs/submission/src/fee.mjs'`.
 
 - [x] **Step 3: Implement**
@@ -948,13 +948,13 @@ export function floorCrossoverAnnual({ etaE4, sqrtHalfDtE6, feeMinPips }) {
 
 - [x] **Step 4: Run, expect PASS**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/fee.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/fee.test.mjs`
 Expected: `# pass 5`, `# fail 0`. A failure here with `shared/src/units.ts` present means the shared mirror changed: the shared mirror and the contract are the reference, fix the expectation only after checking plan 04's test vectors, and log it.
 
 - [x] **Step 5: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/src/fee.mjs docs/submission/test/fee.test.mjs && git commit -m "feat(submission): fee helpers on the shared fee mirror"
+cd ~/Development/hackathons/clim && git add docs/submission/src/fee.mjs docs/submission/test/fee.test.mjs && git commit -m "feat(submission): fee helpers on the shared fee mirror"
 ```
 
 ---
@@ -1112,7 +1112,7 @@ test("replaceBlock swaps only the content between markers", () => {
 
 - [x] **Step 2: Run it, expect FAIL**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/readme-blocks.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/readme-blocks.test.mjs`
 Expected: FAIL with `Cannot find module '.../docs/submission/src/readme-blocks.mjs'`.
 
 - [x] **Step 3: Implement the renderer and the CLI**
@@ -1415,13 +1415,13 @@ console.log(`README.md updated: ${Object.keys(blocks).join(", ")}${missing.lengt
 
 - [x] **Step 4: Run, expect PASS**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/readme-blocks.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/readme-blocks.test.mjs`
 Expected: `# pass 10`, `# fail 0`.
 
 - [x] **Step 5: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/src/readme-blocks.mjs docs/submission/src/update-readme.mjs docs/submission/test/readme-blocks.test.mjs && git commit -m "feat(submission): generated README blocks (links, results, params, fees, deployments, evidence, team)"
+cd ~/Development/hackathons/clim && git add docs/submission/src/readme-blocks.mjs docs/submission/src/update-readme.mjs docs/submission/test/readme-blocks.test.mjs && git commit -m "feat(submission): generated README blocks (links, results, params, fees, deployments, evidence, team)"
 ```
 
 ---
@@ -1489,7 +1489,7 @@ process.exit(bad ? 1 : 0);
 
 - [x] **Step 2: Run it on the real repo**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run check; echo "exit=$?"`
+Run: `cd ~/Development/hackathons/clim/docs/submission && npm run check; echo "exit=$?"`
 Expected before Gate C: one line per input (OK, MISSING, or INVALID followed by the reasons) and `exit=1`. For example after plan 04 Task 6 (infrastructure addresses and the provisional `params.json` committed) and before plan 01 deploys:
 ```
 INVALID shared/deployments/sepolia.json
@@ -1507,7 +1507,7 @@ exit=1
 
 - [x] **Step 3: Check the final mode**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run check:final | grep -A3 links.json`
+Run: `cd ~/Development/hackathons/clim/docs/submission && npm run check:final | grep -A3 links.json`
 Expected (with `links.json` as of 2026-10-07: dashboard URL set and wired to Sepolia; the `liveMockData` check that printed a third line here was removed with the flag):
 ```
 INVALID docs/submission/links.json
@@ -1518,7 +1518,7 @@ INVALID docs/submission/links.json
 - [x] **Step 4: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/src/check-inputs.mjs && git commit -m "feat(submission): input checker CLI"
+cd ~/Development/hackathons/clim && git add docs/submission/src/check-inputs.mjs && git commit -m "feat(submission): input checker CLI"
 ```
 
 ---
@@ -1592,7 +1592,7 @@ test("redactUrls hides keys in RPC URLs", () => {
 
 - [x] **Step 2: Run it, expect FAIL**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/evidence.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/evidence.test.mjs`
 Expected: FAIL with `Cannot find module '.../docs/submission/src/evidence.mjs'`.
 
 - [x] **Step 3: Implement the helpers and the CLI**
@@ -1803,16 +1803,16 @@ process.exit(leaks || inHistory ? 1 : 0);
 
 - [x] **Step 4: Run, expect PASS, then the scan**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/evidence.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/evidence.test.mjs`
 Expected: `# pass 6`, `# fail 0`.
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run scan`
+Run: `cd ~/Development/hackathons/clim/docs/submission && npm run scan`
 Expected: `no .env secret in the patches of <c> commits (all refs)`, then `no .env secret in <n> tracked files (<m> secret values checked)`, and exit code 0 (the history pass was added on 2026-10-07, audit round 4: main is public and pushed as work goes on).
 
 - [x] **Step 5: End-to-end check on a local chain (no repo files touched)**
 
 This proves the CLI decodes real logs. It runs in a temporary copy of the tooling.
 ```bash
-T=$(mktemp -d) && mkdir -p $T/repo/shared/deployments $T/repo/bots/out/cre-sim $T/emitter/src && cp -R /Users/fianso/Development/hackathons/clim/docs/submission $T/repo/docs-submission-copy && mkdir -p $T/repo/docs && mv $T/repo/docs-submission-copy $T/repo/docs/submission
+T=$(mktemp -d) && mkdir -p $T/repo/shared/deployments $T/repo/bots/out/cre-sim $T/emitter/src && cp -R ~/Development/hackathons/clim/docs/submission $T/repo/docs-submission-copy && mkdir -p $T/repo/docs && mv $T/repo/docs-submission-copy $T/repo/docs/submission
 cat > $T/emitter/src/E.sol <<'SOL'
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
@@ -1843,7 +1843,7 @@ https://eth-sepolia.g.alchemy.com/v2/<redacted>
 - [x] **Step 6: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/src/evidence.mjs docs/submission/src/collect-evidence.mjs docs/submission/src/scan-secrets.mjs docs/submission/test/evidence.test.mjs && git commit -m "feat(submission): CRE evidence collector and secret scan"
+cd ~/Development/hackathons/clim && git add docs/submission/src/evidence.mjs docs/submission/src/collect-evidence.mjs docs/submission/src/scan-secrets.mjs docs/submission/test/evidence.test.mjs && git commit -m "feat(submission): CRE evidence collector and secret scan"
 ```
 
 ---
@@ -1888,7 +1888,7 @@ def test_fee_figure_is_1600x900(tmp_path):
 
 Run:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && uv run --no-project --with "matplotlib>=3.9,<3.11" --with "pillow>=10" --with "pytest>=8" pytest docs/submission/figures -q -p no:warnings --rootdir docs/submission/figures
+cd ~/Development/hackathons/clim && uv run --no-project --with "matplotlib>=3.9,<3.11" --with "pillow>=10" --with "pytest>=8" pytest docs/submission/figures -q -p no:warnings --rootdir docs/submission/figures
 ```
 Expected: FAIL, `ModuleNotFoundError: No module named 'fee_figure'`.
 
@@ -2046,14 +2046,14 @@ Run the same pytest command as Step 2. Expected: `1 passed` (`2 passed` before t
 
 Then draw the figure from the fixture and open it with the Read tool:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && mkdir -p docs/submission/out && uv run --no-project --with "matplotlib>=3.9,<3.11" python docs/submission/figures/fee_figure.py docs/submission/test/fixtures/replay.json docs/submission/out/fee-fixture.png
+cd ~/Development/hackathons/clim && mkdir -p docs/submission/out && uv run --no-project --with "matplotlib>=3.9,<3.11" python docs/submission/figures/fee_figure.py docs/submission/test/fixtures/replay.json docs/submission/out/fee-fixture.png
 ```
 Expected: `wrote docs/submission/out/fee-fixture.png`; the image shows a blue volatility line on top and an amber step line with a grey dashed flat line below, titled "4 February 2026: the storm arrives, the fee follows".
 
 - [x] **Step 5: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/figures && git commit -m "feat(submission): README fee figure and video title cards"
+cd ~/Development/hackathons/clim && git add docs/submission/figures && git commit -m "feat(submission): README fee figure and video title cards"
 ```
 
 ---
@@ -2173,13 +2173,13 @@ for f in "$V/demo-full.mp4" "$V/demo-stage.mp4"; do
 done
 ```
 
-Then: `chmod +x /Users/fianso/Development/hackathons/clim/docs/submission/scripts/build-video.sh`
+Then: `chmod +x ~/Development/hackathons/clim/docs/submission/scripts/build-video.sh`
 
 - [x] **Step 2: Test it on synthetic recordings**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && mkdir -p out/video/raw && for s in s11 s12 s13 s14 s16 s22 s31 s32; do ffmpeg -nostdin -y -v error -f lavfi -i "testsrc2=size=2880x1800:rate=60:duration=15" -c:v libx264 -preset ultrafast -pix_fmt yuv420p out/video/raw/$s.mov; done && for s in s15 s21; do ffmpeg -nostdin -y -v error -f lavfi -i "testsrc2=size=2880x1800:rate=60:duration=90" -c:v libx264 -preset ultrafast -pix_fmt yuv420p out/video/raw/$s.mov; done
-cd /Users/fianso/Development/hackathons/clim/docs/submission && uv run --no-project --with "pillow>=10" python figures/video_cards.py out/video/cards test/fixtures/replay.json && bash scripts/build-video.sh
+cd ~/Development/hackathons/clim/docs/submission && mkdir -p out/video/raw && for s in s11 s12 s13 s14 s16 s22 s31 s32; do ffmpeg -nostdin -y -v error -f lavfi -i "testsrc2=size=2880x1800:rate=60:duration=15" -c:v libx264 -preset ultrafast -pix_fmt yuv420p out/video/raw/$s.mov; done && for s in s15 s21; do ffmpeg -nostdin -y -v error -f lavfi -i "testsrc2=size=2880x1800:rate=60:duration=90" -c:v libx264 -preset ultrafast -pix_fmt yuv420p out/video/raw/$s.mov; done
+cd ~/Development/hackathons/clim/docs/submission && uv run --no-project --with "pillow>=10" python figures/video_cards.py out/video/cards test/fixtures/replay.json && bash scripts/build-video.sh
 ```
 Expected (sizes vary):
 ```
@@ -2187,19 +2187,19 @@ wrote 4 cards and 10 captions to out/video/cards
 out/video/demo-full.mp4  155.0 s  30 MB
 out/video/demo-stage.mp4  78.0 s  17 MB
 ```
-Then check the format: `ffprobe -v error -show_entries stream=width,height,r_frame_rate,pix_fmt,codec_name -of compact /Users/fianso/Development/hackathons/clim/docs/submission/out/video/demo-stage.mp4`
+Then check the format: `ffprobe -v error -show_entries stream=width,height,r_frame_rate,pix_fmt,codec_name -of compact ~/Development/hackathons/clim/docs/submission/out/video/demo-stage.mp4`
 Expected: `stream|codec_name=h264|width=1920|height=1080|pix_fmt=yuv420p|r_frame_rate=30/1`. Open `out/video/cover-stage.png` with the Read tool: test pattern, night-coloured side bars, caption pill at the bottom.
 
 - [x] **Step 3: Delete the synthetic files**
 
 ```bash
-rm -rf /Users/fianso/Development/hackathons/clim/docs/submission/out/video
+rm -rf ~/Development/hackathons/clim/docs/submission/out/video
 ```
 
 - [x] **Step 4: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/scripts/build-video.sh && git commit -m "feat(submission): ffmpeg pipeline for the full and stage demo cuts"
+cd ~/Development/hackathons/clim && git add docs/submission/scripts/build-video.sh && git commit -m "feat(submission): ffmpeg pipeline for the full and stage demo cuts"
 ```
 
 ---
@@ -2294,7 +2294,7 @@ test("deck refuses to build without videos unless allowed", async () => {
 
 - [x] **Step 2: Run it, expect FAIL**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/deck.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/deck.test.mjs`
 Expected: FAIL with `Cannot find module '.../docs/submission/deck/build-deck.mjs'`.
 
 - [x] **Step 3: Implement the style module**
@@ -2908,18 +2908,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
 - [x] **Step 7: Run, expect PASS, then the whole suite**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node --test test/deck.test.mjs`
+Run: `cd ~/Development/hackathons/clim/docs/submission && node --test test/deck.test.mjs`
 Expected: `# pass 4`, `# fail 0`.
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm test`
+Run: `cd ~/Development/hackathons/clim/docs/submission && npm test`
 Expected: `# pass 39`, `# fail 0`.
 
 - [x] **Step 8: QA a fixture deck with the pptx skill**
 
 Build a draft from the fixtures (no video yet) and validate it with the pptx skill's validator, found on disk (on this Mac it is under `~/.claude/skills/synced/.../pptx/scripts/office/validate.py`).
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && node --input-type=module -e "import('./deck/build-deck.mjs').then(({buildDeck}) => buildDeck({params:'test/fixtures/params.json',backtest:'test/fixtures/backtest-summary.json',replay:'test/fixtures/replay.json',validation:'test/fixtures/validation.json',links:'test/fixtures/links.json',team:'test/fixtures/team.json'}, 'out/clim-fixture.pptx', {allowMissingVideo:true})).then(f => console.log('wrote', f))"
-V=$(find ~/.claude -path '*pptx*/scripts/office/validate.py' -print -quit) && test -n "$V" && echo "validator: $V" && uv run --no-project --with defusedxml --with lxml python "$V" /Users/fianso/Development/hackathons/clim/docs/submission/out/clim-fixture.pptx
-uvx --from 'markitdown[pptx]' markitdown /Users/fianso/Development/hackathons/clim/docs/submission/out/clim-fixture.pptx > /Users/fianso/Development/hackathons/clim/docs/submission/out/clim-fixture.md && grep -c "Slide number" /Users/fianso/Development/hackathons/clim/docs/submission/out/clim-fixture.md
+cd ~/Development/hackathons/clim/docs/submission && node --input-type=module -e "import('./deck/build-deck.mjs').then(({buildDeck}) => buildDeck({params:'test/fixtures/params.json',backtest:'test/fixtures/backtest-summary.json',replay:'test/fixtures/replay.json',validation:'test/fixtures/validation.json',links:'test/fixtures/links.json',team:'test/fixtures/team.json'}, 'out/clim-fixture.pptx', {allowMissingVideo:true})).then(f => console.log('wrote', f))"
+V=$(find ~/.claude -path '*pptx*/scripts/office/validate.py' -print -quit) && test -n "$V" && echo "validator: $V" && uv run --no-project --with defusedxml --with lxml python "$V" ~/Development/hackathons/clim/docs/submission/out/clim-fixture.pptx
+uvx --from 'markitdown[pptx]' markitdown ~/Development/hackathons/clim/docs/submission/out/clim-fixture.pptx > ~/Development/hackathons/clim/docs/submission/out/clim-fixture.md && grep -c "Slide number" ~/Development/hackathons/clim/docs/submission/out/clim-fixture.md
 ```
 Expected: `wrote out/clim-fixture.pptx`, `validator: <path>`, `All validations PASSED!`, `22`. If no validator is found (the `find` prints nothing and the chain stops), skip validation and rely on markitdown and the visual pass of Step 9; log it.
 
@@ -2928,8 +2928,8 @@ Expected: `wrote out/clim-fixture.pptx`, `validator: <path>`, `All validations P
 LibreOffice is not installed on this Mac. Run it without installing it (checked on 2026-10-06 with 26.8.1; the download is about 300 MB): 
 ```bash
 D=$(mktemp -d) && curl -sSL -o $D/lo.dmg https://download.documentfoundation.org/libreoffice/stable/26.8.1/mac/aarch64/LibreOffice_26.8.1_MacOS_aarch64.dmg && mkdir -p $D/mnt && hdiutil attach -nobrowse -mountpoint $D/mnt $D/lo.dmg
-$D/mnt/LibreOffice.app/Contents/MacOS/soffice --headless --convert-to pdf --outdir /Users/fianso/Development/hackathons/clim/docs/submission/out /Users/fianso/Development/hackathons/clim/docs/submission/out/clim-fixture.pptx
-cd /Users/fianso/Development/hackathons/clim/docs/submission/out && find . -maxdepth 1 -name 'slide-*.jpg' -delete && pdftoppm -jpeg -r 80 clim-fixture.pdf slide && ls -1 "$PWD"/slide-*.jpg
+$D/mnt/LibreOffice.app/Contents/MacOS/soffice --headless --convert-to pdf --outdir ~/Development/hackathons/clim/docs/submission/out ~/Development/hackathons/clim/docs/submission/out/clim-fixture.pptx
+cd ~/Development/hackathons/clim/docs/submission/out && find . -maxdepth 1 -name 'slide-*.jpg' -delete && pdftoppm -jpeg -r 80 clim-fixture.pdf slide && ls -1 "$PWD"/slide-*.jpg
 ```
 If version 26.8.1 is gone, take the current one from https://download.documentfoundation.org/libreoffice/stable/. If the redirect lands on a slow mirror (on 2026-10-06 it picked one at about 35 KB/s), take a faster one from the same URL plus `.mirrorlist` (`https://mirror.fcix.net/tdf/libreoffice/stable/26.8.1/mac/aarch64/LibreOffice_26.8.1_MacOS_aarch64.dmg` ran at about 1 MB/s) and compare `shasum -a 256` with the URL plus `.sha256`. Shells reset between agent calls, so print `$D` and reuse the literal path. Keep `$D/mnt` mounted for Task 17 (`hdiutil detach $D/mnt` when done). `find ... -delete` replaces `rm -f slide-*.jpg`, which aborts in zsh when nothing matches.
 Open every image with the Read tool (or dispatch a subagent to look at them fresh) and fix in `slides.mjs`, never by hand: text overflow, overlaps, titles at different heights, low contrast, a number split from its unit. LibreOffice substitutes Calibri with Carlito (same metrics), so text fit is reliable. The "VIDEO MISSING" boxes on slides 6 and 21 are expected for this draft.
@@ -2939,7 +2939,7 @@ The references on slide 22 and in the README were checked: Kupiec (1995) is *The
 - [x] **Step 10: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/deck docs/submission/test/deck.test.mjs && git commit -m "feat(submission): pptx deck builder with native charts, embedded videos and notes"
+cd ~/Development/hackathons/clim && git add docs/submission/deck docs/submission/test/deck.test.mjs && git commit -m "feat(submission): pptx deck builder with native charts, embedded videos and notes"
 ```
 
 ---
@@ -3491,22 +3491,22 @@ own license:
 
 - [x] **Step 2: Render the draft with pending blocks**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && node src/update-readme.mjs --allow-missing`
-Expected: `README.md updated: links, results, params, fee-schedule, deployments, evidence, team (pending: deployments, params, backtest, replay, validation, evidence)` (the list shrinks as inputs appear; provisional parameters count as pending; without `lab/out/validation.json` the results block is still written, without the sentence on the significance of the gap). Then: `grep -c "_Pending:" /Users/fianso/Development/hackathons/clim/README.md` prints the number of blocks still pending (at most 5: results, params, fee-schedule, deployments, evidence).
+Run: `cd ~/Development/hackathons/clim/docs/submission && node src/update-readme.mjs --allow-missing`
+Expected: `README.md updated: links, results, params, fee-schedule, deployments, evidence, team (pending: deployments, params, backtest, replay, validation, evidence)` (the list shrinks as inputs appear; provisional parameters count as pending; without `lab/out/validation.json` the results block is still written, without the sentence on the significance of the gap). Then: `grep -c "_Pending:" ~/Development/hackathons/clim/README.md` prints the number of blocks still pending (at most 5: results, params, fee-schedule, deployments, evidence).
 
 - [x] **Step 3: Check the two mermaid diagrams render**
 
 GitHub renders mermaid natively; check locally before pushing. Install mermaid-cli in a throwaway folder and point it at the installed Chrome (no Chromium download):
 ```bash
 M=$(mktemp -d) && cd $M && npm init -y > /dev/null && PUPPETEER_SKIP_DOWNLOAD=1 npm install --silent @mermaid-js/mermaid-cli@11 && echo '{"executablePath":"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome","args":["--no-sandbox"]}' > pp.json
-awk '/^```mermaid/{f=1;n++;next} /^```/{if(f){f=0}} f{print > ("d" n ".mmd")}' /Users/fianso/Development/hackathons/clim/README.md && for d in d1 d2; do ./node_modules/.bin/mmdc -p pp.json -i $d.mmd -o $d.png -w 1600 -b white; done && ls -1 $M/d*.png
+awk '/^```mermaid/{f=1;n++;next} /^```/{if(f){f=0}} f{print > ("d" n ".mmd")}' ~/Development/hackathons/clim/README.md && for d in d1 d2; do ./node_modules/.bin/mmdc -p pp.json -i $d.mmd -o $d.png -w 1600 -b white; done && ls -1 $M/d*.png
 ```
 Expected: `Generating single mermaid chart` twice and two PNG paths. Open them with the Read tool: `d1.png` is the architecture flowchart (four weather stations, the CRE risk desk, RiskDesk, ClimHook, the PoolManager and the dashboard), `d2.png` a 4-participant sequence diagram.
 
 - [x] **Step 4: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add README.md && git commit -m "docs: judge-facing README with generated blocks"
+cd ~/Development/hackathons/clim && git add README.md && git commit -m "docs: judge-facing README with generated blocks"
 ```
 
 ---
@@ -3649,7 +3649,7 @@ A Chainlink judge suggested it at the booth on 7 October 2026: the fee should al
 
 - [x] **Step 2: Check the anchors the README and the mentor message use**
 
-Run: `grep -n "^## Can a pool that is already live switch to clim?" /Users/fianso/Development/hackathons/clim/docs/faq.md`
+Run: `grep -n "^## Can a pool that is already live switch to clim?" ~/Development/hackathons/clim/docs/faq.md`
 Expected: one line. GitHub turns it into the anchor `#can-a-pool-that-is-already-live-switch-to-clim`.
 
 - [x] **Step 3: Log and commit**
@@ -3659,7 +3659,7 @@ Append to today's session log (`docs/sessions/$(date +%F).md`; create it with th
 - **Mentor Q1 and Q2 answered:** `docs/faq.md` ("Who changes the fee, and how?", "Can a pool that is already live switch to clim?"), checked against v4-core and OpenZeppelin uniswap-hooks v1.2.1 source.
 ```
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/faq.md docs/sessions && git commit -m "docs: FAQ answering how the fee is set and whether a live pool can switch"
+cd ~/Development/hackathons/clim && git add docs/faq.md docs/sessions && git commit -m "docs: FAQ answering how the fee is set and whether a live pool can switch"
 ```
 
 ---
@@ -3691,7 +3691,7 @@ Done 2026-10-07: `liveMockData` removed, README regenerated (commit `4060cfc`); 
 
 - [x] **Step 3: Check every input**
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run check; echo "exit=$?"`
+Run: `cd ~/Development/hackathons/clim/docs/submission && npm run check; echo "exit=$?"`
 Expected:
 ```
 OK      shared/deployments/sepolia.json
@@ -3712,7 +3712,7 @@ Done 2026-10-07 (07:16 SGT, at `6257b71`): exactly this output, seven `OK`, the 
 
 Plan 04's `status` script compares the deployed hook's `quoteFee()` with the shared fee mirror computed from `shared/params.json` and the desk state:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/bots && bun run status --pair live; echo "exit=$?"
+cd ~/Development/hackathons/clim/bots && bun run status --pair live; echo "exit=$?"
 ```
 Expected: the pool, desk and hook lines and `exit=0`. A hook/mirror mismatch (exit code 1) means `shared/params.json` does not describe the deployed hook: stop and fix it before anything is generated.
 
@@ -3721,7 +3721,7 @@ Done 2026-10-07 (07:16 SGT): `exit=0`, no `PROBLEM` line; at block 11859036 the 
 - [x] **Step 5: Log the freeze and commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && P=$(node -p "require('./shared/params.json').pStar") && echo "- **Freeze:** deployments and parameters frozen for the submission at commit $(git rev-parse --short HEAD) (P* = $P). No redeploy after this line." >> docs/sessions/$(date +%F).md && git add docs/submission/links.json docs/submission/team.json docs/sessions && git commit -m "chore(submission): freeze deployments, set live URL and team"
+cd ~/Development/hackathons/clim && P=$(node -p "require('./shared/params.json').pStar") && echo "- **Freeze:** deployments and parameters frozen for the submission at commit $(git rev-parse --short HEAD) (P* = $P). No redeploy after this line." >> docs/sessions/$(date +%F).md && git add docs/submission/links.json docs/submission/team.json docs/sessions && git commit -m "chore(submission): freeze deployments, set live URL and team"
 ```
 
 Done 2026-10-07: `links.json` (live URL, `4060cfc`) and `team.json` (solo, `ad0310c`) were already committed; the deployments last changed in `b791761` (replay suite) and the parameters in `62d01be` (P\* = 0.3). The freeze line, at commit `6257b71`, is a line of the plan checkbox pass, appended to the 2026-10-07 session log with the other lines of that pass rather than with the command above.
@@ -3738,14 +3738,14 @@ Done 2026-10-07: `links.json` (live URL, `4060cfc`) and `team.json` (solo, `ad03
 
 - [x] **Step 1: Check the transcripts exist**
 
-Run: `ls -t /Users/fianso/Development/hackathons/clim/bots/out/cre-sim/*.log | head -5`
+Run: `ls -t ~/Development/hackathons/clim/bots/out/cre-sim/*.log | head -5`
 Expected: recent `live-<run start>.log` files written by plan 04's `bun run cre-loop` (one transcript per `cre workflow simulate` run). The collector reads this folder by default; pass `--logs <path relative to the repo root>` in Step 2 if they are elsewhere.
 
 Done 2026-10-07 (07:16 SGT): 1,246 transcripts in `bots/out/cre-sim/`, the newest `live-2026-10-06T23-16-18Z.log`, one every 30 s.
 
 - [x] **Step 2: Collect** Done 2026-10-07 (10:09 UTC): 2,025 live and 459 replay `RiskReported` events, four `REPORT applied` transcripts kept (runs that printed the read-back's false `NOT APPLIED` dropped), `docs/evidence/README.md` written, README regenerated with no pending block but the deck and video links, `bots/out/cre-runs.jsonl` and `security-demos.jsonl` committed.
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && SEPOLIA_RPC_URL=https://sepolia.gateway.tenderly.co npm run evidence`
+Run: `cd ~/Development/hackathons/clim/docs/submission && SEPOLIA_RPC_URL=https://sepolia.gateway.tenderly.co npm run evidence`
 (The Tenderly gateway serves the full log history; publicnode answers `pruned history unavailable` for logs older than about 10,000 blocks, about 33 h, measured by plan 05.)
 Expected (counts differ):
 ```
@@ -3781,10 +3781,10 @@ To reproduce, see [Getting started](../../README.md#getting-started) in the main
 
 - [x] **Step 5: Regenerate the README and commit** Done 2026-10-07 (10:09 UTC): 2,025 live and 459 replay `RiskReported` events, four `REPORT applied` transcripts kept (runs that printed the read-back's false `NOT APPLIED` dropped), `docs/evidence/README.md` written, README regenerated with no pending block but the deck and video links, `bots/out/cre-runs.jsonl` and `security-demos.jsonl` committed.
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run readme`
+Run: `cd ~/Development/hackathons/clim/docs/submission && npm run readme`
 Expected: `README.md updated: links, results, params, fee-schedule, deployments, evidence, team`.
 ```bash
-cd /Users/fianso/Development/hackathons/clim && P=(docs/evidence README.md bots/out/cre-runs.jsonl) && { [ ! -f bots/out/security-demos.jsonl ] || P+=(bots/out/security-demos.jsonl); } && git add "${P[@]}" && git commit -m "docs(evidence): CRE reports on Sepolia, simulate transcripts and run records" -- "${P[@]}"
+cd ~/Development/hackathons/clim && P=(docs/evidence README.md bots/out/cre-runs.jsonl) && { [ ! -f bots/out/security-demos.jsonl ] || P+=(bots/out/security-demos.jsonl); } && git add "${P[@]}" && git commit -m "docs(evidence): CRE reports on Sepolia, simulate transcripts and run records" -- "${P[@]}"
 ```
 
 ---
@@ -3801,20 +3801,20 @@ cd /Users/fianso/Development/hackathons/clim && P=(docs/evidence README.md bots/
 - [x] **Step 1: Draw it**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && mkdir -p docs/media && uv run --no-project --with "matplotlib>=3.9,<3.11" python docs/submission/figures/fee_figure.py lab/out/replay-2026-02-04.json docs/media/fee-follows-weather.png
+cd ~/Development/hackathons/clim && mkdir -p docs/media && uv run --no-project --with "matplotlib>=3.9,<3.11" python docs/submission/figures/fee_figure.py lab/out/replay-2026-02-04.json docs/media/fee-follows-weather.png
 ```
 Expected: `wrote docs/media/fee-follows-weather.png`. Open it with the Read tool: the amber step line must rise and fall with the blue volatility line, and the grey dashed line must be flat. If the fee line sits on the floor the whole time, the replay was computed at other parameters than `shared/params.json`: ask plan 03 to recompute.
 
 - [x] **Step 2: Regenerate and read the README as a judge would** **Done 2026-10-07 (end of session).** README regenerated at `69c9b4e` and after (no `_Pending:` block); read in full by six audit rounds (consistency and honesty lenses).
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run readme && grep -c "_Pending:" /Users/fianso/Development/hackathons/clim/README.md`
+Run: `cd ~/Development/hackathons/clim/docs/submission && npm run readme && grep -c "_Pending:" ~/Development/hackathons/clim/README.md`
 Expected: `README.md updated: ...` then `0`.
 Read the whole README once. The hand-written text must not contradict the generated numbers (for example "the pair's usual tier when it is calm" requires `feeMinPips` to be the market tier). Fix the prose, not the generated blocks.
 
 - [x] **Step 3: Commit** **Done 2026-10-07 (end of session).** README committed with the evidence (`69c9b4e`) and every later fix.
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/media/fee-follows-weather.png README.md && git commit -m "docs: README figure and numbers at the deployed parameters" -- docs/media/fee-follows-weather.png README.md || echo "nothing to commit"
+cd ~/Development/hackathons/clim && git add docs/media/fee-follows-weather.png README.md && git commit -m "docs: README figure and numbers at the deployed parameters" -- docs/media/fee-follows-weather.png README.md || echo "nothing to commit"
 ```
 
 ---
@@ -3830,10 +3830,10 @@ Rewritten on 2026-10-07: the maintainer decided that the video is him on camera,
 
 1. Do Not Disturb on (Control Centre, Focus). Quit Slack, Telegram, Mail and anything that pops up.
 2. Browser: a Chrome **Guest** window (profile menu, Guest), so no bookmark, extension or e-mail address shows; zoom 110%. Open the dashboard, `https://clim-zeta.vercel.app/app`, and any other tab the shot plan lists (for example the live RiskDesk on Etherscan, `https://sepolia.etherscan.io/address/<riskDesks.live of shared/deployments/sepolia.json>`).
-3. Terminal, if the live demo shows one: a new window, font size 18 pt, then `cd /Users/fianso/Development/hackathons/clim/bots && export PS1='$ ' && clear`. Never run `cat .env`, `env`, or anything that prints a key.
+3. Terminal, if the live demo shows one: a new window, font size 18 pt, then `cd ~/Development/hackathons/clim/bots && export PS1='$ ' && clear`. Never run `cat .env`, `env`, or anything that prints a key.
 4. Check the live system just before recording:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/bots && bun run status --pair live; echo "exit=$?"
+cd ~/Development/hackathons/clim/bots && bun run status --pair live; echo "exit=$?"
 ```
 Expected: the pool, desk and hook lines, the desk in mode normal, and `exit=0` (the same check as Task 12 Step 4). Anything else: fix the live system first (run-book), do not record a broken demo.
 
@@ -3874,15 +3874,15 @@ Rewritten on 2026-10-07: there is no video build any more (Task 8 history). The 
 - [ ] **Step 1 (maintainer): Drop the stage cut in under its exact name** **Maintainer's step.**
 
 ```bash
-mkdir -p /Users/fianso/Development/hackathons/clim/docs/submission/out/video
-cp "<stage export>.mp4" /Users/fianso/Development/hackathons/clim/docs/submission/out/video/demo-stage.mp4
+mkdir -p ~/Development/hackathons/clim/docs/submission/out/video
+cp "<stage export>.mp4" ~/Development/hackathons/clim/docs/submission/out/video/demo-stage.mp4
 ```
 The name matters: `deck/build-deck.mjs` embeds `demo-stage.mp4` full-bleed on slide 08 and refuses to build the final deck without it.
 
 - [ ] **Step 2: Check duration, sound and format** **Maintainer's step (needs his videos; `npm run deck` probes the stage video's duration, sound and codec and re-encodes when needed).**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission/out/video && f=demo-stage.mp4 && printf '%s  %.1f s  audio=%s  video=%s  %s MB\n' "$f" "$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$f")" "$(ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 "$f" | head -1)" "$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,pix_fmt -of csv=p=0 "$f")" "$(du -m "$f" | cut -f1)"
+cd ~/Development/hackathons/clim/docs/submission/out/video && f=demo-stage.mp4 && printf '%s  %.1f s  audio=%s  video=%s  %s MB\n' "$f" "$(ffprobe -v error -show_entries format=duration -of default=nw=1:nk=1 "$f")" "$(ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 "$f" | head -1)" "$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,pix_fmt -of csv=p=0 "$f")" "$(du -m "$f" | cut -f1)"
 ```
 Expected, one line like (duration and size vary):
 ```
@@ -3892,7 +3892,7 @@ Check: the stage cut is about 30 s and `audio=` is not empty (empty means no sou
 
 - [ ] **Step 3: Watch both cuts** **Maintainer's step.**
 
-`open /Users/fianso/Development/hackathons/clim/docs/submission/out/video/demo-stage.mp4` (QuickTime), then the full export. Check: the sound is clear from start to end; nothing private is visible (no key, no e-mail address, no notification, no browser profile); the stage cut shows the risk desk reporting on Sepolia, the fee following the weather and the dashboard reading the chain (what slide 08's notes announce). A bad take: back to Task 15 Steps 2 to 4, then Step 1 here.
+`open ~/Development/hackathons/clim/docs/submission/out/video/demo-stage.mp4` (QuickTime), then the full export. Check: the sound is clear from start to end; nothing private is visible (no key, no e-mail address, no notification, no browser profile); the stage cut shows the risk desk reporting on Sepolia, the fee following the weather and the dashboard reading the chain (what slide 08's notes announce). A bad take: back to Task 15 Steps 2 to 4, then Step 1 here.
 
 ---
 
@@ -3911,7 +3911,7 @@ Rewritten on 2026-10-07 for deck v2, then for the 10-slide cut: the slides are P
 
 Done on 2026-10-07 in commit `1a53016` (20 slides, two videos; LibreOffice rendered all 20 slides of a draft), then cut to 10 slides the same day: `deck/build-deck.mjs` (the stage video only), `deck/v2/` (10 PNGs, `slides.json`, `live.json`), the scripts `deck`, `deck:draft` and `evidence:text`, `test/deck.test.mjs` (10 slides, one embedded mp4 on slide 08, the refusal without the stage video, every note with "Slide text:" and "Sources (not read aloud):") and `test/cre-evidence-text.test.mjs`. To check it again:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && npm test 2>&1 | grep -E "^# (pass|fail)"
+cd ~/Development/hackathons/clim/docs/submission && npm test 2>&1 | grep -E "^# (pass|fail)"
 ```
 Expected: `# pass 40`, `# fail 0`.
 
@@ -3919,11 +3919,11 @@ Expected: `# pass 40`, `# fail 0`.
 
 Do this right before the final build: the count grows by about 120 an hour while the loop runs. The fifth value of `state()` is `seq`, the number of reports the live desk applied.
 ```bash
-cd /Users/fianso/Development/hackathons/clim && D=$(jq -r .riskDesks.live shared/deployments/sepolia.json) && cast call "$D" "state()(uint40,uint32,uint16,uint8,uint32)" --rpc-url "${SEPOLIA_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}"
+cd ~/Development/hackathons/clim && D=$(jq -r .riskDesks.live shared/deployments/sepolia.json) && cast call "$D" "state()(uint40,uint32,uint16,uint8,uint32)" --rpc-url "${SEPOLIA_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}"
 ```
 Expected: five lines (`tObs`, `sigmaE9`, `kE4`, `flags`, `seq`), for example `1791323959 [1.791e9]`, `25139 [2.513e4]`, `10000 [1e4]`, `0`, `623` (read at 21:59 UTC on 2026-10-06). Then write the count with the read time:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && D=$(jq -r .riskDesks.live shared/deployments/sepolia.json) && SEQ=$(cast call "$D" "state()(uint40,uint32,uint16,uint8,uint32)" --rpc-url "${SEPOLIA_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}" | sed -n 5p | awk '{print $1}') && READ=$(date -u "+%-d %b %H:%M UTC") && printf '{\n  "seq": %s,\n  "readUtc": "%s"\n}\n' "$SEQ" "$READ" > docs/submission/deck/v2/live.json && cat docs/submission/deck/v2/live.json
+cd ~/Development/hackathons/clim && D=$(jq -r .riskDesks.live shared/deployments/sepolia.json) && SEQ=$(cast call "$D" "state()(uint40,uint32,uint16,uint8,uint32)" --rpc-url "${SEPOLIA_RPC_URL:-https://ethereum-sepolia-rpc.publicnode.com}" | sed -n 5p | awk '{print $1}') && READ=$(date -u "+%-d %b %H:%M UTC") && printf '{\n  "seq": %s,\n  "readUtc": "%s"\n}\n' "$SEQ" "$READ" > docs/submission/deck/v2/live.json && cat docs/submission/deck/v2/live.json
 ```
 Expected: `{ "seq": <n>, "readUtc": "<d Mon HH:MM UTC>" }`, for example `"seq": 624` and `"readUtc": "6 Oct 22:00 UTC"`. The builder fills `{{LIVE_SEQ}}` (with a thousands comma, for example `1,234`) and `{{LIVE_SEQ_READ}}` in the slide text and notes of `slides.json` from this file.
 
@@ -3933,7 +3933,7 @@ In Figma file `LyeDZ1KdOYws6nTzD8dI76` (group `204:320` "Pres"), put the same tw
 
 Check that a longer number does not wrap or overlap, and that every other text in frame `204:212` matches slide 07's `text` in `slides.json` word for word. Fix any difference in Figma first. Export the frame as PNG at 1x over `docs/submission/deck/v2/png/07-live.png` (the frame is already 3840 x 2160; in Figma: select the frame, Export, 1x, PNG). Then:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission/deck/v2/png && sips -g pixelWidth -g pixelHeight 07-live.png
+cd ~/Development/hackathons/clim/docs/submission/deck/v2/png && sips -g pixelWidth -g pixelHeight 07-live.png
 ```
 Expected: `pixelWidth: 3840` and `pixelHeight: 2160`. Open it with the Read tool: the count and the read time match `live.json`.
 
@@ -3941,40 +3941,40 @@ Expected: `pixelWidth: 3840` and `pixelHeight: 2160`. Open it with the Read tool
 
 1. Build:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run deck
+cd ~/Development/hackathons/clim/docs/submission && npm run deck
 ```
 Expected: `wrote docs/submission/out/clim.pptx: 10 slides, video: stage, <n> MB`. "demo-stage.mp4 missing": back to Task 16 Step 1.
 
 2. Size:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && du -m out/clim.pptx
+cd ~/Development/hackathons/clim/docs/submission && du -m out/clim.pptx
 ```
 Expected: a number under 100 (the builder aims for 95 MB and refuses a deck over 100 MB: Google Drive does not preview larger files).
 
 3. Render with LibreOffice to PDF and look at every slide. LibreOffice is not installed on this Mac; run it from its disk image without installing it (version 26.8.1 on 2026-10-06; the download is about 300 MB):
 ```bash
 D=$(mktemp -d) && echo "$D" && curl -sSL -o $D/lo.dmg https://download.documentfoundation.org/libreoffice/stable/26.8.1/mac/aarch64/LibreOffice_26.8.1_MacOS_aarch64.dmg && mkdir -p $D/mnt && hdiutil attach -nobrowse -mountpoint $D/mnt $D/lo.dmg
-$D/mnt/LibreOffice.app/Contents/MacOS/soffice --headless --convert-to pdf --outdir /Users/fianso/Development/hackathons/clim/docs/submission/out /Users/fianso/Development/hackathons/clim/docs/submission/out/clim.pptx
-cd /Users/fianso/Development/hackathons/clim/docs/submission/out && find . -maxdepth 1 -name 'slide-*.jpg' -delete && pdftoppm -jpeg -r 80 clim.pdf slide && ls -1 "$PWD"/slide-*.jpg
+$D/mnt/LibreOffice.app/Contents/MacOS/soffice --headless --convert-to pdf --outdir ~/Development/hackathons/clim/docs/submission/out ~/Development/hackathons/clim/docs/submission/out/clim.pptx
+cd ~/Development/hackathons/clim/docs/submission/out && find . -maxdepth 1 -name 'slide-*.jpg' -delete && pdftoppm -jpeg -r 80 clim.pdf slide && ls -1 "$PWD"/slide-*.jpg
 ```
 Shells reset between agent calls: print `$D` and reuse the literal path. If 26.8.1 is gone, take the current version from https://download.documentfoundation.org/libreoffice/stable/; if the redirect lands on a slow mirror, pick a faster one from the same URL plus `.mirrorlist` and compare `shasum -a 256` with the URL plus `.sha256`. `hdiutil detach $D/mnt` when done.
 Expected: 10 images, `slide-01.jpg` to `slide-10.jpg`. Open every image with the Read tool (or dispatch a subagent to look at them fresh): each Figma slide full-bleed, in the order of "Deck content, slide by slide"; slide 07 shows the new count; slides 01, 07 and 10 show the live URL `clim-zeta.vercel.app`; slide 08 shows the stage video's poster frame over the whole slide. A wrong slide is fixed in Figma (and in `slides.json` if its text changed), re-exported, and the deck rebuilt.
 
 4. Commit the new count and slide 07:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && P=(docs/submission/deck/v2/live.json docs/submission/deck/v2/png/07-live.png) && git add "${P[@]}" && git commit -m "chore(deck): live report count on slide 07" -- "${P[@]}"
+cd ~/Development/hackathons/clim && P=(docs/submission/deck/v2/live.json docs/submission/deck/v2/png/07-live.png) && git add "${P[@]}" && git commit -m "chore(deck): live report count on slide 07" -- "${P[@]}"
 ```
 
 - [ ] **Step 5 (maintainer): Play it in PowerPoint (or Keynote) and set the stage video to start by itself** **Maintainer's step.**
 
-1. `open -a "Microsoft PowerPoint" /Users/fianso/Development/hackathons/clim/docs/submission/out/clim.pptx` (or `open -a Keynote` with the same path if PowerPoint is not at hand).
+1. `open -a "Microsoft PowerPoint" ~/Development/hackathons/clim/docs/submission/out/clim.pptx` (or `open -a Keynote` with the same path if PowerPoint is not at hand).
 2. Slide Show from slide 08: the stage video plays over the whole slide, with sound.
 3. In PowerPoint, on slide 08, select the video, Playback tab, Start: "Automatically". Save (Cmd+S).
 4. If the video does not play: delete it on slide 08, Insert, Video, "Movie from File...", pick the embedded copy `docs/submission/out/video/deck/demo-stage.mp4` (it fits the size budget), place it over the whole slide, set Start as above, save, and log under "## Build notes" of today's session log:
 ```markdown
 - (submission) Deck video: the pptxgenjs embed did not play in PowerPoint for Mac; re-inserted by hand (plan 06 Task 17 Step 5).
 ```
-5. Check the size again after saving: `du -m /Users/fianso/Development/hackathons/clim/docs/submission/out/clim.pptx`, under 100.
+5. Check the size again after saving: `du -m ~/Development/hackathons/clim/docs/submission/out/clim.pptx`, under 100.
 
 After this step, do not rebuild the deck with `npm run deck` (it overwrites `out/clim.pptx`), or redo this step.
 
@@ -4008,14 +4008,14 @@ Open each link in a Chrome Incognito window. The `.pptx` shows a preview or a do
 
 Put the `.pptx` link in `deckUrl` and the full video's link in `videoUrl` of `docs/submission/links.json`. The `videoUrl` is also the submission's Project link (Task 21 Step 3) and goes into the CRE evidence text (`npm run evidence:text`). Then:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run readme && npm run check:final; echo "exit=$?"
+cd ~/Development/hackathons/clim/docs/submission && npm run readme && npm run check:final; echo "exit=$?"
 ```
 Expected: `README.md updated: ...`, then every line `OK`, then `exit=0`.
 
 - [ ] **Step 5: Commit** **Maintainer's step.**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/submission/links.json README.md && git commit -m "docs: deck and demo video links" -- docs/submission/links.json README.md
+cd ~/Development/hackathons/clim && git add docs/submission/links.json README.md && git commit -m "docs: deck and demo video links" -- docs/submission/links.json README.md
 ```
 
 To change the deck before submitting, keep the same link: right click the file, File information, Manage versions, Upload new version. Never change it after submitting (the rules lock slides at submission).
@@ -4030,19 +4030,19 @@ To change the deck before submitting, keep the same link: right click the file, 
 - [x] **Step 1: Tests and generated content** **Done 2026-10-07 (end of session).** `# pass 40`; README markers: only the deck and video links say "added at submission" until the maintainer's Task 18.
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && npm test 2>&1 | grep -E "^# (pass|fail)" && grep -c -E "_Pending:|added at submission" /Users/fianso/Development/hackathons/clim/README.md
+cd ~/Development/hackathons/clim/docs/submission && npm test 2>&1 | grep -E "^# (pass|fail)" && grep -c -E "_Pending:|added at submission" ~/Development/hackathons/clim/README.md
 ```
 Expected: `# pass 40`, `# fail 0`, `0`.
 
 - [x] **Step 2: Secret scan** **Done 2026-10-07 (end of session).** `npm run scan`: no .env secret in the patches of 293 commits (all refs) nor in 482 tracked files.
 
-Run: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run scan`
-Expected: `no .env secret in the patches of <c> commits (all refs)`, then `no .env secret in <n> tracked files (<m> secret values checked)`. Also run `cd /Users/fianso/Development/hackathons/clim && git status --short | grep -E "\.env$|secrets\.yaml$"` and expect no output. Any leak: rotate that testnet key at once (main is public and pushed as work goes on, so a value in any pushed commit counts as exposed, rewritten or not), then remove the value.
+Run: `cd ~/Development/hackathons/clim/docs/submission && npm run scan`
+Expected: `no .env secret in the patches of <c> commits (all refs)`, then `no .env secret in <n> tracked files (<m> secret values checked)`. Also run `cd ~/Development/hackathons/clim && git status --short | grep -E "\.env$|secrets\.yaml$"` and expect no output. Any leak: rotate that testnet key at once (main is public and pushed as work goes on, so a value in any pushed commit counts as exposed, rewritten or not), then remove the value.
 
 - [x] **Step 3: Clean-clone smoke test of "Getting started"** Done on 2026-10-07 at `9edd30f` (session log 2026-10-07: forge 73 passed, 2 skipped; lab 77 passed, 5 skipped; `cre workflow simulate` completes without a broadcast; the app installs, syncs and builds; no README fix needed). Since then the commands of README Getting started, the lockfiles and `.gitmodules` are unchanged, and so is the code under contracts/ and bots/; lab/ gained the Fables study in `aeb72a2` (18 tests; `lab/pyproject.toml` and `lab/uv.lock` unchanged), so its line was re-run on a clean copy of HEAD without `lab/data/` (`git archive HEAD lab shared`, then `uv run pytest -q`): 92 passed, 8 skipped, which README Getting started's lab comment now says (audit round 6); under cre/risk-desk/ and shared/ only a comment in `scripts/latency.ts` and the removal of the unused `poolManagerAbi` from `shared/src/abis.ts` changed (shared, bots and risk-desk tests and typechecks green, session log 2026-10-07), and `app/package.json` only gained the `licenses` script. Re-run it only if one of them changes before the final push.
 
 ```bash
-T=$(mktemp -d) && git clone --recurse-submodules /Users/fianso/Development/hackathons/clim $T/clim && cd $T/clim
+T=$(mktemp -d) && git clone --recurse-submodules ~/Development/hackathons/clim $T/clim && cd $T/clim
 bun install 2>&1 | tail -2
 (cd contracts && forge test) 2>&1 | tail -3
 (cd lab && uv sync && uv run pytest -q) 2>&1 | tail -3
@@ -4059,7 +4059,7 @@ Expected: forge reports all tests passed, pytest passes, the simulation prints a
 
 For a re-run, commit only what Step 3 fixed (add to `P` any other file it fixed, such as a `.env.example`):
 ```bash
-cd /Users/fianso/Development/hackathons/clim && P=(README.md docs/sessions) && git add "${P[@]}" && git commit -m "docs: README commands checked on a clean clone" -- "${P[@]}" || echo "nothing to commit"
+cd ~/Development/hackathons/clim && P=(README.md docs/sessions) && git add "${P[@]}" && git commit -m "docs: README commands checked on a clean clone" -- "${P[@]}" || echo "nothing to commit"
 ```
 
 ---
@@ -4073,7 +4073,7 @@ cd /Users/fianso/Development/hackathons/clim && P=(README.md docs/sessions) && g
 
 Ask the maintainer: "Everything is committed and checked. May I push `main` to `origin` (github.com/DVB-ANS/clim, public)?" Push only after an explicit yes:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git push origin main
+cd ~/Development/hackathons/clim && git push origin main
 ```
 
 - [x] **Step 2: Repository description, homepage and topics**
@@ -4107,7 +4107,7 @@ Expected: `2026-10-04T08:00:30...` / `2026-10-06T00:36:27...` and `2026-10-07T15
 - [ ] **Step 2: Get the CRE evidence figures** **Maintainer's step.**
 
 ```bash
-node -e 'const e=require("/Users/fianso/Development/hackathons/clim/docs/evidence/cre-reports-sepolia.json"); for (const d of e.desks) { console.log(d.label, d.address, d.reports.length, "reports"); for (const r of d.reports.slice(-3)) console.log("https://sepolia.etherscan.io/tx/" + r.txHash); }'
+node -e 'const e=require("~/Development/hackathons/clim/docs/evidence/cre-reports-sepolia.json"); for (const d of e.desks) { console.log(d.label, d.address, d.reports.length, "reports"); for (const r of d.reports.slice(-3)) console.log("https://sepolia.etherscan.io/tx/" + r.txHash); }'
 ```
 
 - [ ] **Step 3: Fill the main-track submission** **Maintainer's step.**
@@ -4127,7 +4127,7 @@ Check the checklist before pressing submit:
 
 Add the track to the same submission. In "Evidence of a successful CRE simulation or deployment", paste the text printed by:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run evidence:text
+cd ~/Development/hackathons/clim/docs/submission && npm run evidence:text
 ```
 Expected: the evidence text (see "Submission texts"), with the live and replay report counts read on-chain at run time, then `(<n> of 1500 characters)`; it refuses a text over 1,500 characters and adds the demo video link once `videoUrl` is in `links.json` (Task 18). If plan 02 deployed the workflow to a DON, add the workflow ID and the deployment transaction.
 
@@ -4138,7 +4138,7 @@ Submit. Do not change the Drive files afterwards. Append to today's session log:
 - **Submitted:** main track and Chainlink CRE track on Builderbase. Repo, live URL and deck links as in `docs/submission/links.json`.
 ```
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/sessions && git commit -m "docs(session): submission logged" -- docs/sessions
+cd ~/Development/hackathons/clim && git add docs/sessions && git commit -m "docs(session): submission logged" -- docs/sessions
 ```
 Push this commit only if the maintainer asks.
 
@@ -4156,7 +4156,7 @@ Push this commit only if the maintainer asks.
 - [x] **Step 1: Collect the environment**
 
 ```bash
-cre version; bun --version; sw_vers -productVersion; node -p "require('/Users/fianso/Development/hackathons/clim/cre/risk-desk/package.json').dependencies['@chainlink/cre-sdk']"; cre whoami
+cre version; bun --version; sw_vers -productVersion; node -p "require('~/Development/hackathons/clim/cre/risk-desk/package.json').dependencies['@chainlink/cre-sdk']"; cre whoami
 ```
 Got on 2026-10-07: CRE CLI v1.37.0, `@chainlink/cre-sdk` 1.23.0, Bun 1.3.9, macOS 15.7; `cre whoami` printed `Deploy Access: Not enabled` for organization `org_5FPbh9KQQJLGWcEh` at about 05:35 SGT (21:35 UTC on 2026-10-06), so the DON deployment is cut (master plan cut list item 1, master Task 16 Step 2).
 
@@ -4186,7 +4186,7 @@ The same five asks as the DevEx report, in its order.
 - [x] **Step 3: Resolve every row**
 
 For each row, set Status to `confirmed`, `corrected: <one sentence>` or `not hit`, followed by its evidence, using what plans 02 and 04 logged. The five asks are the DevEx report's "Top 5 asks", in its order and with its wording: its bold title, then one sentence starting with a verb. Each row's suggestion and counts match the DevEx report and `cre-loop-evidence.md`. Row 6 gives the deploy-access status with its date, and says whether the DON deployment ran or was cut.
-Then run: `grep -c -E "design phase|to confirm" /Users/fianso/Development/hackathons/clim/docs/feedback/cre-friction-log.md`
+Then run: `grep -c -E "design phase|to confirm" ~/Development/hackathons/clim/docs/feedback/cre-friction-log.md`
 Expected: `0`.
 Result on 2026-10-07: 22 rows `confirmed`, row 3 `corrected` (a run need not recompile: `cre workflow build` once, then `simulate --wasm`), rows 7 and 8 `not hit` (no Robinhood Chain, no DON).
 
@@ -4194,7 +4194,7 @@ Result on 2026-10-07: 22 rows `confirmed`, row 3 `corrected` (a run need not rec
 
 The message to the Chainlink mentor is a draft in the maintainer's private notes (outside the repo), marked as such, for the maintainer to send himself. It answers his three questions at the idea pitch (session log 2026-10-06): the FAQ entries "Who changes the fee, and how?" and "Can a pool that is already live switch to clim?", the DevEx report, the friction log and the repo https://github.com/DVB-ANS/clim. Add one `- (CRE) Friction log send-ready: ... (plan 06 Task 22).` line under "## Build notes" of today's session log, then commit:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/feedback/cre-friction-log.md docs/sessions/2026-10-07.md docs/superpowers/plans/2026-10-06-clim-06-demo-submission.md && git commit -m "docs(cre): friction log send-ready, DON deployment cut (deploy access not enabled)"
+cd ~/Development/hackathons/clim && git add docs/feedback/cre-friction-log.md docs/sessions/2026-10-07.md docs/superpowers/plans/2026-10-06-clim-06-demo-submission.md && git commit -m "docs(cre): friction log send-ready, DON deployment cut (deploy access not enabled)"
 ```
 
 ---
@@ -4208,7 +4208,7 @@ cd /Users/fianso/Development/hackathons/clim && git add docs/feedback/cre-fricti
 
 Append to today's session log every mentor, judge or organizer feedback received while demoing or submitting that is not logged yet (one line each, `- **<who>:** <what>, <what we did>`). Commit:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/sessions && git commit -m "docs(session): feedback from submission day" -- docs/sessions || echo "nothing to commit"
+cd ~/Development/hackathons/clim && git add docs/sessions && git commit -m "docs(session): feedback from submission day" -- docs/sessions || echo "nothing to commit"
 ```
 
 - [x] **Step 2: Private vault notes (never committed)** **Done 2026-10-07 (end of session).** Overview, Feedbacks, both one-pagers, the video script and the final report updated in French.
@@ -4310,7 +4310,7 @@ clim is a volatility-indexed LP fee with a prediction you can check. When prices
 
 **Built with:** Chainlink CRE (TypeScript SDK, cron trigger, HTTP capability, consensus by median, EVM write), Uniswap v4 hooks, OpenZeppelin uniswap-hooks, Solidity and Foundry, TypeScript, viem and Bun bots, Next.js, Python. Network: Ethereum Sepolia.
 
-**Evidence of a successful CRE simulation or deployment (CRE track field):** generated, never typed: `cd /Users/fianso/Development/hackathons/clim/docs/submission && npm run evidence:text` (Task 21 Step 4). The text lives in `src/cre-evidence-text.mjs` (since 2026-10-07; it replaces the hand-filled text drafted here, which pointed at the old deck's slide 6): the workflow and how it runs (`cre workflow simulate --broadcast` every 30 s; DON deploy access not granted during the hackathon, so the DON deployment was cut), what one run does on the one simulated node (the report goes from the operator key through MockKeystoneForwarder, with no DON signature), the live RiskDesk with its `state().seq` read at run time and the observation-to-block latency, the replay desk and its count, the first report and the forged report on Etherscan, one run's log line, the link to `docs/evidence`, and the demo video link once `videoUrl` is in `docs/submission/links.json`. At most 1,500 characters (the field's limit; 1,391 on 2026-10-07 at 03:05 UTC without the video link, 1,494 in the test with a 99,999 count and a long video link).
+**Evidence of a successful CRE simulation or deployment (CRE track field):** generated, never typed: `cd ~/Development/hackathons/clim/docs/submission && npm run evidence:text` (Task 21 Step 4). The text lives in `src/cre-evidence-text.mjs` (since 2026-10-07; it replaces the hand-filled text drafted here, which pointed at the old deck's slide 6): the workflow and how it runs (`cre workflow simulate --broadcast` every 30 s; DON deploy access not granted during the hackathon, so the DON deployment was cut), what one run does on the one simulated node (the report goes from the operator key through MockKeystoneForwarder, with no DON signature), the live RiskDesk with its `state().seq` read at run time and the observation-to-block latency, the replay desk and its count, the first report and the forged report on Etherscan, one run's log line, the link to `docs/evidence`, and the demo video link once `videoUrl` is in `docs/submission/links.json`. At most 1,500 characters (the field's limit; 1,391 on 2026-10-07 at 03:05 UTC without the video link, 1,494 in the test with a 99,999 count and a long video link).
 
 ---
 

@@ -64,7 +64,7 @@ Contracts as built (plan 02, `contracts/src/v2/`):
 
 Checked while writing this plan, on scratch copies outside the repository (nothing sent to a real chain): the plan's contracts and scripts compile and the contracts suite gives 156 passed, 3 skipped; `deploy-live.sh` then `live-smoke.sh` run clean on an anvil fork of the testnet (anvil's public test keys); the CRE workflow's 48 tests pass, `tsc` and `cre workflow build` succeed, and dry runs of `rh-testnet-settings` and `rh-shadow-settings` complete in the CRE simulator on `robinhood-testnet` (the shadow run read Fables' mainnet pool at 2,507.48 against a venue mid of 2,506.55, devPips -369); `shared` gives 72 tests passing and `bots` 91, both typecheck; the runner, keeper, arbitrage, retail, fund, status, gas and verify scripts ran against a fork answering as chain 46630; `study_estimator.py` reproduced study 2's `binance-1s` result on stand-in minute data. Task 23 (added 2026-10-14) was checked the same way on a scratch copy: `shared` 77 and `bots` 111 tests pass and both typecheck, the six generated plists pass `plutil -lint`, the supervised loop was run with a forced 120 s clock jump and a streak of failing ticks (it wrote the `wake` and `rpc-errors` records and backed off 2, 4, 8 s), and `Outage.t.sol` passes (6 tests) beside the contracts suite; no launchd job was installed. Code blocks below are those versions.
 
-The running Sepolia v1 stack lives in another checkout, `/Users/fianso/Development/hackathons/clim/bots` (processes `bun run cre-loop --pair live`, `bun src/sim-loop.ts --pair live`, `bash scripts/sim-loop.sh staging-settings --broadcast`, `bun run arb --pair live`, `bun run noise --pair live`, `bun run status --pair live --watch`). Nothing in this repository is running, so `cre/risk-desk` is changed in place (its Sepolia version stays at tag `token2049-submission` and in that checkout). Every v2 process started by this plan has a command line without `--pair live` and without `staging-settings`, so the shutdown patterns of Task 26 can never hit it.
+The running Sepolia v1 stack lives in another checkout, `~/Development/hackathons/clim/bots` (processes `bun run cre-loop --pair live`, `bun src/sim-loop.ts --pair live`, `bash scripts/sim-loop.sh staging-settings --broadcast`, `bun run arb --pair live`, `bun run noise --pair live`, `bun run status --pair live --watch`). Nothing in this repository is running, so `cre/risk-desk` is changed in place (its Sepolia version stays at tag `token2049-submission` and in that checkout). Every v2 process started by this plan has a command line without `--pair live` and without `staging-settings`, so the shutdown patterns of Task 26 can never hit it.
 
 ## Decisions taken in this plan (beyond the brief)
 
@@ -86,7 +86,7 @@ The running Sepolia v1 stack lives in another checkout, `/Users/fianso/Developme
 - **Venue mid** for devPips is the median of real-time tickers (USD, Binance converted with Kraken's USDT/USD, v1's source; the lab converts with Coinbase's USDT-USD 1-minute closes, the same market on another venue), as the lab used 1 s prices; with fewer than 3 tickers it falls back to the median 1-minute close. If the pool cannot be read, devPips is 0 (no directional premium), and the log says so.
 - **The volatility estimator** is a workflow config field (`sigmaEstimator`) with all three candidates implemented and tested, synced from `shared/params-fables.json`, so the CRE tasks are the same whichever estimator Task 2 picks.
 - **Public RPCs** for the testnet everywhere (deploy, CRE, bots), so no keyed URL appears in a command or a log; `bots/.env` may override `RH_TESTNET_RPC_URL` if the public endpoint rate-limits.
-- **Runs on the maintainer's Mac** (his decision, 2026-10-14), not on a server: six launchd LaunchAgents `fi.clim-fables.<name>` (desk, runner, keeper, arb, noise, outages), installed at go-live (Task 25). The Mac's sleep is his (his Pauline app owns `pmset disablesleep`): nothing in this plan keeps the Mac awake (no `caffeinate`, no `pmset`). Outages are handled (resume after a wall-clock jump, nonce re-sync, stale actions dropped, capped backoff) and recorded from the chain in `bots/out/outages.json` (Task 23); plan 04's app shows those windows as measured.
+- **Runs on the maintainer's Mac** (his decision, 2026-10-14), not on a server: six launchd LaunchAgents `fi.clim-fables.<name>` (desk, runner, keeper, arb, noise, outages), installed at go-live (Task 25). The Mac's sleep is his: nothing in this plan keeps the Mac awake (no `caffeinate`, no `pmset`). Outages are handled (resume after a wall-clock jump, nonce re-sync, stale actions dropped, capped backoff) and recorded from the chain in `bots/out/outages.json` (Task 23); plan 04's app shows those windows as measured.
 
 ## File structure
 
@@ -6903,7 +6903,7 @@ git commit -m "feat(bots): live funding, status, gas evidence and final on-chain
 
 ### Task 23: Supervision and outage handling
 
-The live stack runs on the maintainer's Mac, not on a server (his decision). The Mac sleeps whenever his Pauline app lets it (Pauline owns `pmset disablesleep`); it can also lose the network or reboot, and a process can crash. This task makes every such outage clean and visible. It adds nothing that keeps the Mac awake: no `caffeinate`, no `pmset`, no keep-awake step anywhere in this plan.
+The live stack runs on the maintainer's Mac, not on a server (his decision). The Mac sleeps whenever he lets it; it can also lose the network or reboot, and a process can crash. This task makes every such outage clean and visible. It adds nothing that keeps the Mac awake: no `caffeinate`, no `pmset`, no keep-awake step anywhere in this plan.
 
 - **Supervision.** One launchd LaunchAgent per long-running process (`fi.clim-fables.desk`, `.runner`, `.keeper`, `.arb`, `.noise`, `.outages`), written by a tested plist generator: absolute `bun` and `cre` paths resolved at install time, absolute `WorkingDirectory` (`bots/`), `RunAtLoad` and `KeepAlive` (back after a reboot, a crash or an exit), `ThrottleInterval` 30 s, logs under `bots/out/logs/`, and only `HOME` and `PATH` in the plist: keys and RPC URLs stay in `bots/.env` and `cre/.env`, which the processes read as when started by hand. The agents are installed by the go-live task (Task 25), not before.
 - **Resume.** Each process ticks on a timer of at most 10 s, so a wall-clock gap of more than 60 s between two firings means the Mac slept or the process was stopped. The process then re-syncs its nonce from the chain, re-reads the desk, and drops any action prepared before the gap (a keeper fee, an arbitrage or retail order sized on old prices) instead of sending it late. Failed ticks (an RPC error, the network down) back off from 2 s, doubling up to 60 s, and never crash the process. A blind desk is a normal skip for the runner, logged once per blind spell.
@@ -7599,7 +7599,7 @@ Create `bots/src/live/lib/launchd.ts`:
 // each process reads bots/.env (Bun, from its WorkingDirectory bots/) or cre/.env (the CRE CLI) as when started by hand.
 // RunAtLoad and KeepAlive bring every job back after a reboot (the plists stay in ~/Library/LaunchAgents) and after a
 // crash (no sooner than ThrottleInterval after its last start). Nothing here keeps the Mac awake: sleep is the
-// maintainer's (his Pauline app), and outages are recorded (scripts/outages.ts), not prevented.
+// maintainer's, and outages are recorded (scripts/outages.ts), not prevented.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { constants } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
@@ -9410,7 +9410,7 @@ cd bots && bun run live:status --watch     # a snapshot every 15 s, with each jo
 
 `live:install` resolves `bun` and `cre` on PATH and writes their absolute paths into the plists; rerun it after moving the repository or reinstalling either tool (it reloads the jobs). `bun run live:install <name>` (re)installs one job. The plists carry only `HOME` and `PATH`: the keys stay in `bots/.env` and `cre/.env`, read by the processes as when started by hand. The desk job runs the CRE CLI as this user, so `cre whoami` must show a logged-in account.
 
-Nothing in this stack keeps the Mac awake: sleep is the maintainer's (his Pauline app owns `pmset disablesleep`). While the Mac sleeps the stack pauses and the pools fall back as 8.6 describes; the outage is recorded, and every job resumes on wake.
+Nothing in this stack keeps the Mac awake: sleep is the maintainer's. While the Mac sleeps the stack pauses and the pools fall back as 8.6 describes; the outage is recorded, and every job resumes on wake.
 
 ### 8.4 Check and stop
 
@@ -9467,7 +9467,7 @@ A window has `from` (the `tObs` of the last report before the silence), `to` (th
 - After a reboot: nothing to do once the maintainer logs in (LaunchAgents start with his session; with nobody logged in, nothing runs and the outage lasts until login).
 - After a crash: launchd restarts the job 30 s after its last start. A job that keeps exiting shows its `last exit` code in `live:status`: read `bun run live:logs <name>`, fix the cause, then `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>`.
 - Offline: the processes back off and retry; the desk's failed CRE runs are recorded in `bots/out/desk-runs.jsonl`; everything resumes with the network.
-- Never add `caffeinate` or change `pmset`: the Mac's sleep is the maintainer's (Pauline).
+- Never add `caffeinate` or change `pmset`: the Mac's sleep is the maintainer's.
 ````
 
 - [ ] **Step 3: Commit**
@@ -9479,7 +9479,7 @@ git commit -m "docs(runbook): clim x Fables live stack on Robinhood Chain testne
 
 ### Task 25: Go live and measure the gas
 
-This task runs the stack on Robinhood Chain testnet with testnet keys, as launchd jobs on the maintainer's Mac (Task 23). The Mac's sleep stays his (his Pauline app): do not run `caffeinate` or `pmset`, and do not ask him to keep the Mac awake. If it sleeps during this task, the outage is recorded (runbook 8.6) and the 30-minute check below waits for 30 minutes without one.
+This task runs the stack on Robinhood Chain testnet with testnet keys, as launchd jobs on the maintainer's Mac (Task 23). The Mac's sleep stays his: do not run `caffeinate` or `pmset`, and do not ask him to keep the Mac awake. If it sleeps during this task, the outage is recorded (runbook 8.6) and the 30-minute check below waits for 30 minutes without one.
 
 - [ ] **Step 1: Preflight**
 
@@ -9583,7 +9583,7 @@ Expected: exit code 0 a few minutes after the reinstall, and `outages: <w> recor
 
 - [ ] **Step 4: Stop the Sepolia v1 stack**
 
-The v1 processes run from `/Users/fianso/Development/hackathons/clim/bots`. Run the master plan's patterns, plus the two that match the children `bun run` leaves behind:
+The v1 processes run from `~/Development/hackathons/clim/bots`. Run the master plan's patterns, plus the two that match the children `bun run` leaves behind:
 
 ```bash
 pkill -f "cre-loop --pair live"; pkill -f "arb --pair live"; pkill -f "noise --pair live"; pkill -f "status --pair live"
@@ -9594,11 +9594,11 @@ pgrep -fl "live:(desk|runner|keeper|arb|noise)|src/live/|rh-testnet-settings"
 
 Expected: `no Sepolia v1 process left`, then the testnet processes still listed (desk loop, runner, keeper, arbitrage, retail, outages, all under launchd). If a v1 process survives, `kill` its PID from the `pgrep` line. If a testnet process is missing, `bun run live:status` names its job; restart it (runbook 8.5).
 
-The master plan's note on restoring the Mac's sleep with `pmset` once the Sepolia bots stop is superseded by the maintainer's decision of 2026-10-14: his Pauline app owns that switch and the live stack handles sleep as an outage. Leave `pmset` alone and do not ask about it.
+The master plan's note on restoring the Mac's sleep with `pmset` once the Sepolia bots stop is superseded by the maintainer's decision of 2026-10-14: he owns that switch and the live stack handles sleep as an outage. Leave `pmset` alone and do not ask about it.
 
 - [ ] **Step 5: Record, tick the master plan, commit and push**
 
-Append to the session log: `(ops) Sepolia v1 stack stopped at <UTC time> (cre-loop, arb, noise, status of the hackathon checkout). The live stack runs as six launchd jobs on the maintainer's Mac; its sleep stays his (Pauline), pmset untouched. Simulated outage: jobs stopped <UTC> to <UTC>; outages.json window <from> to <to> UTC, <durationSec> s, seq <n> to <n+1>, reason "<reason>"; at block <B> (from + 660 s) D 700/700, K <f>/<f>, F 700/700, policy mode 2 (blind).` In `docs/superpowers/plans/2026-10-13-clim-fables-00-master.md`, tick the two checkboxes of Task 4. Then:
+Append to the session log: `(ops) Sepolia v1 stack stopped at <UTC time> (cre-loop, arb, noise, status of the hackathon checkout). The live stack runs as six launchd jobs on the maintainer's Mac; its sleep stays his, pmset untouched. Simulated outage: jobs stopped <UTC> to <UTC>; outages.json window <from> to <to> UTC, <durationSec> s, seq <n> to <n+1>, reason "<reason>"; at block <B> (from + 660 s) D 700/700, K <f>/<f>, F 700/700, policy mode 2 (blind).` In `docs/superpowers/plans/2026-10-13-clim-fables-00-master.md`, tick the two checkboxes of Task 4. Then:
 
 ```bash
 git add docs/evidence/live-check-*.json docs/sessions/ docs/superpowers/plans/2026-10-13-clim-fables-00-master.md
@@ -9614,5 +9614,5 @@ git push
 - The K pool's bot is an imitation of an observed pattern; every place that shows it (the deployments file's `driver`, the bot's header and log line, the runbook) says so. Never describe it as Fables' keeper.
 - Nothing in this plan writes to Robinhood Chain mainnet: the only mainnet access is the shadow target's `eth_call` (read) and plan 01's lab reads. `LiveScript._guard()` and `deploy-live.sh` refuse chain 4663.
 - No secret is printed: keys are created by `live:keys` (addresses only), `contracts/.env` is sourced, never echoed, and every RPC used in a command is public. The launchd plists carry only `HOME` and `PATH` (`plistFor` refuses anything else).
-- Nothing in this plan keeps the Mac awake: no `caffeinate`, no `pmset`, no request to the maintainer to keep it awake. His Pauline app owns sleep; the stack treats a sleep as an outage, recovers from it, and records it (Task 23, runbook 8.6).
+- Nothing in this plan keeps the Mac awake: no `caffeinate`, no `pmset`, no request to the maintainer to keep it awake. He owns the Mac's sleep; the stack treats a sleep as an outage, recovers from it, and records it (Task 23, runbook 8.6).
 - Outage windows come from the chain (consecutive `RiskReportedV2`, gap above 90 s) and are published as measured; plan 04's app shows them, it does not hide the gaps of a laptop-hosted showcase.

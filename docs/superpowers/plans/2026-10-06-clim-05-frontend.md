@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Execution status (read first; fixer pass, 2026-10-06).** Tasks 1 to 24 of this plan, plus the Frontend scope upgrade decided by the maintainer (wallet connect, core `/swap` and `/lp` pages, session log 2026-10-06), were executed after kickoff in the private repository DVB-ANS/clim-front (local clone `/Users/fianso/Development/hackathons/clim-front`, its root is this plan's `app/`, first commit 2026-10-06 20:24 SGT). Its own `docs/sessions/2026-10-06.md` records the deviations from the code below: design tokens instead of raw Tailwind colours, wagmi 2.19.5 + RainbowKit 2.2.11 + TanStack Query 5 (the "viem only" choice is reversed), `CLIM_ROOT` for `npm run sync`, `/swap` and `/lp` with a simulated mode until the live pair exists. The dashboard is live at https://clim-zeta.vercel.app (Vercel project `clim`, mock data until Gate B).
+> **Execution status (read first; fixer pass, 2026-10-06).** Tasks 1 to 24 of this plan, plus the Frontend scope upgrade decided by the maintainer (wallet connect, core `/swap` and `/lp` pages, session log 2026-10-06), were executed after kickoff in the private repository DVB-ANS/clim-front (local clone `~/Development/hackathons/clim-front`, its root is this plan's `app/`, first commit 2026-10-06 20:24 SGT). Its own `docs/sessions/2026-10-06.md` records the deviations from the code below: design tokens instead of raw Tailwind colours, wagmi 2.19.5 + RainbowKit 2.2.11 + TanStack Query 5 (the "viem only" choice is reversed), `CLIM_ROOT` for `npm run sync`, `/swap` and `/lp` with a simulated mode until the live pair exists. The dashboard is live at https://clim-zeta.vercel.app (Vercel project `clim`, mock data until Gate B).
 > In the clim repository: **do not re-run Tasks 1 to 24.** Master plan Task 14 imports clim-front into `app/` with `git subtree` (history kept, so the commit dates stay visible), then runs Task 28 (post-import fixes from the plan review), Task 25 (wire to Sepolia), Task 27 (check `/swap` and `/lp` on Sepolia) and Task 26 (freeze). Tasks 1 to 24 stay below as the reference of what the app does. After the import, the app changes only in `clim/app/`. **Status 2026-10-07:** imported at clim-front `d05ee94` (subtree `758ab5a`); Tasks 1 to 24 are ticked from clim-front's history (each task names its commit and what differs today), Tasks 25 to 28 were done in clim, and the live URL reads Sepolia.
 
 **Goal:** A basic but functional public dashboard (live URL on Vercel) that shows how clim computes its fee from the Chainlink CRE risk desk, compares the clim pool V with its static twin S from on-chain logs, checks the model's arbitrage-frequency prediction, and presents the lab's Feb 4 2026 replay and backtests; restyled later.
@@ -15,7 +15,7 @@
 
 ## Conventions (read once)
 
-- **Working directory.** Every command runs from the repository root (`/Users/fianso/Development/hackathons/clim`). Commands that run inside the app are written `(cd app && …)`.
+- **Working directory.** Every command runs from the repository root (`~/Development/hackathons/clim`). Commands that run inside the app are written `(cd app && …)`.
 - **Hackathon rule.** All code in this plan is written after the hackathon kickoff (rule in `CLAUDE.md`). It was drafted and validated in a throwaway scratch project the same day; it is typed into the repo by executing this plan.
 - **Living document.** If reality differs (a version, an address, a schema chosen by another plan), change the code, update this plan in the same commit, and add one line to today's session log (`docs/sessions/<YYYY-MM-DD>.md`, same headings as `docs/sessions/2026-10-06.md`).
 - **Docs and UI text are in English.** No secrets anywhere in `app/`: the only env vars are `NEXT_PUBLIC_*` testnet settings.
@@ -118,7 +118,7 @@ Done in DVB-ANS/clim-front, imported into app/ by master Task 14 (subtree 758ab5
 ```bash
 npx -y create-next-app@16.3.8 app --ts --tailwind --eslint --app --src-dir --import-alias "@/*" --use-npm --disable-git --no-react-compiler --yes
 ```
-Expected: ends with `Success! Created app at /Users/fianso/Development/hackathons/clim/app`. It pins `next` 16.3.8 and `react` 19.2.8 and writes `app/AGENTS.md` + `app/CLAUDE.md` (Next.js agent rules: keep them). If the install step fails with `ETIMEDOUT`, run `(cd app && npm install --fetch-retries=5 --fetch-timeout=180000)`.
+Expected: ends with `Success! Created app at ~/Development/hackathons/clim/app`. It pins `next` 16.3.8 and `react` 19.2.8 and writes `app/AGENTS.md` + `app/CLAUDE.md` (Next.js agent rules: keep them). If the install step fails with `ETIMEDOUT`, run `(cd app && npm install --fetch-retries=5 --fetch-timeout=180000)`.
 
 - [x] **Step 2: Add the dependencies**
 

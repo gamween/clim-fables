@@ -305,7 +305,7 @@ The README opens with a "Verify in 10 minutes" path, and `/integrate` mirrors it
 - The README credits the TOKEN2049 Origins origin and states the showcase and non-affiliation.
 - The Sepolia bots keep running until the testnet desk is live, then they stop. The live stack runs on the
   maintainer's Mac (his decision, 2026-10-14), supervised by launchd with outage handling (plan 03 Task 23); the
-  Mac's sleep stays managed by his own app (Pauline), and nothing in this project restores or changes `pmset`.
+  Mac's sleep stays managed by his own app, and nothing in this project restores or changes `pmset`.
 - The message to the Chainlink mentor stays a draft that the maintainer sends himself.
 - The vault gets a project note next to the TOKEN2049 Origins overview.
 

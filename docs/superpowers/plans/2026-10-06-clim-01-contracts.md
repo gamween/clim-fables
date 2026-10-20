@@ -82,7 +82,7 @@ Every code block below was compiled and run before this plan was written (scratc
   ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; }
   ```
   `ok forge script ...` prints the same lines as before (`ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.` for a broadcast, `Script ran successfully.` otherwise, or the `Error` lines) and fails as soon as the output contains `Error`, which stops the chain.
-- Commands in this plan start with `cd /Users/fianso/Development/hackathons/clim/...` because the shell's working directory resets between calls. Where a command uses `$PRIVATE_KEY` or `$SEPOLIA_RPC_URL` in the shell (cast, curl), it first runs `set -a && source .env && set +a`.
+- Commands in this plan start with `cd ~/Development/hackathons/clim/...` because the shell's working directory resets between calls. Where a command uses `$PRIVATE_KEY` or `$SEPOLIA_RPC_URL` in the shell (cast, curl), it first runs `set -a && source .env && set +a`.
 
 ---
 
@@ -161,7 +161,7 @@ Every code block below was compiled and run before this plan was written (scratc
 - [x] **Step 1: Create the env template**
 
 ```bash
-mkdir -p /Users/fianso/Development/hackathons/clim/contracts
+mkdir -p ~/Development/hackathons/clim/contracts
 ```
 
 Then write `contracts/.env.example`:
@@ -185,7 +185,7 @@ Expected: `Successfully created new keypair.`, then an `Address:` line and a `Pr
 - [x] **Step 3: Verify every Sepolia address on-chain**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && set -a && source .env && set +a && R=$SEPOLIA_RPC_URL && \
+cd ~/Development/hackathons/clim/contracts && set -a && source .env && set +a && R=$SEPOLIA_RPC_URL && \
 cast chain-id --rpc-url $R && \
 for a in 0xE03A1074c86CFeDd5C142C4F04F1a1536e203543 0xE1Dd9c3fA50EDB962E442f60DfBc432e24537E4C 0x9B6b46e2c869aa39918Db7f52f5557FE577B6eEe 0x0C478023803a644c94c4CE1C1e7b9A087e411B0A 0x15fC6ae953E024d975e77382eEeC56A9101f9F88 0xF8344CFd5c43616a4366C34E3EEE75af79a74482 0x4e59b44847b379578588920cA78FbF26c0B4956C; do echo "$a $(cast codesize $a --rpc-url $R)"; done && \
 cast call 0x15fC6ae953E024d975e77382eEeC56A9101f9F88 "typeAndVersion()(string)" --rpc-url $R && \
@@ -217,7 +217,7 @@ If any code size is 0, or any view call returns something else, stop. Update the
 - [x] **Step 4: Check the deployer's balance**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && set -a && source .env && set +a && cast balance $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $SEPOLIA_RPC_URL --ether
+cd ~/Development/hackathons/clim/contracts && set -a && source .env && set +a && cast balance $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $SEPOLIA_RPC_URL --ether
 ```
 Expected: at least `0.05`. The whole live suite uses under 7M gas: about 0.007 ETH at Sepolia's 1 gwei on 2026-10-06. If the balance is lower, fund the address from a Sepolia faucet and run the command again.
 
@@ -236,7 +236,7 @@ Append to `docs/sessions/2026-10-06.md`. If the section `## Contracts (plan 01)`
 - [x] **Step 6: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/.env.example docs/sessions/2026-10-06.md && git status --short && git commit -m "chore(contracts): env template and verified Sepolia infrastructure"
+cd ~/Development/hackathons/clim && git add contracts/.env.example docs/sessions/2026-10-06.md && git status --short && git commit -m "chore(contracts): env template and verified Sepolia infrastructure"
 ```
 Expected: `contracts/.env` does not appear in the `git status --short` output (it is gitignored), and the commit succeeds.
 
@@ -297,14 +297,14 @@ permit2/=lib/uniswap-hooks/lib/v4-periphery/lib/permit2/
 ```
 
 ```bash
-mkdir -p /Users/fianso/Development/hackathons/clim/contracts/{src/receiver,src/interfaces,src/libraries,src/test-tokens,test/utils,test/fork,test/fixtures,script/base} /Users/fianso/Development/hackathons/clim/shared/{deployments,abis}
+mkdir -p ~/Development/hackathons/clim/contracts/{src/receiver,src/interfaces,src/libraries,src/test-tokens,test/utils,test/fork,test/fixtures,script/base} ~/Development/hackathons/clim/shared/{deployments,abis}
 ```
 
 - [x] **Step 2: Install the dependencies**
 
 The install is slow: it clones about 25 nested submodules and took 12 to 15 minutes on 2026-10-06. Run it with `run_in_background: true` and wait for it to finish. Do not add `--shallow`: in forge 1.4.2, `--shallow` cannot check out a tag (`Error: Tag: "v1.17.0" not found`).
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge install foundry-rs/forge-std@v1.17.0 OpenZeppelin/uniswap-hooks@v1.2.1
+cd ~/Development/hackathons/clim/contracts && forge install foundry-rs/forge-std@v1.17.0 OpenZeppelin/uniswap-hooks@v1.2.1
 ```
 Expected (last lines):
 ```
@@ -316,7 +316,7 @@ Expected (last lines):
 
 `forge install` stages each submodule at the default-branch HEAD and checks the tag out only in the working tree. `git add` records the tag commits.
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add .gitmodules contracts/lib/forge-std contracts/lib/uniswap-hooks contracts/foundry.lock && git submodule status contracts/lib/forge-std contracts/lib/uniswap-hooks && git -C contracts/lib/uniswap-hooks submodule status lib/v4-core lib/v4-periphery lib/openzeppelin-contracts
+cd ~/Development/hackathons/clim && git add .gitmodules contracts/lib/forge-std contracts/lib/uniswap-hooks contracts/foundry.lock && git submodule status contracts/lib/forge-std contracts/lib/uniswap-hooks && git -C contracts/lib/uniswap-hooks submodule status lib/v4-core lib/v4-periphery lib/openzeppelin-contracts
 ```
 Expected: no line starts with `+` or `-`, and the commits are exactly:
 ```
@@ -330,7 +330,7 @@ Expected: no line starts with `+` or `-`, and the commits are exactly:
 - [x] **Step 4: Vendor the Chainlink receiver at the pinned commit and check the hashes**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts/src/receiver && C=d0223f31182c76bc36b1cc9d47b13b18efcf2bf6 && for f in ReceiverTemplate.sol IReceiver.sol IERC165.sol; do curl -fsSL -o $f "https://raw.githubusercontent.com/smartcontractkit/cre-templates/$C/starter-templates/circuit-breaker/circuit-breaker-ts/contracts/evm/src/$f"; done && shasum -a 256 ReceiverTemplate.sol IReceiver.sol IERC165.sol
+cd ~/Development/hackathons/clim/contracts/src/receiver && C=d0223f31182c76bc36b1cc9d47b13b18efcf2bf6 && for f in ReceiverTemplate.sol IReceiver.sol IERC165.sol; do curl -fsSL -o $f "https://raw.githubusercontent.com/smartcontractkit/cre-templates/$C/starter-templates/circuit-breaker/circuit-breaker-ts/contracts/evm/src/$f"; done && shasum -a 256 ReceiverTemplate.sol IReceiver.sol IERC165.sol
 ```
 Expected:
 ```
@@ -342,7 +342,7 @@ Do not edit these files. Their MIT headers stay as they are.
 
 - [x] **Step 5: Ignore the local dry-run outputs**
 
-Append to `/Users/fianso/Development/hackathons/clim/.gitignore`:
+Append to `~/Development/hackathons/clim/.gitignore`:
 ```gitignore
 
 # Foundry dry runs on a local anvil fork
@@ -353,7 +353,7 @@ shared/deployments/anvil.json
 - [x] **Step 6: Build check**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge build
+cd ~/Development/hackathons/clim/contracts && forge build
 ```
 Expected: `Compiler run successful!`. The first run downloads solc 0.8.26. This compiles the vendored receiver against OpenZeppelin 5.5.0's `Ownable`, which validates the remappings.
 
@@ -372,7 +372,7 @@ Append under `## Contracts (plan 01)` in `docs/sessions/2026-10-06.md`:
 - [x] **Step 8: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add .gitignore .gitmodules contracts/foundry.toml contracts/remappings.txt contracts/foundry.lock contracts/lib/forge-std contracts/lib/uniswap-hooks contracts/src/receiver docs/sessions/2026-10-06.md && git commit -m "build(contracts): Foundry project, pinned v4 and OZ hooks deps, vendored CRE receiver"
+cd ~/Development/hackathons/clim && git add .gitignore .gitmodules contracts/foundry.toml contracts/remappings.txt contracts/foundry.lock contracts/lib/forge-std contracts/lib/uniswap-hooks contracts/src/receiver docs/sessions/2026-10-06.md && git commit -m "build(contracts): Foundry project, pinned v4 and OZ hooks deps, vendored CRE receiver"
 ```
 
 ### Task 3: ClimFeeMath
@@ -493,7 +493,7 @@ contract ClimFeeMathTest is Test {
 - [x] **Step 2: Run it, expected FAIL**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/ClimFeeMath.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/ClimFeeMath.t.sol
 ```
 Expected: `Error (6275): Source "src/libraries/ClimFeeMath.sol" not found`.
 
@@ -534,7 +534,7 @@ library ClimFeeMath {
 - [x] **Step 4: Run, expected PASS**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/ClimFeeMath.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/ClimFeeMath.t.sol
 ```
 Expected: `Suite result: ok. 11 passed; 0 failed; 0 skipped`.
 
@@ -550,7 +550,7 @@ Append under `## Contracts (plan 01)` in `docs/sessions/2026-10-06.md`:
 - [x] **Step 6: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/src/libraries/ClimFeeMath.sol contracts/test/ClimFeeMath.t.sol docs/sessions/2026-10-06.md && git commit -m "feat(contracts): ClimFeeMath fee formula with ceil rounding and clamps"
+cd ~/Development/hackathons/clim && git add contracts/src/libraries/ClimFeeMath.sol contracts/test/ClimFeeMath.t.sol docs/sessions/2026-10-06.md && git commit -m "feat(contracts): ClimFeeMath fee formula with ceil rounding and clamps"
 ```
 
 ### Task 4: IRiskDesk
@@ -615,14 +615,14 @@ interface IRiskDesk {
 - [x] **Step 2: Build**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge build
+cd ~/Development/hackathons/clim/contracts && forge build
 ```
 Expected: `Compiler run successful!`
 
 - [x] **Step 3: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/src/interfaces/IRiskDesk.sol && git commit -m "feat(contracts): IRiskDesk interface, RiskReported event and flags"
+cd ~/Development/hackathons/clim && git add contracts/src/interfaces/IRiskDesk.sol && git commit -m "feat(contracts): IRiskDesk interface, RiskReported event and flags"
 ```
 
 ### Task 5: RiskDesk
@@ -981,7 +981,7 @@ contract RiskDeskTest is DeskHelpers {
 - [x] **Step 2: Run it, expected FAIL**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/RiskDesk.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/RiskDesk.t.sol
 ```
 Expected: `Error (6275): Source "src/RiskDesk.sol" not found`.
 
@@ -1111,7 +1111,7 @@ contract RiskDesk is ReceiverTemplate, IRiskDesk {
 - [x] **Step 4: Run, expected PASS**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/RiskDesk.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/RiskDesk.t.sol
 ```
 Expected: `Suite result: ok. 30 passed; 0 failed; 0 skipped`.
 
@@ -1129,7 +1129,7 @@ Append under `## Contracts (plan 01)` in `docs/sessions/2026-10-06.md`:
 - [x] **Step 6: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/src/RiskDesk.sol contracts/test/utils/DeskHelpers.sol contracts/test/RiskDesk.t.sol docs/sessions/2026-10-06.md && git commit -m "feat(contracts): RiskDesk CRE consumer with sim guard, freshness, quorum, envelope and flags"
+cd ~/Development/hackathons/clim && git add contracts/src/RiskDesk.sol contracts/test/utils/DeskHelpers.sol contracts/test/RiskDesk.t.sol docs/sessions/2026-10-06.md && git commit -m "feat(contracts): RiskDesk CRE consumer with sim guard, freshness, quorum, envelope and flags"
 ```
 
 ### Task 6: Fork test against the real Sepolia MockKeystoneForwarder
@@ -1227,7 +1227,7 @@ contract MockForwarderForkTest is DeskHelpers {
 - [x] **Step 2: Run, expected PASS**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path 'test/fork/*' -vv
+cd ~/Development/hackathons/clim/contracts && forge test --match-path 'test/fork/*' -vv
 ```
 Expected (`.env` holds `SEPOLIA_RPC_URL`): `[PASS] test_OperatorReportIsDelivered()`, `[PASS] test_ThirdPartyReportIsSwallowedNotReverted()`, `Suite result: ok. 2 passed`. Without the variable: `[SKIP: skipped] setUp()`. From now on, `forge test` includes these fork tests whenever `.env` sets `SEPOLIA_RPC_URL`. A third Sepolia fork test, `test_Fork_MockForwarder_WorkflowIdCheck_ReportRejected` in `contracts/test/ReceiverTemplateMetadata.t.sol` (added on 2026-10-07 in `57933bc`), lives outside `test/fork/`, so `--no-match-path 'test/fork/*'` no longer keeps the run fully offline. Measured on 2026-10-07: `forge test` with `.env` gives `76 tests passed, 0 failed, 0 skipped (76 total tests)` (73 offline plus 3 fork tests); `SEPOLIA_RPC_URL= forge test` stays offline and gives `73 tests passed, 0 failed, 2 skipped (75 total tests)` (the skipped `setUp()` of this suite counts as one).
 
@@ -1257,7 +1257,7 @@ Append under `## Contracts (plan 01)` in `docs/sessions/2026-10-06.md`:
 - [x] **Step 5: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/test/fork/MockForwarder.fork.t.sol docs/feedback/cre-friction-log.md docs/sessions/2026-10-06.md && git commit -m "test(contracts): fork test of the Sepolia MockKeystoneForwarder against RiskDesk"
+cd ~/Development/hackathons/clim && git add contracts/test/fork/MockForwarder.fork.t.sol docs/feedback/cre-friction-log.md docs/sessions/2026-10-06.md && git commit -m "test(contracts): fork test of the Sepolia MockKeystoneForwarder against RiskDesk"
 ```
 
 ### Task 7: TestToken
@@ -1344,7 +1344,7 @@ contract TestTokenTest is Test {
 - [x] **Step 2: Run it, expected FAIL**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/TestToken.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/TestToken.t.sol
 ```
 Expected: `Error (6275): Source "src/test-tokens/TestToken.sol" not found`.
 
@@ -1392,14 +1392,14 @@ contract TestToken is ERC20, Ownable {
 - [x] **Step 4: Run, expected PASS**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/TestToken.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/TestToken.t.sol
 ```
 Expected: `Suite result: ok. 6 passed; 0 failed; 0 skipped`.
 
 - [x] **Step 5: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/src/test-tokens/TestToken.sol contracts/test/TestToken.t.sol && git commit -m "feat(contracts): 18-decimal TestToken with owner mint and a public faucet"
+cd ~/Development/hackathons/clim && git add contracts/src/test-tokens/TestToken.sol contracts/test/TestToken.t.sol && git commit -m "feat(contracts): 18-decimal TestToken with owner mint and a public faucet"
 ```
 
 ### Task 8: ClimHook
@@ -1691,7 +1691,7 @@ contract ClimHookTest is HookHelpers {
 - [x] **Step 2: Run it, expected FAIL**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/ClimHook.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/ClimHook.t.sol
 ```
 Expected: `Error (6275): Source "src/ClimHook.sol" not found`.
 
@@ -1784,14 +1784,14 @@ contract ClimHook is BaseOverrideFee {
 - [x] **Step 4: Run, expected PASS**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/ClimHook.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/ClimHook.t.sol
 ```
 Expected: `Suite result: ok. 17 passed; 0 failed; 0 skipped`. The fuzz test swaps through the real PoolManager 1,000 times, which takes about one second.
 
 - [x] **Step 5: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/src/ClimHook.sol contracts/test/utils/HookHelpers.sol contracts/test/ClimHook.t.sol && git commit -m "feat(contracts): ClimHook dynamic LP fee from RiskDesk with blind and degraded floors"
+cd ~/Development/hackathons/clim && git add contracts/src/ClimHook.sol contracts/test/utils/HookHelpers.sol contracts/test/ClimHook.t.sol && git commit -m "feat(contracts): ClimHook dynamic LP fee from RiskDesk with blind and degraded floors"
 ```
 
 ### Task 9: Integration test (twin pools, one storm)
@@ -1913,14 +1913,14 @@ contract IntegrationTest is HookHelpers {
 
 This task adds no production code, so the test passes at once. If it fails, the bug is in Tasks 3 to 8: use superpowers:systematic-debugging, and do not edit the expected numbers without recomputing them by hand.
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/Integration.t.sol && forge test --no-match-path 'test/fork/*'
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/Integration.t.sol && forge test --no-match-path 'test/fork/*'
 ```
 Expected: `Suite result: ok. 2 passed`, then `66 tests passed, 0 failed, 0 skipped (66 total tests)`.
 
 - [x] **Step 3: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/test/Integration.t.sol && git commit -m "test(contracts): end-to-end storm on twin pools V and S"
+cd ~/Development/hackathons/clim && git add contracts/test/Integration.t.sol && git commit -m "test(contracts): end-to-end storm on twin pools V and S"
 ```
 
 ### Task 10: Script base, tokens, arbitrage router and desk scripts
@@ -2163,14 +2163,14 @@ contract DeployDesk is ClimScript {
 - [x] **Step 4: Build**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge build
+cd ~/Development/hackathons/clim/contracts && forge build
 ```
 Expected: `Compiler run successful!`. These scripts run for real in Task 15, on a fork.
 
 - [x] **Step 5: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/script/base/ClimScript.sol contracts/script/00_Tokens.s.sol contracts/script/01_DeployDesk.s.sol contracts/test/fixtures/params.p30.json && git commit -m "feat(contracts): deploy script base, test tokens, arbitrage router and RiskDesk scripts"
+cd ~/Development/hackathons/clim && git add contracts/script/base/ClimScript.sol contracts/script/00_Tokens.s.sol contracts/script/01_DeployDesk.s.sol contracts/test/fixtures/params.p30.json && git commit -m "feat(contracts): deploy script base, test tokens, arbitrage router and RiskDesk scripts"
 ```
 
 ### Task 11: 02_DeployHook
@@ -2235,14 +2235,14 @@ contract DeployHook is ClimScript {
 - [x] **Step 2: Build**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge build
+cd ~/Development/hackathons/clim/contracts && forge build
 ```
 Expected: `Compiler run successful!`
 
 - [x] **Step 3: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/script/02_DeployHook.s.sol && git commit -m "feat(contracts): mined CREATE2 deployment of ClimHook from params.json"
+cd ~/Development/hackathons/clim && git add contracts/script/02_DeployHook.s.sol && git commit -m "feat(contracts): mined CREATE2 deployment of ClimHook from params.json"
 ```
 
 ### Task 12: 03_CreatePools
@@ -2290,7 +2290,7 @@ contract CreatePoolsTest is Test {
 - [x] **Step 2: Run it, expected FAIL**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/CreatePools.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/CreatePools.t.sol
 ```
 Expected: `Error (6275): Source "script/03_CreatePools.s.sol" not found`.
 
@@ -2373,7 +2373,7 @@ contract CreatePools is ClimScript {
 - [x] **Step 4: Run, expected PASS**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge test --match-path test/CreatePools.t.sol
+cd ~/Development/hackathons/clim/contracts && forge test --match-path test/CreatePools.t.sol
 ```
 Expected: `Suite result: ok. 3 passed; 0 failed; 0 skipped`.
 
@@ -2381,7 +2381,7 @@ Expected: `Suite result: ok. 3 passed; 0 failed; 0 skipped`.
 
 The plan 00 integration pass already wrote both changes into the spec (§3.7 "Replay pair" and the §2.6 `shared/params.json` table). Check they are there:
 ```bash
-cd /Users/fianso/Development/hackathons/clim && grep -c "shares the tETH/tUSD pair with the live pair" docs/superpowers/specs/2026-10-06-clim-design.md && grep -c "replayStaticFeePips" docs/superpowers/specs/2026-10-06-clim-design.md
+cd ~/Development/hackathons/clim && grep -c "shares the tETH/tUSD pair with the live pair" docs/superpowers/specs/2026-10-06-clim-design.md && grep -c "replayStaticFeePips" docs/superpowers/specs/2026-10-06-clim-design.md
 ```
 Expected: `1`, then a count of at least `1`. If either is `0`, replace the spec's §3.7 "Replay pair" paragraph with
 ```markdown
@@ -2405,7 +2405,7 @@ Append under `## Contracts (plan 01)` in `docs/sessions/2026-10-06.md`:
 - [x] **Step 7: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/script/03_CreatePools.s.sol contracts/test/CreatePools.t.sol docs/superpowers/specs/2026-10-06-clim-design.md docs/sessions/2026-10-06.md && git commit -m "feat(contracts): twin pool initialization script, spec update for the shared token pair"
+cd ~/Development/hackathons/clim && git add contracts/script/03_CreatePools.s.sol contracts/test/CreatePools.t.sol docs/superpowers/specs/2026-10-06-clim-design.md docs/sessions/2026-10-06.md && git commit -m "feat(contracts): twin pool initialization script, spec update for the shared token pair"
 ```
 
 ### Task 13: 04_AddLiquidity and 05_WriteDeployments
@@ -2689,14 +2689,14 @@ contract WriteDeployments is ClimScript {
 - [x] **Step 3: Build and run the whole offline suite**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && forge build && forge test --no-match-path 'test/fork/*'
+cd ~/Development/hackathons/clim/contracts && forge build && forge test --no-match-path 'test/fork/*'
 ```
 Expected: `Compiler run successful!`, then `69 tests passed, 0 failed, 0 skipped (69 total tests)`. On 2026-10-07 the same command gives `74 tests passed, 0 failed, 0 skipped (74 total tests)` with `.env`'s `SEPOLIA_RPC_URL` (the fork test of `ReceiverTemplateMetadata.t.sol` sits outside `test/fork/`), or `73 tests passed, 0 failed, 1 skipped (74 total tests)` with `SEPOLIA_RPC_URL=`.
 
 - [x] **Step 4: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/script/04_AddLiquidity.s.sol contracts/script/05_WriteDeployments.s.sol && git commit -m "feat(contracts): full-range liquidity and deployments writer in plan 04's schema"
+cd ~/Development/hackathons/clim && git add contracts/script/04_AddLiquidity.s.sol contracts/script/05_WriteDeployments.s.sol && git commit -m "feat(contracts): full-range liquidity and deployments writer in plan 04's schema"
 ```
 
 ### Task 14: ABI export and on-chain smoke script
@@ -2778,14 +2778,14 @@ echo "S swap fee (pips): $(swap_fee "($C0,$C1,$SFEE,60,0x00000000000000000000000
 - [x] **Step 3: Run the exporter**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && chmod +x script/export-abis.sh script/smoke.sh && ./script/export-abis.sh && jq -r '[.[] | select(.type=="function") | .name] | join(",")' ../shared/abis/ClimHook.json
+cd ~/Development/hackathons/clim/contracts && chmod +x script/export-abis.sh script/smoke.sh && ./script/export-abis.sh && jq -r '[.[] | select(.type=="function") | .name] | join(",")' ../shared/abis/ClimHook.json
 ```
 Expected: eight lines `../shared/abis/RiskDesk.json`, `IRiskDesk.json`, `ClimHook.json`, `TestToken.json`, `IPoolManager.json`, `IStateView.json`, `PoolSwapTest.json`, `PoolModifyLiquidityTest.json`, then a list that contains `quoteFee`, `desk`, `etaE4`, `feeMinPips`, `feeMaxPips`, `feeSafePips`, `tauKillSec`, `MODE_BLIND`, `MODE_DEGRADED`, `MODE_NORMAL`.
 
 - [x] **Step 4: Commit**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/script/export-abis.sh contracts/script/smoke.sh shared/abis && git commit -m "feat(contracts): ABI export to shared/ and on-chain smoke script"
+cd ~/Development/hackathons/clim && git add contracts/script/export-abis.sh contracts/script/smoke.sh shared/abis && git commit -m "feat(contracts): ABI export to shared/ and on-chain smoke script"
 ```
 
 ### Task 15: Dry run on an anvil fork of Sepolia
@@ -2800,7 +2800,7 @@ cd /Users/fianso/Development/hackathons/clim && git add contracts/script/export-
 
 With chain id 31337, outputs go to `deployments/31337/` and `shared/deployments/anvil.json`, and the params guard stays off. Start the fork with `run_in_background: true`:
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && set -a && source .env && set +a && anvil --fork-url "$SEPOLIA_RPC_URL" --chain-id 31337 --port 8545 --silent
+cd ~/Development/hackathons/clim/contracts && set -a && source .env && set +a && anvil --fork-url "$SEPOLIA_RPC_URL" --chain-id 31337 --port 8545 --silent
 ```
 Then:
 ```bash
@@ -2811,7 +2811,7 @@ Expected: `31337`.
 - [x] **Step 2: Deploy the live, replay and DON suites with anvil's first key and the fixture params**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 PARAMS_PATH=test/fixtures/params.p30.json && \
+cd ~/Development/hackathons/clim/contracts && export PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 PARAMS_PATH=test/fixtures/params.p30.json && \
 ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; } && \
 ok forge script script/00_Tokens.s.sol --rpc-url anvil --broadcast && \
 F=0; for S in live replay; do P=$([ $S = live ] && echo 2713 || echo 2254); \
@@ -2828,7 +2828,7 @@ Expected: ten lines `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.`, then `Error: scr
 - [x] **Step 3: Check the merged file against plan 04's rules**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && D=shared/deployments/anvil.json && for p in liveV liveS replayV replayS; do id=$(cast keccak $(cast abi-encode "f(address,address,uint24,int24,address)" $(jq -r ".pools.$p.key.currency0" $D) $(jq -r ".pools.$p.key.currency1" $D) $(jq -r ".pools.$p.key.fee" $D) $(jq -r ".pools.$p.key.tickSpacing" $D) $(jq -r ".pools.$p.key.hooks" $D))); [ "$id" = "$(jq -r .pools.$p.poolId $D)" ] && echo "$p poolId OK" || echo "$p MISMATCH"; done && jq -c '{dyn: [.pools.liveV.key.fee, .pools.replayV.key.fee], hooksMatch: (.pools.liveV.key.hooks == .hooks.live and .pools.replayV.key.hooks == .hooks.replay), sStatic: [.pools.liveS.key.fee, .pools.replayS.key.fee], sorted: (.pools.liveV.key.currency0 < .pools.liveV.key.currency1), liq: .liquidity, arb: (.routers.arb != null)}' $D && cast call $(jq -r .riskDesks.don $D) "simMode()(bool)" --rpc-url http://127.0.0.1:8545 && cast call $(jq -r .routers.arb $D) "manager()(address)" --rpc-url http://127.0.0.1:8545
+cd ~/Development/hackathons/clim && D=shared/deployments/anvil.json && for p in liveV liveS replayV replayS; do id=$(cast keccak $(cast abi-encode "f(address,address,uint24,int24,address)" $(jq -r ".pools.$p.key.currency0" $D) $(jq -r ".pools.$p.key.currency1" $D) $(jq -r ".pools.$p.key.fee" $D) $(jq -r ".pools.$p.key.tickSpacing" $D) $(jq -r ".pools.$p.key.hooks" $D))); [ "$id" = "$(jq -r .pools.$p.poolId $D)" ] && echo "$p poolId OK" || echo "$p MISMATCH"; done && jq -c '{dyn: [.pools.liveV.key.fee, .pools.replayV.key.fee], hooksMatch: (.pools.liveV.key.hooks == .hooks.live and .pools.replayV.key.hooks == .hooks.replay), sStatic: [.pools.liveS.key.fee, .pools.replayS.key.fee], sorted: (.pools.liveV.key.currency0 < .pools.liveV.key.currency1), liq: .liquidity, arb: (.routers.arb != null)}' $D && cast call $(jq -r .riskDesks.don $D) "simMode()(bool)" --rpc-url http://127.0.0.1:8545 && cast call $(jq -r .routers.arb $D) "manager()(address)" --rpc-url http://127.0.0.1:8545
 ```
 Expected: four `poolId OK` lines, then `{"dyn":[8388608,8388608],"hooksMatch":true,"sStatic":[600,2500],"sorted":true,"liq":{"live":"…","replay":"…"},"arb":true}` (live L ≈ 5.2e24: the fixer pass measured `5208646657242166984120997` at $2,713), then `false`, then `0xE03A1074c86CFeDd5C142C4F04F1a1536e203543` (the arbitrage router points at the PoolManager).
 
@@ -2837,7 +2837,7 @@ Expected: four `poolId OK` lines, then `{"dyn":[8388608,8388608],"hooksMatch":tr
 - [x] **Step 4: Smoke test: a report through the real mock forwarder, then swaps on V and S**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 PUSH_REPORT=1 ./script/smoke.sh http://127.0.0.1:8545 ../shared/deployments/anvil.json live
+cd ~/Development/hackathons/clim/contracts && PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 PUSH_REPORT=1 ./script/smoke.sh http://127.0.0.1:8545 ../shared/deployments/anvil.json live
 ```
 Expected:
 ```
@@ -2851,7 +2851,7 @@ S swap fee (pips): 600
 - [x] **Step 5: Stop the fork and remove the dry-run outputs**
 
 ```bash
-pkill -f "anvil --fork-url"; rm -rf /Users/fianso/Development/hackathons/clim/contracts/deployments/31337 /Users/fianso/Development/hackathons/clim/shared/deployments/anvil.json; cd /Users/fianso/Development/hackathons/clim && git status --short
+pkill -f "anvil --fork-url"; rm -rf ~/Development/hackathons/clim/contracts/deployments/31337 ~/Development/hackathons/clim/shared/deployments/anvil.json; cd ~/Development/hackathons/clim && git status --short
 ```
 Expected: `git status --short` shows no file under `contracts/deployments/`, `contracts/broadcast/`, or `shared/deployments/anvil.json`. Broadcasts on chain 31337 are gitignored.
 
@@ -2865,7 +2865,7 @@ Append under `## Contracts (plan 01)` in `docs/sessions/2026-10-06.md`:
   - Swap fees: V paid `quoteFee()`, S paid its static fee.
 ```
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/sessions/2026-10-06.md && git commit -m "docs(sessions): contracts dry run on a Sepolia fork"
+cd ~/Development/hackathons/clim && git add docs/sessions/2026-10-06.md && git commit -m "docs(sessions): contracts dry run on a Sepolia fork"
 ```
 
 ### Task 16: GATE, then deploy the live suite to Sepolia
@@ -2880,7 +2880,7 @@ cd /Users/fianso/Development/hackathons/clim && git add docs/sessions/2026-10-06
 - [x] **Step 1: Gate checks**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && set -a && source .env && set +a && \
+cd ~/Development/hackathons/clim/contracts && set -a && source .env && set +a && \
 jq -e '(.decidedBy | (startswith("PROVISIONAL") or startswith("FIXTURE"))) | not' ../shared/params.json && \
 jq -e '.staticFeePips > 0 and .replayStaticFeePips != .staticFeePips and .feeMinPips <= .feeSafePips and .feeSafePips <= .feeMaxPips' ../shared/params.json && \
 cast balance $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $SEPOLIA_RPC_URL --ether && \
@@ -2893,7 +2893,7 @@ Expected: `true`, `true`, a balance of at least `0.05`, and `76 tests passed, 0 
 Sepolia runs Glamsterdam (its block headers carry `blockAccessListHash` and `slotNumber`), whose gas schedule makes contract creation and new storage several times more expensive than the `cancun` schedule `forge` simulates locally: on 2026-10-06 the first `00_Tokens` transaction ran out of gas (tx `0xe853dba51848b0bd0aa005095ceb474ea56370688429e9d82df8ed00661d6312`, limit 862,119 from the local simulation, where the node estimates 4,350,932). Every Sepolia `forge script --broadcast` therefore passes `--skip-simulation`: forge then asks the node (`eth_estimateGas`, times 1.3) for each transaction's gas right before sending it, one at a time (foundry v1.4.2 `crates/script/src/broadcast.rs`, `estimate_via_rpc`). Measured: `TestToken` about 4.3M gas, `PoolSwapTest` 9.4M, the whole live suite about 0.04 ETH at 0.95 gwei.
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && \
+cd ~/Development/hackathons/clim/contracts && \
 ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; } && \
 ok forge script script/00_Tokens.s.sol --rpc-url sepolia --broadcast --slow --skip-simulation && \
 SUITE=live ok forge script script/01_DeployDesk.s.sol --rpc-url sepolia --broadcast --slow --skip-simulation && \
@@ -2905,7 +2905,7 @@ Expected: three `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.` lines and three JSON 
 - [x] **Step 3: Create the pools at the current ETH price and add liquidity**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && export INIT_ETH_USD=$(curl -s https://api.coinbase.com/v2/prices/ETH-USD/spot | jq -r '.data.amount | tonumber | floor') && echo "INIT_ETH_USD=$INIT_ETH_USD" && \
+cd ~/Development/hackathons/clim/contracts && export INIT_ETH_USD=$(curl -s https://api.coinbase.com/v2/prices/ETH-USD/spot | jq -r '.data.amount | tonumber | floor') && echo "INIT_ETH_USD=$INIT_ETH_USD" && \
 ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; } && \
 SUITE=live ok forge script script/03_CreatePools.s.sol --rpc-url sepolia --broadcast --slow --skip-simulation && \
 SUITE=live ok forge script script/04_AddLiquidity.s.sol --rpc-url sepolia --broadcast --slow --skip-simulation
@@ -2915,14 +2915,14 @@ Expected: a plausible price (`INIT_ETH_USD=2713` on 2026-10-06), then two `ONCHA
 - [x] **Step 4: Write shared/deployments/sepolia.json and the ABIs**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; } && ok forge script script/05_WriteDeployments.s.sol --rpc-url sepolia && ./script/export-abis.sh >/dev/null && jq -c '{chainId, riskDesks, hooks, routers, liveS: .pools.liveS.key.fee, liq: .liquidity.live}' ../shared/deployments/sepolia.json
+cd ~/Development/hackathons/clim/contracts && ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; } && ok forge script script/05_WriteDeployments.s.sol --rpc-url sepolia && ./script/export-abis.sh >/dev/null && jq -c '{chainId, riskDesks, hooks, routers, liveS: .pools.liveS.key.fee, liq: .liquidity.live}' ../shared/deployments/sepolia.json
 ```
-Expected: `Script ran successfully.`, then one JSON line: `chainId` is 11155111, `riskDesks.live`, `hooks.live` and `routers.arb` are addresses, `replay` and `don` are null, and `liveS` is `staticFeePips`. If plan 04 is set up (`shared/src/config.ts`), also run `cd /Users/fianso/Development/hackathons/clim/shared && bun test test/config.test.ts`. Expected: ` 0 fail`.
+Expected: `Script ran successfully.`, then one JSON line: `chainId` is 11155111, `riskDesks.live`, `hooks.live` and `routers.arb` are addresses, `replay` and `don` are null, and `liveS` is `staticFeePips`. If plan 04 is set up (`shared/src/config.ts`), also run `cd ~/Development/hackathons/clim/shared && bun test test/config.test.ts`. Expected: ` 0 fail`.
 
 - [x] **Step 5: Smoke on Sepolia (no report pushed: the first report must come from CRE)**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && set -a && source .env && set +a && ./script/smoke.sh "$SEPOLIA_RPC_URL" ../shared/deployments/sepolia.json live
+cd ~/Development/hackathons/clim/contracts && set -a && source .env && set +a && ./script/smoke.sh "$SEPOLIA_RPC_URL" ../shared/deployments/sepolia.json live
 ```
 Expected:
 - `quoteFee before: 3000 2` (blind: the desk has never reported);
@@ -2940,7 +2940,7 @@ Append under `## Contracts (plan 01)` in `docs/sessions/2026-10-06.md`:
   - Next: plan 02 points the workflow at `riskDesks.live`, with `CRE_ETH_PRIVATE_KEY` = the deployer key.
 ```
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/deployments/11155111 contracts/broadcast shared/deployments/sepolia.json shared/abis docs/sessions/2026-10-06.md && git commit -m "deploy(contracts): live clim suite on Sepolia (tokens, RiskDesk, ClimHook, twin pools)" && git show --stat --oneline HEAD | cat
+cd ~/Development/hackathons/clim && git add contracts/deployments/11155111 contracts/broadcast shared/deployments/sepolia.json shared/abis docs/sessions/2026-10-06.md && git commit -m "deploy(contracts): live clim suite on Sepolia (tokens, RiskDesk, ClimHook, twin pools)" && git show --stat --oneline HEAD | cat
 ```
 Expected: the commit lists `contracts/deployments/11155111/{tokens,desk-live,hook-live,pools-live,liquidity-live}.json`, the `contracts/broadcast/*/11155111/` run files, `shared/deployments/sepolia.json`, `shared/abis/*.json` and the session log. Neither `contracts/.env` nor `contracts/cache/` appears.
 
@@ -2955,7 +2955,7 @@ Expected: the commit lists `contracts/deployments/11155111/{tokens,desk-live,hoo
 - [x] **Step 1: Verify the four contracts**
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && set -a && source .env && set +a && D=../shared/deployments/sepolia.json && P=../shared/params.json && DEPLOYER=$(jq -r .deployer $D) && \
+cd ~/Development/hackathons/clim/contracts && set -a && source .env && set +a && D=../shared/deployments/sepolia.json && P=../shared/params.json && DEPLOYER=$(jq -r .deployer $D) && \
 forge verify-contract $(jq -r .tokens.tETH.address $D) src/test-tokens/TestToken.sol:TestToken --chain sepolia --etherscan-api-key $ETHERSCAN_API_KEY --watch --constructor-args $(cast abi-encode "constructor(string,string,address,uint256)" "clim test ETH" "tETH" $DEPLOYER 10000000000000000000) && \
 forge verify-contract $(jq -r .tokens.tUSD.address $D) src/test-tokens/TestToken.sol:TestToken --chain sepolia --etherscan-api-key $ETHERSCAN_API_KEY --watch --constructor-args $(cast abi-encode "constructor(string,string,address,uint256)" "clim test USD" "tUSD" $DEPLOYER 25000000000000000000000) && \
 forge verify-contract $(jq -r .riskDesks.live $D) src/RiskDesk.sol:RiskDesk --chain sepolia --etherscan-api-key $ETHERSCAN_API_KEY --watch --constructor-args $(cast abi-encode "constructor(address,address,bool)" $(jq -r .cre.mockForwarder $D) $DEPLOYER false) && \
@@ -2970,7 +2970,7 @@ Append under `## Contracts (plan 01)`:
 - **Sepolia contracts verified** (tETH, tUSD, live RiskDesk, live ClimHook): source readable on Etherscan for the judges.
 ```
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add docs/sessions/2026-10-06.md && git commit -m "docs(sessions): Sepolia contracts verified"
+cd ~/Development/hackathons/clim && git add docs/sessions/2026-10-06.md && git commit -m "docs(sessions): Sepolia contracts verified"
 ```
 
 ### Task 18: Replay suite on Sepolia (P1)
@@ -2986,7 +2986,7 @@ cd /Users/fianso/Development/hackathons/clim && git add docs/sessions/2026-10-06
 
 The replay desk gets its own `simOperator`, so the live and replay CRE loops (both running for hours) never send from the same key and never race for a nonce. `simOperator` is immutable per desk, which is why this happens before the deployment. The key is written without being printed (only its address is shown) and funded with 0.2 Sepolia ETH from the deployer: one report every 30 s for the 4.5 h of the replay costs about 0.1 ETH at 1 gwei.
 ```bash
-cd /Users/fianso/Development/hackathons/clim && test -d cre && { test -f cre/.env.replay || { K=$(cast wallet new --json | jq -r '.[0].private_key'); printf '# Replay desk operator (simOperator of riskDesks.replay, plan 01 Task 18). Testnet only, never committed.\nCRE_ETH_PRIVATE_KEY=%s\nSEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com\n' "${K#0x}" > cre/.env.replay; }; } && git check-ignore -q cre/.env.replay && echo IGNORED_OK && \
+cd ~/Development/hackathons/clim && test -d cre && { test -f cre/.env.replay || { K=$(cast wallet new --json | jq -r '.[0].private_key'); printf '# Replay desk operator (simOperator of riskDesks.replay, plan 01 Task 18). Testnet only, never committed.\nCRE_ETH_PRIVATE_KEY=%s\nSEPOLIA_RPC_URL=https://ethereum-sepolia-rpc.publicnode.com\n' "${K#0x}" > cre/.env.replay; }; } && git check-ignore -q cre/.env.replay && echo IGNORED_OK && \
 R=$(cast wallet address --private-key "0x$(grep '^CRE_ETH_PRIVATE_KEY=' cre/.env.replay | cut -d= -f2)") && echo "replay operator $R" && \
 cd contracts && set -a && source .env && set +a && cast send "$R" --value 0.2ether --private-key "$PRIVATE_KEY" --rpc-url "$SEPOLIA_RPC_URL" | grep -E "^status" && cast balance "$R" --rpc-url "$SEPOLIA_RPC_URL" --ether
 ```
@@ -2996,7 +2996,7 @@ Expected: `IGNORED_OK`, `replay operator 0x<address>`, `status               1 (
 
 The replay window starts at 2026-02-04 12:00 UTC, which is 1770206400000 ms; its first Binance close was $2,254.
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && export SIM_OPERATOR=$(cast wallet address --private-key "0x$(grep '^CRE_ETH_PRIVATE_KEY=' ../cre/.env.replay | cut -d= -f2)") && echo "SIM_OPERATOR=$SIM_OPERATOR" && \
+cd ~/Development/hackathons/clim/contracts && export SIM_OPERATOR=$(cast wallet address --private-key "0x$(grep '^CRE_ETH_PRIVATE_KEY=' ../cre/.env.replay | cut -d= -f2)") && echo "SIM_OPERATOR=$SIM_OPERATOR" && \
 export INIT_ETH_USD=$(curl -s "https://data-api.binance.vision/api/v3/klines?symbol=ETHUSDT&interval=1m&startTime=1770206400000&limit=1" | jq -r '.[0][1] | tonumber | floor') && echo "INIT_ETH_USD=$INIT_ETH_USD" && \
 ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; } && \
 F=0; for s in 01_DeployDesk 02_DeployHook 03_CreatePools 04_AddLiquidity; do SUITE=replay ok forge script script/$s.s.sol --rpc-url sepolia --broadcast --slow --skip-simulation || { F=1; break; }; done; [ $F = 0 ] && \
@@ -3013,7 +3013,7 @@ Append under `## Contracts (plan 01)`:
 - **Replay suite deployed on Sepolia:** desk flagged REPLAY with its own operator key (`cre/.env.replay`, simOperator <address>), its own hook, V and S initialized at the replay window's first price (Binance ETHUSDT 2026-02-04 12:00 UTC).
 ```
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/deployments/11155111 contracts/broadcast shared/deployments/sepolia.json docs/sessions/2026-10-06.md && git commit -m "deploy(contracts): replay suite on Sepolia"
+cd ~/Development/hackathons/clim && git add contracts/deployments/11155111 contracts/broadcast shared/deployments/sepolia.json docs/sessions/2026-10-06.md && git commit -m "deploy(contracts): replay suite on Sepolia"
 ```
 
 ### Task 19: DON desk on Sepolia (only when plan 02 Task 13 asks for it)
@@ -3028,14 +3028,14 @@ cd /Users/fianso/Development/hackathons/clim && git add contracts/deployments/11
 - [ ] **Step 1: Deploy the DON desk (production forwarder; simulation mode is switched off in the same broadcast)** **Cut (2026-10-07):** the DON deployment is cut with plan 02 Task 13 (master cut list item 1): `cre whoami` still printed `Deploy Access: Not enabled` about 6.5 h after the access request of 2026-10-06 22:56 SGT (friction log row 6) and again at 07:17 SGT on 2026-10-07 (23:17 UTC on 2026-10-06), over 8 h after it, so no DON can write to a DON desk and clim stays on `simulate --broadcast` through `MockKeystoneForwarder`; `riskDesks.don` stays null in `shared/deployments/sepolia.json` and no `desk-don.json` exists.
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim/contracts && ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; } && SUITE=don ok forge script script/01_DeployDesk.s.sol --rpc-url sepolia --broadcast --slow --skip-simulation && ok forge script script/05_WriteDeployments.s.sol --rpc-url sepolia && cat deployments/11155111/desk-don.json
+cd ~/Development/hackathons/clim/contracts && ok(){ out=$("$@" 2>&1); echo "$out" | grep -E "ONCHAIN EXECUTION COMPLETE|Error" || echo "$out" | grep -E "Script ran successfully"; ! echo "$out" | grep -q "Error"; } && SUITE=don ok forge script script/01_DeployDesk.s.sol --rpc-url sepolia --broadcast --slow --skip-simulation && ok forge script script/05_WriteDeployments.s.sol --rpc-url sepolia && cat deployments/11155111/desk-don.json
 ```
 Expected: `ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.`, `Script ran successfully.`, and a fragment with `"forwarder": "0xF8344CFd5c43616a4366C34E3EEE75af79a74482"` and `"simMode": false`. `riskDesks.don` is now set in `shared/deployments/sepolia.json`. Plan 02's later `cast send <don desk> "disableSim()"` is then a harmless no-op.
 
 - [ ] **Step 2: Commit** **Cut (2026-10-07):** nothing to commit, Step 1 is cut with plan 02 Task 13 (master cut list item 1, CRE deploy access never enabled).
 
 ```bash
-cd /Users/fianso/Development/hackathons/clim && git add contracts/deployments/11155111/desk-don.json contracts/broadcast shared/deployments/sepolia.json && git commit -m "deploy(contracts): DON RiskDesk on the production KeystoneForwarder"
+cd ~/Development/hackathons/clim && git add contracts/deployments/11155111/desk-don.json contracts/broadcast shared/deployments/sepolia.json && git commit -m "deploy(contracts): DON RiskDesk on the production KeystoneForwarder"
 ```
 
 ---

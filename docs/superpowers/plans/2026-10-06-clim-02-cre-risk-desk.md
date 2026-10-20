@@ -13,7 +13,7 @@
 ## Before you start (read once)
 
 ### Where commands run
-- Repo root: `/Users/fianso/Development/hackathons/clim`. Every command in this plan starts from the repo root. Commands that need another directory start with `cd`, inside a subshell `( ... )` so the next command starts from the root again.
+- Repo root: `~/Development/hackathons/clim`. Every command in this plan starts from the repo root. Commands that need another directory start with `cd`, inside a subshell `( ... )` so the next command starts from the root again.
 - The CRE project root is `cre/` (it holds `project.yaml`), and the workflow folder is `cre/risk-desk/`. Run `cre workflow ...` from `cre/` and `bun ...` from `cre/risk-desk/`.
 
 ### Facts verified while writing this plan (2026-10-06)

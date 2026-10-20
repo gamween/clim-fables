@@ -222,7 +222,7 @@ cd bots && bun run live:status --watch     # a snapshot every 15 s, with each jo
 
 `live:install` resolves `bun` and `cre` on PATH and writes their absolute paths into the plists; rerun it after moving the repository or reinstalling either tool (it reloads the jobs). `bun run live:install <name>` (re)installs one job. The plists carry only `HOME` and `PATH`: the keys stay in `bots/.env` and `cre/.env`, read by the processes as when started by hand. The desk job runs the CRE CLI as this user, so `cre whoami` must show a logged-in account.
 
-Nothing in this stack keeps the Mac awake: sleep is the maintainer's (his Pauline app owns `pmset disablesleep`). While the Mac sleeps the stack pauses and the pools fall back as 8.6 describes; the outage is recorded, and every job resumes on wake.
+Nothing in this stack keeps the Mac awake: sleep is the maintainer's to manage (`pmset` is left alone). While the Mac sleeps the stack pauses and the pools fall back as 8.6 describes; the outage is recorded, and every job resumes on wake.
 
 ### 8.4 Check and stop
 
@@ -281,4 +281,4 @@ A window has `from` (the `tObs` of the last report before the silence), `to` (th
 - After a reboot: nothing to do once the maintainer logs in (LaunchAgents start with his session; with nobody logged in, nothing runs and the outage lasts until login).
 - After a crash: launchd restarts the job 30 s after its last start. A job that keeps exiting shows its `last exit` code in `live:status`: read `bun run live:logs <name>`, fix the cause, then `launchctl kickstart -k gui/$(id -u)/fi.clim-fables.<name>`.
 - Offline: the processes back off and retry; the desk's failed CRE runs are recorded in `bots/out/desk-runs.jsonl`; everything resumes with the network.
-- Never add `caffeinate` or change `pmset`: the Mac's sleep is the maintainer's (Pauline).
+- Never add `caffeinate` or change `pmset`: the Mac's sleep is the maintainer's to manage.

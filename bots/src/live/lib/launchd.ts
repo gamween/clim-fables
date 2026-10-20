@@ -3,7 +3,7 @@
 // each process reads bots/.env (Bun, from its WorkingDirectory bots/) or cre/.env (the CRE CLI) as when started by hand.
 // RunAtLoad and KeepAlive bring every job back after a reboot (the plists stay in ~/Library/LaunchAgents) and after a
 // crash (no sooner than ThrottleInterval after its last start). Nothing here keeps the Mac awake: sleep is the
-// maintainer's (his Pauline app), and outages are recorded (scripts/outages.ts), not prevented.
+// maintainer's to manage, and outages are recorded (scripts/outages.ts), not prevented.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { constants } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";

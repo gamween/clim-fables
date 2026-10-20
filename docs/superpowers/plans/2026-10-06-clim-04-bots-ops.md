@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Where commands run:** every command in this plan runs from the repository root, `/Users/fianso/Development/hackathons/clim`, unless it starts with its own `cd` (`cd shared && ...`, `cd bots && ...`). Launch Claude Code with that folder as its working directory, or prefix each command with `cd /Users/fianso/Development/hackathons/clim && `: agent shells reset to the launch folder between calls.
+> **Where commands run:** every command in this plan runs from the repository root, `~/Development/hackathons/clim`, unless it starts with its own `cd` (`cd shared && ...`, `cd bots && ...`). Launch Claude Code with that folder as its working directory, or prefix each command with `cd ~/Development/hackathons/clim && `: agent shells reset to the launch folder between calls.
 
 **Goal:** Build `shared/`, the single TypeScript source of truth (units, the fee formula mirror, price math, the CRE report encoding, ABIs, deployments and parameters), and `bots/` (arbitrageur, retail flow, CRE run recorder around plan 02's simulation loop, replay server, funding, status and forged-report scripts), plus the run-book that starts everything on Ethereum Sepolia.
 
