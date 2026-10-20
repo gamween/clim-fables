@@ -36,6 +36,15 @@
   flex-direction: column;
   gap: 48px;
 }
+/* Fables' markets page starts 16 px higher than its landing (title at y 152 against the hero's 168 at 1450 px), with
+   its head stats on the title's top line, and 32 px between the head and the summary rail. */
+.marketsPage {
+  margin-top: -16px;
+}
+.marketsPage > .pageHead {
+  align-items: flex-start;
+  margin-bottom: -16px;
+}
 .filterBar {
   display: flex;
   justify-content: space-between;

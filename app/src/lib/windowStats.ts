@@ -1,6 +1,6 @@
 // The statistics of one fee window, computed the same way by the pages and by the live check (e2e/live.spec.ts), so
 // the check compares like with like: the page's numbers against a fresh read of the same blocks.
-import { overrideSteps, peakAndLow, pokeCount, timeWeightedAverage, type Direction, type FeeStep, type HookConfig, type PokeEvent } from "./fees";
+import { climQuoteOf, climSteps, overrideSteps, peakAndLow, pokeCount, timeWeightedAverage, type ClimPoint, type Direction, type FeeStep, type HookConfig, type PokeEvent } from "./fees";
 import type { SwapRow } from "./chain/decode";
 
 export type FeeWindow = { fromTs: number; toTs: number; steps: FeeStep[]; avg: number | null; peak: number | null; low: number | null; changes: number };
@@ -17,4 +17,17 @@ export type SwapWindow = { count: number; meanFeePips: number | null };
 /** Swaps of a window whose blocks were chosen from timestamps (useLogHistory): every swap read is in the window. */
 export function swapWindow(swaps: readonly SwapRow[]): SwapWindow {
   return { count: swaps.length, meanFeePips: swaps.length ? swaps.reduce((a, x) => a + x.feePips, 0) / swaps.length : null };
+}
+
+export type ClimWindow = { fromTs: number; toTs: number; steps: FeeStep[]; avg: number | null };
+
+/** clim's recommendation over a window, one step per report (its symmetric quote in both directions), and its
+ *  time-weighted average. */
+export function climWindow(points: readonly ClimPoint[], toTs: number, windowSec: number): ClimWindow {
+  const fromTs = toTs - windowSec;
+  const steps = climSteps(points, fromTs, toTs).map((x) => {
+    const q = climQuoteOf(x);
+    return { ...x, fee0For1: q, fee1For0: q };
+  });
+  return { fromTs, toTs, steps, avg: timeWeightedAverage(steps, toTs, "0For1") };
 }

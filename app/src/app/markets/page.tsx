@@ -1,11 +1,12 @@
 import { MarketsHeadStats } from "@/components/markets/MarketsHeadStats";
+import { MarketsSummary } from "@/components/markets/MarketsSummary";
 import { MarketsTable } from "@/components/markets/MarketsTable";
 import { Card } from "@/components/ui/kit";
 import p from "@/components/pages.module.css";
 
 export default function MarketsPage() {
   return (
-    <div className={p.stack} data-qa="page">
+    <div className={`${p.stack} ${p.marketsPage}`} data-qa="page">
       <div className={p.pageHead}>
         <div>
           <h1 className={p.pageTitle} data-qa="page-title">
@@ -15,6 +16,7 @@ export default function MarketsPage() {
         </div>
         <MarketsHeadStats />
       </div>
+      <MarketsSummary />
       <Card>
         <MarketsTable filterable />
       </Card>

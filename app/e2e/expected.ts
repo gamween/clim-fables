@@ -6,7 +6,7 @@ const pool = (n: string) => [...fee(`pool:${n}`), `pool:${n}:price`, ...window(`
 
 export const EXPECTED: Record<string, string[]> = {
   "/": ["fables:fee0For1", "clim:quote", "clim:seq"],
-  "/markets": [...fee("fables"), "fables:price", "fables:changes", "clim:seq", ...["D", "K", "F"].flatMap((n) => [...fee(`pool:${n}`), `pool:${n}:price`])],
+  "/markets": [...fee("fables"), "fables:price", "fables:changes", "fables:avg", "clim:avg", "clim:seq", ...["D", "K", "F"].flatMap((n) => [...fee(`pool:${n}`), `pool:${n}:price`])],
   "/markets/eth": [...fee("fables"), "fables:price", ...window("fables"), "clim:quote", ...fee("clim"), "clim:mode", "clim:seq", "clim:tObs", "desk:sigma5", "desk:dev"],
   "/markets/d": [...pool("D"), "pool:D:meanSwapFee"],
   "/markets/k": [...pool("K"), "pool:K:meanSwapFee"],

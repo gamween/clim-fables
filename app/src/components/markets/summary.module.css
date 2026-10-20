@@ -1,0 +1,160 @@
+/* Fables' markets summary rail (inventory §2.2): two 208 px cards side by side, scroll-snapping under 900 px. */
+.railOuter {
+  overflow: hidden;
+  margin: -2px;
+  padding: 2px;
+}
+.rail {
+  display: flex;
+  gap: var(--s6);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+.rail::-webkit-scrollbar {
+  display: none;
+}
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 calc((100% - var(--s6)) / 2);
+  min-width: min(320px, 100%);
+  height: 208px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  background-image: var(--dot-grid);
+  background-size: var(--dot-grid-size);
+  box-shadow: var(--shadow-table);
+  overflow: clip;
+  scroll-snap-align: start;
+}
+.head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4) var(--s1);
+  pointer-events: none;
+}
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s0);
+  min-width: 0;
+}
+.label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s1);
+  min-height: 18px;
+  color: var(--ink-secondary);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: -0.22px;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+.big {
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1.2;
+  font-variant-numeric: lining-nums tabular-nums;
+  white-space: nowrap;
+}
+.caption {
+  min-height: 20px;
+  color: var(--ink-secondary);
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: -0.22px;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.bigSkeleton {
+  display: block;
+  width: 120px;
+  height: 24px;
+  margin: 2px 0;
+  border-radius: 6px;
+  background: var(--skeleton);
+  animation: wait 1.5s ease-in-out infinite;
+}
+.plotBox {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.plotWait {
+  display: flex;
+  height: 100%;
+  padding: 0 var(--s4) var(--s3);
+}
+.plotSkeleton {
+  flex: 1;
+  border-radius: 8px;
+  background: var(--skeleton);
+  animation: wait 1.5s ease-in-out infinite;
+}
+@keyframes wait {
+  50% {
+    opacity: 0.4;
+  }
+}
+.hit {
+  position: absolute;
+  inset: 0;
+}
+.plot {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--brand);
+}
+.series {
+  animation: reveal 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+}
+@keyframes reveal {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.crosshair {
+  stroke: var(--line-interactive);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.column {
+  fill: var(--hover);
+}
+.columnIdle {
+  fill: transparent;
+}
+.bar {
+  transition: fill-opacity var(--dur-fast) var(--ease-std);
+}
+.bar[data-dim="on"] {
+  fill-opacity: 0.4;
+}
+@media (max-width: 900px) {
+  .card {
+    flex-basis: min(100%, 480px);
+  }
+}
+@media (max-width: 575px) {
+  .plotBox {
+    pointer-events: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .series {
+    animation: none;
+  }
+}

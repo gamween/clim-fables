@@ -6,9 +6,9 @@ import { robinhood, robinhoodTestnet } from "viem/chains";
 import { LIVE } from "../src/lib/chain/deployments";
 import { hookViewAbi } from "../src/lib/chain/events";
 import { FABLES } from "../src/lib/chain/fables";
-import { readPoolOverrides } from "../src/lib/chain/readClim";
+import { readClimPoints, readPoolOverrides } from "../src/lib/chain/readClim";
 import { readFablesPokes, readSwaps } from "../src/lib/chain/readFables";
-import { feeWindow, swapWindow } from "../src/lib/windowStats";
+import { climWindow, feeWindow, swapWindow } from "../src/lib/windowStats";
 
 export type LiveElement = { key: string; chain: string; block: string; raw: string; text: string; fromBlock?: string; toBlock?: string; fromTs?: string; toTs?: string; source?: string; cacheBlock?: string };
 
@@ -45,6 +45,10 @@ export async function resolve(e: LiveElement): Promise<string> {
     if (a === "fee0For1" || a === "fee1For0") {
       const [f01, f10] = await testnet.readContract({ address: LIVE.policy, abi: climFeePolicyAbi, functionName: "quoteDirectional", blockNumber });
       return String(a === "fee0For1" ? f01 : f10);
+    }
+    if (a === "avg") {
+      const r = range(e);
+      return String(climWindow(await readClimPoints(testnet, r.fromBlock, r.toBlock), r.toTs, r.toTs - r.fromTs).avg);
     }
     const [tObs, seq] = await testnet.readContract({ address: LIVE.policy, abi: climFeePolicyAbi, functionName: "lastObservation", blockNumber });
     return String(a === "seq" ? seq : tObs);
