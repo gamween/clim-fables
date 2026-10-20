@@ -89,10 +89,10 @@ export function MarketsTable({ filterable = false, limit }: { filterable?: boole
                 <tr key={r.key} data-market={r.key}>
                   <td>
                     <Link href={r.href} className={p.marketCell}>
-                      <PairLogo size={40} />
+                      <PairLogo size={40} test={r.network === "testnet"} />
                       <span>
                         <span className={p.marketName}>{r.name}</span>
-                        <AssetBadge name={r.asset[0]} kind={r.asset[1]} />
+                        <AssetBadge name={r.asset[0]} kind={r.asset[1]} test={r.network === "testnet"} />
                       </span>
                     </Link>
                   </td>

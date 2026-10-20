@@ -45,7 +45,7 @@ export function PoolHeader({ title, network, sub, actions }: { title: string; ne
       </Link>
       <div className={p.identity}>
         <div className={p.identityLeft}>
-          <PairLogo size={61} />
+          <PairLogo size={61} test={network === "testnet"} />
           <div>
             <h1 className={p.pairTitle}>{title}</h1>
             <div className={p.pairSub}>

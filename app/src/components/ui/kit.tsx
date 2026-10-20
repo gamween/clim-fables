@@ -119,10 +119,10 @@ export function NetworkTag({ network }: { network: "mainnet" | "testnet" }) {
   );
 }
 
-export function AssetBadge({ name, kind }: { name: string; kind: string }) {
+export function AssetBadge({ name, kind, test = false }: { name: string; kind: string; test?: boolean }) {
   return (
     <span className={s.assetBadge}>
-      <EthMark size={12} />
+      <EthMark size={12} test={test} bare />
       <span>{name}</span>
       <span className={s.assetDivider} />
       <span>{kind}</span>
@@ -172,12 +172,12 @@ export function AddressLink({ href, children, title }: { href: string; children:
 }
 
 /** ETH and USDG as two halves of one circle (Fables' pair logo); USDG's mark is Fables' file, ETH's is clim's. */
-export function PairLogo({ size = 40 }: { size?: number }) {
+export function PairLogo({ size = 40, test = false }: { size?: number; test?: boolean }) {
   const half = size / 2 - 1;
   return (
     <span className={s.pair} style={{ width: size, height: size }} aria-hidden>
       <span className={s.pairHalf} style={{ left: 0, width: half }}>
-        <EthMark size={size} />
+        <EthMark size={size} test={test} />
       </span>
       <span className={s.pairHalf} style={{ right: 0, width: half }}>
         {/* eslint-disable-next-line @next/next/no-img-element -- a 2-colour SVG at a fixed size, nothing to optimise */}
